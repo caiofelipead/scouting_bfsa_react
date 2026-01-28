@@ -766,25 +766,21 @@ def main():
                 st.markdown(create_section_title("📈", "Rankings"), unsafe_allow_html=True)
                 st.plotly_chart(create_bar_chart(indices_values), use_container_width=True, config={'displayModeBar': False}, key="bar_rel")
             
-            st.markdown(create_section_title("📍", "Posicionamento vs Série B 2025"), unsafe_allow_html=True)
-            
-            # Filtrar apenas jogadores da Série B
-            wyscout_serie_b = wyscout[wyscout['Equipa'].isin(SERIE_B_TEAMS)]
-            st.caption(f"Comparando com {len(wyscout_serie_b)} jogadores da Série B 2025")
+            st.markdown(create_section_title("📍", "Posicionamento vs Liga"), unsafe_allow_html=True)
             
             col1, col2 = st.columns(2)
             with col1:
                 if posicao_rel in ['Atacante', 'Extremo']:
-                    fig = create_scatter_plot(wyscout_serie_b, 'Golos esperados/90', 'Assistências esperadas/90', jogador_rel, 'xG vs xA por 90 (Série B)')
+                    fig = create_scatter_plot(wyscout, 'Golos esperados/90', 'Assistências esperadas/90', jogador_rel, 'xG vs xA por 90')
                 else:
-                    fig = create_scatter_plot(wyscout_serie_b, 'Passes progressivos/90', 'Corridas progressivas/90', jogador_rel, 'Passes Prog. vs Corridas Prog. (Série B)')
+                    fig = create_scatter_plot(wyscout, 'Passes progressivos/90', 'Corridas progressivas/90', jogador_rel, 'Passes Prog. vs Corridas Prog.')
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="scatter1")
             
             with col2:
                 if posicao_rel in ['Zagueiro', 'Volante']:
-                    fig = create_scatter_plot(wyscout_serie_b, 'Duelos defensivos/90', 'Duelos defensivos ganhos, %', jogador_rel, 'Volume vs Eficiência Defensiva (Série B)')
+                    fig = create_scatter_plot(wyscout, 'Duelos defensivos/90', 'Duelos defensivos ganhos, %', jogador_rel, 'Volume vs Eficiência Defensiva')
                 else:
-                    fig = create_scatter_plot(wyscout_serie_b, 'Dribles/90', 'Dribles com sucesso, %', jogador_rel, 'Volume vs Eficiência 1x1 (Série B)')
+                    fig = create_scatter_plot(wyscout, 'Dribles/90', 'Dribles com sucesso, %', jogador_rel, 'Volume vs Eficiência 1x1')
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="scatter2")
             
             # SkillCorner - DADOS FÍSICOS
