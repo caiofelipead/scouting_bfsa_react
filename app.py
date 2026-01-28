@@ -44,22 +44,33 @@ st.markdown(f"""
     .stTabs [data-baseweb="tab"] {{ background: transparent; color: {COLORS['text_muted']}; font-weight: 500; border-radius: 8px; padding: 8px 16px; }}
     .stTabs [aria-selected="true"] {{ background: {COLORS['accent']} !important; color: white !important; }}
     
-    h1, h2, h3 {{ font-family: 'Inter', sans-serif; color: white !important; }}
+    /* Forçar textos brancos */
+    h1, h2, h3, h4, h5, h6 {{ font-family: 'Inter', sans-serif; color: #ffffff !important; }}
     p {{ font-family: 'Inter', sans-serif; color: {COLORS['text_secondary']}; }}
+    span {{ color: #ffffff; }}
     
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {{ color: white !important; }}
-    [data-testid="stSubheader"] {{ color: white !important; }}
-    .stSelectbox label {{ color: white !important; }}
-    .stRadio label {{ color: white !important; }}
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {{ color: #ffffff !important; }}
+    .stMarkdown p {{ color: #ffffff !important; }}
+    [data-testid="stSubheader"] {{ color: #ffffff !important; }}
     
-    .section-title {{
-        color: white !important;
-        font-size: 18px !important;
-        font-weight: 700 !important;
-        margin: 20px 0 15px 0 !important;
-        padding: 10px 0 !important;
-        border-bottom: 2px solid {COLORS['accent']} !important;
-    }}
+    /* Selectbox e inputs */
+    .stSelectbox label {{ color: #ffffff !important; }}
+    .stSelectbox div[data-baseweb="select"] {{ background: {COLORS['card']}; }}
+    .stRadio label {{ color: #ffffff !important; }}
+    .stTextInput label {{ color: #ffffff !important; }}
+    
+    /* Expander */
+    .streamlit-expanderHeader {{ color: #ffffff !important; background: {COLORS['card']} !important; }}
+    .streamlit-expanderContent {{ background: {COLORS['card']} !important; }}
+    
+    /* Dataframe */
+    .stDataFrame {{ background: {COLORS['card']}; }}
+    
+    /* Links */
+    a {{ color: {COLORS['accent']} !important; }}
+    
+    /* Info/Warning boxes */
+    .stAlert {{ background: {COLORS['card']} !important; color: #ffffff !important; }}
     
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
@@ -274,11 +285,11 @@ def create_legend_html():
 
 
 def create_section_title(icon, title):
-    """Cria título de seção bem visível"""
+    """Cria título de seção bem visível com fundo"""
     return f"""
-    <div style="display: flex; align-items: center; gap: 12px; margin: 30px 0 20px 0; padding-bottom: 12px; border-bottom: 3px solid {COLORS['accent']};">
-        <span style="font-size: 24px;">{icon}</span>
-        <span style="color: white; font-size: 20px; font-weight: 700;">{title}</span>
+    <div style="display: flex; align-items: center; gap: 12px; margin: 30px 0 20px 0; padding: 12px 16px; background: {COLORS['card']}; border-left: 4px solid {COLORS['accent']}; border-radius: 0 8px 8px 0;">
+        <span style="font-size: 22px;">{icon}</span>
+        <span style="color: #ffffff; font-size: 18px; font-weight: 700;">{title}</span>
     </div>
     """
 
@@ -349,10 +360,10 @@ def create_wyscout_radar(metrics_dict):
         polar=dict(
             radialaxis=dict(visible=False, range=[0, 150]),
             angularaxis=dict(visible=False, direction='clockwise'),
-            bgcolor='rgba(0,0,0,0)'
+            bgcolor=COLORS['bg']
         ),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor=COLORS['card'],
+        plot_bgcolor=COLORS['bg'],
         margin=dict(l=100, r=100, t=60, b=60),
         height=420,
         showlegend=False
@@ -382,19 +393,19 @@ def create_bar_chart(metrics_dict, title=""):
     
     fig.update_layout(
         title=dict(text=f"<b>{title}</b>", font=dict(size=16, color='white')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor=COLORS['card'],
+        plot_bgcolor=COLORS['bg'],
         xaxis=dict(
             range=[0, 100], 
-            gridcolor='rgba(255,255,255,0.08)', 
+            gridcolor='rgba(255,255,255,0.1)', 
             tickfont=dict(color='white', size=12),
             title=dict(text='<b>Percentil</b>', font=dict(color='white', size=13))
         ),
         yaxis=dict(
-            tickfont=dict(color='white', size=13, weight=500), 
+            tickfont=dict(color='white', size=13), 
             categoryorder='total ascending'
         ),
-        margin=dict(l=170, r=40, t=60, b=60),
+        margin=dict(l=180, r=40, t=60, b=60),
         height=max(320, len(categories) * 50 + 120)
     )
     
@@ -427,13 +438,13 @@ def create_comparison_radar(p1_data, p2_data, p1_name, p2_name):
         polar=dict(
             radialaxis=dict(visible=True, range=[0, 100], gridcolor='rgba(255,255,255,0.15)', tickfont=dict(color='white', size=11)),
             angularaxis=dict(gridcolor='rgba(255,255,255,0.15)', tickfont=dict(color='white', size=12, weight=500)),
-            bgcolor='rgba(0,0,0,0)'
+            bgcolor=COLORS['bg']
         ),
-        paper_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor=COLORS['card'],
         legend=dict(
             orientation='h', yanchor='bottom', y=1.1, xanchor='center', x=0.5, 
             font=dict(color='white', size=14, weight=600),
-            bgcolor='rgba(26,26,34,0.9)',
+            bgcolor=COLORS['card'],
             bordercolor='rgba(255,255,255,0.2)',
             borderwidth=1
         ),
@@ -493,8 +504,8 @@ def create_scatter_plot(df, x_col, y_col, highlight=None, title=""):
     
     fig.update_layout(
         title=dict(text=f"<b>{title}</b>", font=dict(size=17, color='white')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor=COLORS['card'],
+        plot_bgcolor=COLORS['bg'],
         xaxis=dict(
             title=dict(text=f"<b>{x_label}</b>", font=dict(color='white', size=14)),
             gridcolor='rgba(255,255,255,0.1)',
