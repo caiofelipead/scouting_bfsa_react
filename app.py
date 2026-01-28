@@ -54,14 +54,34 @@ st.markdown(f"""
     
     /* Forçar textos brancos */
     h1, h2, h3, h4, h5, h6 {{ font-family: 'Inter', sans-serif; color: #ffffff !important; }}
-    p, span, label, div {{ color: #ffffff; }}
+    p, label {{ color: #ffffff !important; }}
     
     .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown p {{ color: #ffffff !important; }}
     [data-testid="stSubheader"] {{ color: #ffffff !important; }}
     
-    /* Selectbox e inputs */
-    .stSelectbox label, .stRadio label, .stTextInput label {{ color: #ffffff !important; }}
-    .stSelectbox div[data-baseweb="select"] {{ background: {COLORS['card']}; }}
+    /* SELECTBOX - CORRIGIDO */
+    .stSelectbox label {{ color: #ffffff !important; }}
+    .stSelectbox > div > div {{ background-color: {COLORS['card']} !important; }}
+    .stSelectbox [data-baseweb="select"] {{ background-color: {COLORS['card']} !important; }}
+    .stSelectbox [data-baseweb="select"] > div {{ background-color: {COLORS['card']} !important; color: #ffffff !important; }}
+    
+    /* Dropdown menu options */
+    [data-baseweb="menu"] {{ background-color: {COLORS['card']} !important; }}
+    [data-baseweb="menu"] li {{ background-color: {COLORS['card']} !important; color: #ffffff !important; }}
+    [data-baseweb="menu"] li:hover {{ background-color: #2a2a35 !important; }}
+    [role="listbox"] {{ background-color: {COLORS['card']} !important; }}
+    [role="option"] {{ color: #ffffff !important; background-color: {COLORS['card']} !important; }}
+    [role="option"]:hover {{ background-color: #2a2a35 !important; }}
+    ul[data-testid="stSelectboxVirtualDropdown"] {{ background-color: {COLORS['card']} !important; }}
+    ul[data-testid="stSelectboxVirtualDropdown"] li {{ color: #ffffff !important; }}
+    
+    /* Radio buttons */
+    .stRadio label {{ color: #ffffff !important; }}
+    .stRadio [data-baseweb="radio"] {{ background-color: {COLORS['card']} !important; }}
+    
+    /* Text input */
+    .stTextInput label {{ color: #ffffff !important; }}
+    .stTextInput input {{ background-color: {COLORS['card']} !important; color: #ffffff !important; }}
     
     /* Expander */
     .streamlit-expanderHeader {{ color: #ffffff !important; background: {COLORS['card']} !important; }}
