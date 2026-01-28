@@ -90,4 +90,4 @@ scouting-dashboard/
 
 ---
 
-**Desenvolvido para Botafogo FC Ribeirão Preto**
+**Desenvolvido para Botafogo SA Ribeirão Preto**
