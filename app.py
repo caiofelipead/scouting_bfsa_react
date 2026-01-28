@@ -82,10 +82,45 @@ st.markdown(f"""
         font-weight: 700 !important;
     }}
     
-    h1, h2, h3, p {{ font-family: 'Inter', sans-serif; }}
+    h1, h2, h3 {{ 
+        font-family: 'Inter', sans-serif; 
+        color: {COLORS['text']} !important;
+    }}
+    
+    p {{ 
+        font-family: 'Inter', sans-serif;
+        color: {COLORS['text_secondary']};
+    }}
+    
+    .stSubheader {{
+        color: {COLORS['text']} !important;
+    }}
     
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
+    
+    /* Forçar cor branca nos títulos */
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {{
+        color: white !important;
+    }}
+    
+    [data-testid="stSubheader"] {{
+        color: white !important;
+    }}
+    
+    /* Labels dos selectbox */
+    .stSelectbox label {{
+        color: {COLORS['text_secondary']} !important;
+    }}
+    
+    /* Radio buttons */
+    .stRadio label {{
+        color: {COLORS['text_secondary']} !important;
+    }}
+    
+    .stRadio div[role="radiogroup"] label {{
+        color: {COLORS['text']} !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
