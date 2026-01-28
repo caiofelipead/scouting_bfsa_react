@@ -769,7 +769,13 @@ def main():
             st.markdown(create_section_title("📍", f"Posicionamento vs {posicao_rel}s da Liga"), unsafe_allow_html=True)
             
             # Filtrar jogadores da mesma posição
-            wyscout_pos = wyscout[wyscout['Posição'].apply(get_posicao_categoria) == posicao_rel]
+            wyscout_pos = wyscout[wyscout['Posição'].apply(get_posicao_categoria) == posicao_rel].copy()
+            
+            # SEMPRE incluir o jogador selecionado, mesmo que não seja da posição filtrada
+            jogador_row = wyscout[wyscout['Jogador'] == jogador_rel]
+            if len(jogador_row) > 0 and jogador_rel not in wyscout_pos['Jogador'].values:
+                wyscout_pos = pd.concat([wyscout_pos, jogador_row], ignore_index=True)
+            
             st.caption(f"Comparando com {len(wyscout_pos)} {posicao_rel.lower()}s da base")
             
             col1, col2 = st.columns(2)
