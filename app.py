@@ -194,6 +194,47 @@ def load_data(uploaded_file=None):
     skillcorner = pd.read_excel(xlsx, sheet_name='SkillCorner')
     wyscout = pd.read_excel(xlsx, sheet_name='WyScout')
     
+    # Criar coluna de display para diferenciar jogadores com nomes iguais
+    # Formato: "Jogador (Equipa)" ou "Jogador (Equipa, Idade)" se ainda duplicado
+    wyscout['JogadorDisplay'] = wyscout.apply(
+        lambda r: f"{r['Jogador']} ({r['Equipa']})" if pd.notna(r['Equipa']) else r['Jogador'], 
+        axis=1
+    )
+    
+    # Verificar duplicatas e adicionar idade para diferenciar
+    dup_mask = wyscout['JogadorDisplay'].duplicated(keep=False)
+    wyscout.loc[dup_mask, 'JogadorDisplay'] = wyscout.loc[dup_mask].apply(
+        lambda r: f"{r['Jogador']} ({r['Equipa']}, {int(r['Idade'])}a)" if pd.notna(r['Idade']) else f"{r['Jogador']} ({r['Equipa']}, {r['Posição']})",
+        axis=1
+    )
+    
+    # Se AINDA houver duplicatas (dados realmente duplicados), adicionar índice
+    dup_mask2 = wyscout['JogadorDisplay'].duplicated(keep=False)
+    if dup_mask2.any():
+        # Adicionar contador para cada duplicata
+        wyscout['_dup_count'] = wyscout.groupby('JogadorDisplay').cumcount() + 1
+        wyscout.loc[dup_mask2, 'JogadorDisplay'] = wyscout.loc[dup_mask2].apply(
+            lambda r: f"{r['JogadorDisplay']} #{r['_dup_count']}" if r['_dup_count'] > 1 else r['JogadorDisplay'],
+            axis=1
+        )
+        wyscout.drop('_dup_count', axis=1, inplace=True)
+    
+    # Criar coluna de display para SkillCorner também
+    skillcorner['PlayerDisplay'] = skillcorner.apply(
+        lambda r: f"{r['player_name']} ({r['team_name']})" if pd.notna(r['team_name']) else r['player_name'], 
+        axis=1
+    )
+    
+    # Verificar duplicatas no SkillCorner e adicionar contador
+    dup_mask_sc = skillcorner['PlayerDisplay'].duplicated(keep=False)
+    if dup_mask_sc.any():
+        skillcorner['_dup_count'] = skillcorner.groupby('PlayerDisplay').cumcount() + 1
+        skillcorner.loc[dup_mask_sc, 'PlayerDisplay'] = skillcorner.loc[dup_mask_sc].apply(
+            lambda r: f"{r['PlayerDisplay']} #{r['_dup_count']}" if r['_dup_count'] > 1 else r['PlayerDisplay'],
+            axis=1
+        )
+        skillcorner.drop('_dup_count', axis=1, inplace=True)
+    
     return analises, oferecidos, skillcorner, wyscout
 
 
@@ -511,28 +552,42 @@ def create_scatter_plot(df, x_col, y_col, highlight=None, title=""):
     fig.add_hline(y=y_mean, line_dash="dot", line_color="rgba(255,255,255,0.4)")
     fig.add_vline(x=x_mean, line_dash="dot", line_color="rgba(255,255,255,0.4)")
     
+    # Usar JogadorDisplay para hover e busca (diferencia nomes iguais)
+    display_col = 'JogadorDisplay' if 'JogadorDisplay' in df_valid.columns else 'Jogador' if 'Jogador' in df_valid.columns else 'player_name'
     name_col = 'Jogador' if 'Jogador' in df_valid.columns else 'player_name'
     
     fig.add_trace(go.Scatter(
         x=df_valid[x_col], y=df_valid[y_col],
         mode='markers',
         marker=dict(size=7, color='#6b7280', opacity=0.5),
-        text=df_valid[name_col],
+        text=df_valid[display_col],
         hovertemplate='<b>%{text}</b><br>%{x:.2f} | %{y:.2f}<extra></extra>',
         showlegend=False
     ))
     
-    if highlight and highlight in df_valid[name_col].values:
-        p = df_valid[df_valid[name_col] == highlight].iloc[0]
-        fig.add_trace(go.Scatter(
-            x=[p[x_col]], y=[p[y_col]],
-            mode='markers+text',
-            marker=dict(size=16, color=COLORS['accent'], line=dict(width=3, color='white')),
-            text=[highlight.split()[0]],
-            textposition='top center',
-            textfont=dict(color='white', size=13, weight=700),
-            showlegend=False
-        ))
+    # Highlight pode ser JogadorDisplay ou Jogador
+    if highlight:
+        # Tentar buscar por JogadorDisplay primeiro
+        if display_col in df_valid.columns and highlight in df_valid[display_col].values:
+            p = df_valid[df_valid[display_col] == highlight].iloc[0]
+            label = p[name_col].split()[0] if name_col in p else highlight.split()[0]
+        elif name_col in df_valid.columns and highlight in df_valid[name_col].values:
+            p = df_valid[df_valid[name_col] == highlight].iloc[0]
+            label = highlight.split()[0]
+        else:
+            p = None
+            label = None
+        
+        if p is not None:
+            fig.add_trace(go.Scatter(
+                x=[p[x_col]], y=[p[y_col]],
+                mode='markers+text',
+                marker=dict(size=16, color=COLORS['accent'], line=dict(width=3, color='white')),
+                text=[label],
+                textposition='top center',
+                textfont=dict(color='white', size=13, weight=700),
+                showlegend=False
+            ))
     
     # Labels MUITO VISÍVEIS
     x_label = x_col.replace('/90', ' /90').replace(', %', ' %')
@@ -673,7 +728,7 @@ def main():
     with tab2:
         st.markdown(create_section_title("📈", "Índices Compostos por Posição"), unsafe_allow_html=True)
         
-        jogadores_ws = sorted(wyscout['Jogador'].dropna().unique().tolist())
+        jogadores_ws = sorted(wyscout['JogadorDisplay'].dropna().unique().tolist())
         
         col1, col2 = st.columns([2, 1])
         with col1:
@@ -682,12 +737,12 @@ def main():
             categoria = st.selectbox("Categoria de Posição", list(INDICES_CONFIG.keys()), key='cat_indices')
         
         if jogador_ws:
-            player_ws = wyscout[wyscout['Jogador'] == jogador_ws].iloc[0]
+            player_ws = wyscout[wyscout['JogadorDisplay'] == jogador_ws].iloc[0]
             
             st.markdown(f"""
             <div style="background: {COLORS['card']}; border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid {COLORS['border']};">
                 <span style="color: {COLORS['accent']}; font-weight: 600;">{player_ws['Posição']}</span> | 
-                <span style="color: white; font-weight: 700; font-size: 18px;">{jogador_ws}</span> | 
+                <span style="color: white; font-weight: 700; font-size: 18px;">{player_ws['Jogador']}</span> | 
                 <span style="color: {COLORS['text_secondary']};">{player_ws['Equipa']} • {int(player_ws['Idade']) if pd.notna(player_ws['Idade']) else '-'} anos • {int(player_ws['Minutos jogados:']) if pd.notna(player_ws['Minutos jogados:']) else 0} min</span>
             </div>
             """, unsafe_allow_html=True)
@@ -728,17 +783,18 @@ def main():
     with tab3:
         st.markdown(create_section_title("📋", "Gráficos de Relatório"), unsafe_allow_html=True)
         
-        jogadores_ws = sorted(wyscout['Jogador'].dropna().unique().tolist())
+        jogadores_ws = sorted(wyscout['JogadorDisplay'].dropna().unique().tolist())
         
         col1, col2 = st.columns([2, 1])
         with col1:
-            jogador_rel = st.selectbox("Selecione o Jogador", jogadores_ws, key='rel_player')
+            jogador_rel_display = st.selectbox("Selecione o Jogador", jogadores_ws, key='rel_player')
         with col2:
             # SELETOR DE POSIÇÃO PARA O RELATÓRIO
             posicao_rel = st.selectbox("Posição para Índices", list(INDICES_CONFIG.keys()), key='pos_rel')
         
-        if jogador_rel:
-            player_rel = wyscout[wyscout['Jogador'] == jogador_rel].iloc[0]
+        if jogador_rel_display:
+            player_rel = wyscout[wyscout['JogadorDisplay'] == jogador_rel_display].iloc[0]
+            jogador_rel = player_rel['Jogador']  # Nome original para scatter
             
             st.markdown(f"""
             <div style="background: {COLORS['card']}; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 2px solid {COLORS['accent']};">
@@ -772,8 +828,8 @@ def main():
             wyscout_pos = wyscout[wyscout['Posição'].apply(get_posicao_categoria) == posicao_rel].copy()
             
             # SEMPRE incluir o jogador selecionado, mesmo que não seja da posição filtrada
-            jogador_row = wyscout[wyscout['Jogador'] == jogador_rel]
-            if len(jogador_row) > 0 and jogador_rel not in wyscout_pos['Jogador'].values:
+            jogador_row = wyscout[wyscout['JogadorDisplay'] == jogador_rel_display]
+            if len(jogador_row) > 0 and jogador_rel_display not in wyscout_pos['JogadorDisplay'].values:
                 wyscout_pos = pd.concat([wyscout_pos, jogador_row], ignore_index=True)
             
             st.caption(f"Comparando com {len(wyscout_pos)} {posicao_rel.lower()}s da base")
@@ -781,23 +837,23 @@ def main():
             col1, col2 = st.columns(2)
             with col1:
                 if posicao_rel in ['Atacante', 'Extremo']:
-                    fig = create_scatter_plot(wyscout_pos, 'Golos esperados/90', 'Assistências esperadas/90', jogador_rel, 'xG vs xA por 90')
+                    fig = create_scatter_plot(wyscout_pos, 'Golos esperados/90', 'Assistências esperadas/90', jogador_rel_display, 'xG vs xA por 90')
                 else:
-                    fig = create_scatter_plot(wyscout_pos, 'Passes progressivos/90', 'Corridas progressivas/90', jogador_rel, 'Passes Prog. vs Corridas Prog.')
+                    fig = create_scatter_plot(wyscout_pos, 'Passes progressivos/90', 'Corridas progressivas/90', jogador_rel_display, 'Passes Prog. vs Corridas Prog.')
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="scatter1")
             
             with col2:
                 if posicao_rel in ['Zagueiro', 'Volante']:
-                    fig = create_scatter_plot(wyscout_pos, 'Duelos defensivos/90', 'Duelos defensivos ganhos, %', jogador_rel, 'Volume vs Eficiência Defensiva')
+                    fig = create_scatter_plot(wyscout_pos, 'Duelos defensivos/90', 'Duelos defensivos ganhos, %', jogador_rel_display, 'Volume vs Eficiência Defensiva')
                 else:
-                    fig = create_scatter_plot(wyscout_pos, 'Dribles/90', 'Dribles com sucesso, %', jogador_rel, 'Volume vs Eficiência 1x1')
+                    fig = create_scatter_plot(wyscout_pos, 'Dribles/90', 'Dribles com sucesso, %', jogador_rel_display, 'Volume vs Eficiência 1x1')
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="scatter2")
             
             # SkillCorner - DADOS FÍSICOS
             st.markdown(create_section_title("🏃", "Dados Físicos SkillCorner"), unsafe_allow_html=True)
             
-            # Criar lista de jogadores SkillCorner para seleção
-            sc_players_list = skillcorner['player_name'].dropna().unique().tolist()
+            # Criar lista de jogadores SkillCorner para seleção (com time para diferenciar)
+            sc_players_list = skillcorner['PlayerDisplay'].dropna().unique().tolist()
             sc_players_list = sorted(sc_players_list)
             
             # Tentar match automático para sugerir
@@ -805,14 +861,15 @@ def main():
             default_idx = 0
             if sc_auto_match is not None:
                 try:
-                    default_idx = sc_players_list.index(sc_auto_match['player_name'])
+                    auto_display = f"{sc_auto_match['player_name']} ({sc_auto_match['team_name']})"
+                    default_idx = sc_players_list.index(auto_display)
                 except ValueError:
                     default_idx = 0
             
             # Selectbox para seleção manual
             col_sc1, col_sc2 = st.columns([3, 1])
             with col_sc1:
-                sc_selected_name = st.selectbox(
+                sc_selected_display = st.selectbox(
                     "Selecionar Jogador SkillCorner",
                     sc_players_list,
                     index=default_idx,
@@ -820,13 +877,17 @@ def main():
                     help="Match automático sugerido. Selecione outro se estiver incorreto."
                 )
             with col_sc2:
-                if sc_auto_match is not None and sc_selected_name == sc_auto_match['player_name']:
-                    st.markdown(f"<br><span style='color: {COLORS['elite']}; font-size: 12px;'>✓ Match automático</span>", unsafe_allow_html=True)
+                if sc_auto_match is not None:
+                    auto_display = f"{sc_auto_match['player_name']} ({sc_auto_match['team_name']})"
+                    if sc_selected_display == auto_display:
+                        st.markdown(f"<br><span style='color: {COLORS['elite']}; font-size: 12px;'>✓ Match automático</span>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"<br><span style='color: {COLORS['above']}; font-size: 12px;'>✎ Seleção manual</span>", unsafe_allow_html=True)
                 else:
                     st.markdown(f"<br><span style='color: {COLORS['above']}; font-size: 12px;'>✎ Seleção manual</span>", unsafe_allow_html=True)
             
             # Buscar jogador selecionado
-            sc_player = skillcorner[skillcorner['player_name'] == sc_selected_name].iloc[0] if sc_selected_name else None
+            sc_player = skillcorner[skillcorner['PlayerDisplay'] == sc_selected_display].iloc[0] if sc_selected_display else None
             
             if sc_player is not None:
                 count_match = sc_player.get('count_match', 0)
@@ -952,19 +1013,21 @@ def main():
     with tab4:
         st.markdown(create_section_title("🔄", "Comparar Jogadores"), unsafe_allow_html=True)
         
-        jogadores_ws = sorted(wyscout['Jogador'].dropna().unique().tolist())
+        jogadores_ws = sorted(wyscout['JogadorDisplay'].dropna().unique().tolist())
         
         col1, col2 = st.columns(2)
         with col1:
-            j1 = st.selectbox("Jogador 1", jogadores_ws, key='cmp1')
+            j1_display = st.selectbox("Jogador 1", jogadores_ws, key='cmp1')
         with col2:
-            j2 = st.selectbox("Jogador 2", jogadores_ws, index=min(1, len(jogadores_ws)-1), key='cmp2')
+            j2_display = st.selectbox("Jogador 2", jogadores_ws, index=min(1, len(jogadores_ws)-1), key='cmp2')
         
         categoria_cmp = st.selectbox("Categoria para comparação", list(INDICES_CONFIG.keys()), key='cat_cmp')
         
-        if j1 and j2 and j1 != j2:
-            p1 = wyscout[wyscout['Jogador'] == j1].iloc[0]
-            p2 = wyscout[wyscout['Jogador'] == j2].iloc[0]
+        if j1_display and j2_display and j1_display != j2_display:
+            p1 = wyscout[wyscout['JogadorDisplay'] == j1_display].iloc[0]
+            p2 = wyscout[wyscout['JogadorDisplay'] == j2_display].iloc[0]
+            j1 = p1['Jogador']  # Nome original
+            j2 = p2['Jogador']  # Nome original
             
             indices = INDICES_CONFIG.get(categoria_cmp, {})
             idx1 = {n: calculate_index(p1, m, wyscout) for n, m in indices.items()}
@@ -1010,21 +1073,33 @@ def main():
             # COMPARATIVO FÍSICO SKILLCORNER
             st.markdown(create_section_title("🏃", "Comparativo Físico (SkillCorner)"), unsafe_allow_html=True)
             
-            # Buscar jogadores no SkillCorner
-            sc_players_list = skillcorner['player_name'].dropna().unique().tolist()
+            # Buscar jogadores no SkillCorner (com time para diferenciar)
+            sc_players_list = sorted(skillcorner['PlayerDisplay'].dropna().unique().tolist())
             
             col_sc1, col_sc2 = st.columns(2)
             with col_sc1:
                 sc1_auto = find_skillcorner_player(j1, skillcorner)
-                sc1_default = sc_players_list.index(sc1_auto['player_name']) if sc1_auto is not None and sc1_auto['player_name'] in sc_players_list else 0
-                sc1_name = st.selectbox(f"SkillCorner: {j1}", sorted(sc_players_list), index=sc1_default, key='sc_cmp1')
+                sc1_default = 0
+                if sc1_auto is not None:
+                    try:
+                        auto_display = f"{sc1_auto['player_name']} ({sc1_auto['team_name']})"
+                        sc1_default = sc_players_list.index(auto_display)
+                    except ValueError:
+                        sc1_default = 0
+                sc1_display = st.selectbox(f"SkillCorner: {j1}", sc_players_list, index=sc1_default, key='sc_cmp1')
             with col_sc2:
                 sc2_auto = find_skillcorner_player(j2, skillcorner)
-                sc2_default = sc_players_list.index(sc2_auto['player_name']) if sc2_auto is not None and sc2_auto['player_name'] in sc_players_list else 0
-                sc2_name = st.selectbox(f"SkillCorner: {j2}", sorted(sc_players_list), index=sc2_default, key='sc_cmp2')
+                sc2_default = 0
+                if sc2_auto is not None:
+                    try:
+                        auto_display = f"{sc2_auto['player_name']} ({sc2_auto['team_name']})"
+                        sc2_default = sc_players_list.index(auto_display)
+                    except ValueError:
+                        sc2_default = 0
+                sc2_display = st.selectbox(f"SkillCorner: {j2}", sc_players_list, index=sc2_default, key='sc_cmp2')
             
-            sc1 = skillcorner[skillcorner['player_name'] == sc1_name].iloc[0] if sc1_name else None
-            sc2 = skillcorner[skillcorner['player_name'] == sc2_name].iloc[0] if sc2_name else None
+            sc1 = skillcorner[skillcorner['PlayerDisplay'] == sc1_display].iloc[0] if sc1_display else None
+            sc2 = skillcorner[skillcorner['PlayerDisplay'] == sc2_display].iloc[0] if sc2_display else None
             
             if sc1 is not None and sc2 is not None:
                 physical_metrics = {
