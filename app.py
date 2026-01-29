@@ -2,16 +2,225 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
+from urllib.parse import quote
 
 # ============================================
 # CONFIG
 # ============================================
 st.set_page_config(
-    page_title="Scouting Dashboard | Botafogo SA",
+    page_title="Scouting Dashboard | Botafogo-SP",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ============================================
+# GOOGLE SHEETS CONFIG
+# ============================================
+GOOGLE_SHEET_ID = "1IlCBif0Um_gGXPMa-VV9riYxkX3qAqeKxgQZppSlrjU"
+
+# ============================================
+# BANDEIRAS DE NACIONALIDADE
+# ============================================
+COUNTRY_FLAGS = {
+    'Brazil': '🇧🇷', 'Brasil': '🇧🇷', 'Brazilian': '🇧🇷',
+    'Argentina': '🇦🇷', 'Argentine': '🇦🇷', 'Argentinian': '🇦🇷',
+    'Uruguay': '🇺🇾', 'Uruguai': '🇺🇾', 'Uruguayan': '🇺🇾',
+    'Colombia': '🇨🇴', 'Colômbia': '🇨🇴', 'Colombian': '🇨🇴',
+    'Paraguay': '🇵🇾', 'Paraguai': '🇵🇾', 'Paraguayan': '🇵🇾',
+    'Chile': '🇨🇱', 'Chilean': '🇨🇱',
+    'Peru': '🇵🇪', 'Peruvian': '🇵🇪',
+    'Ecuador': '🇪🇨', 'Equador': '🇪🇨', 'Ecuadorian': '🇪🇨',
+    'Venezuela': '🇻🇪', 'Venezuelan': '🇻🇪',
+    'Bolivia': '🇧🇴', 'Bolívia': '🇧🇴', 'Bolivian': '🇧🇴',
+    'Mexico': '🇲🇽', 'México': '🇲🇽', 'Mexican': '🇲🇽',
+    'United States': '🇺🇸', 'EUA': '🇺🇸', 'USA': '🇺🇸', 'American': '🇺🇸',
+    'Portugal': '🇵🇹', 'Portuguese': '🇵🇹',
+    'Spain': '🇪🇸', 'Espanha': '🇪🇸', 'Spanish': '🇪🇸',
+    'Italy': '🇮🇹', 'Itália': '🇮🇹', 'Italian': '🇮🇹',
+    'France': '🇫🇷', 'França': '🇫🇷', 'French': '🇫🇷',
+    'Germany': '🇩🇪', 'Alemanha': '🇩🇪', 'German': '🇩🇪',
+    'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'Inglaterra': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'English': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    'Netherlands': '🇳🇱', 'Holanda': '🇳🇱', 'Dutch': '🇳🇱',
+    'Belgium': '🇧🇪', 'Bélgica': '🇧🇪', 'Belgian': '🇧🇪',
+    'Japan': '🇯🇵', 'Japão': '🇯🇵', 'Japanese': '🇯🇵',
+    'South Korea': '🇰🇷', 'Coreia do Sul': '🇰🇷', 'Korean': '🇰🇷',
+    'Australia': '🇦🇺', 'Austrália': '🇦🇺', 'Australian': '🇦🇺',
+    'Nigeria': '🇳🇬', 'Nigéria': '🇳🇬', 'Nigerian': '🇳🇬',
+    'Senegal': '🇸🇳', 'Senegalese': '🇸🇳',
+    'Ghana': '🇬🇭', 'Gana': '🇬🇭', 'Ghanaian': '🇬🇭',
+    'Cameroon': '🇨🇲', 'Camarões': '🇨🇲', 'Cameroonian': '🇨🇲',
+    'Morocco': '🇲🇦', 'Marrocos': '🇲🇦', 'Moroccan': '🇲🇦',
+    'Egypt': '🇪🇬', 'Egito': '🇪🇬', 'Egyptian': '🇪🇬',
+    'South Africa': '🇿🇦', 'África do Sul': '🇿🇦',
+    'Angola': '🇦🇴', 'Angolan': '🇦🇴',
+    'Mozambique': '🇲🇿', 'Moçambique': '🇲🇿',
+    'Guinea-Bissau': '🇬🇼', 'Guiné-Bissau': '🇬🇼',
+    'Cape Verde': '🇨🇻', 'Cabo Verde': '🇨🇻',
+    'Costa Rica': '🇨🇷', 'Costa Rican': '🇨🇷',
+    'Panama': '🇵🇦', 'Panamá': '🇵🇦',
+    'Honduras': '🇭🇳', 'Honduran': '🇭🇳',
+    'Jamaica': '🇯🇲', 'Jamaican': '🇯🇲',
+    'Haiti': '🇭🇹', 'Haitian': '🇭🇹',
+    'Dominican Republic': '🇩🇴', 'República Dominicana': '🇩🇴',
+    'Cuba': '🇨🇺', 'Cuban': '🇨🇺',
+    'Poland': '🇵🇱', 'Polônia': '🇵🇱', 'Polish': '🇵🇱',
+    'Czech Republic': '🇨🇿', 'República Tcheca': '🇨🇿', 'Czechia': '🇨🇿',
+    'Croatia': '🇭🇷', 'Croácia': '🇭🇷', 'Croatian': '🇭🇷',
+    'Serbia': '🇷🇸', 'Sérvia': '🇷🇸', 'Serbian': '🇷🇸',
+    'Switzerland': '🇨🇭', 'Suíça': '🇨🇭', 'Swiss': '🇨🇭',
+    'Austria': '🇦🇹', 'Áustria': '🇦🇹', 'Austrian': '🇦🇹',
+    'Sweden': '🇸🇪', 'Suécia': '🇸🇪', 'Swedish': '🇸🇪',
+    'Norway': '🇳🇴', 'Noruega': '🇳🇴', 'Norwegian': '🇳🇴',
+    'Denmark': '🇩🇰', 'Dinamarca': '🇩🇰', 'Danish': '🇩🇰',
+    'Finland': '🇫🇮', 'Finlândia': '🇫🇮', 'Finnish': '🇫🇮',
+    'Russia': '🇷🇺', 'Rússia': '🇷🇺', 'Russian': '🇷🇺',
+    'Ukraine': '🇺🇦', 'Ucrânia': '🇺🇦', 'Ukrainian': '🇺🇦',
+    'Turkey': '🇹🇷', 'Turquia': '🇹🇷', 'Turkish': '🇹🇷',
+    'Greece': '🇬🇷', 'Grécia': '🇬🇷', 'Greek': '🇬🇷',
+    'Romania': '🇷🇴', 'Romênia': '🇷🇴', 'Romanian': '🇷🇴',
+    'Hungary': '🇭🇺', 'Hungria': '🇭🇺', 'Hungarian': '🇭🇺',
+    'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'Escócia': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'Scottish': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+    'Wales': '🏴󠁧󠁢󠁷󠁬󠁳󠁿', 'País de Gales': '🏴󠁧󠁢󠁷󠁬󠁳󠁿', 'Welsh': '🏴󠁧󠁢󠁷󠁬󠁳󠁿',
+    'Ireland': '🇮🇪', 'Irlanda': '🇮🇪', 'Irish': '🇮🇪',
+    'China': '🇨🇳', 'Chinese': '🇨🇳',
+    'India': '🇮🇳', 'Índia': '🇮🇳', 'Indian': '🇮🇳',
+    'Saudi Arabia': '🇸🇦', 'Arábia Saudita': '🇸🇦',
+    'Iran': '🇮🇷', 'Irã': '🇮🇷', 'Iranian': '🇮🇷',
+    'Algeria': '🇩🇿', 'Argélia': '🇩🇿', 'Algerian': '🇩🇿',
+    'Tunisia': '🇹🇳', 'Tunísia': '🇹🇳', 'Tunisian': '🇹🇳',
+    'Congo DR': '🇨🇩', 'RD Congo': '🇨🇩', 'DR Congo': '🇨🇩',
+    'Ivory Coast': '🇨🇮', "Côte d'Ivoire": '🇨🇮', 'Costa do Marfim': '🇨🇮',
+    'Mali': '🇲🇱', 'Malian': '🇲🇱',
+    'Burkina Faso': '🇧🇫',
+    'Slovenia': '🇸🇮', 'Eslovênia': '🇸🇮',
+    'Slovakia': '🇸🇰', 'Eslováquia': '🇸🇰',
+    'Bulgaria': '🇧🇬', 'Bulgária': '🇧🇬',
+    'Albania': '🇦🇱', 'Albânia': '🇦🇱',
+    'North Macedonia': '🇲🇰', 'Macedônia do Norte': '🇲🇰',
+    'Bosnia and Herzegovina': '🇧🇦', 'Bósnia': '🇧🇦',
+    'Montenegro': '🇲🇪',
+    'Kosovo': '🇽🇰',
+    'Iceland': '🇮🇸', 'Islândia': '🇮🇸',
+    'Luxembourg': '🇱🇺', 'Luxemburgo': '🇱🇺',
+    'Cyprus': '🇨🇾', 'Chipre': '🇨🇾',
+    'Israel': '🇮🇱',
+    'United Arab Emirates': '🇦🇪', 'Emirados Árabes': '🇦🇪', 'UAE': '🇦🇪',
+    'Qatar': '🇶🇦', 'Catar': '🇶🇦',
+    'Kuwait': '🇰🇼',
+    'Bahrain': '🇧🇭', 'Bahrein': '🇧🇭',
+    'Oman': '🇴🇲', 'Omã': '🇴🇲',
+}
+
+def get_flag(country):
+    """Retorna emoji de bandeira para o país"""
+    if pd.isna(country):
+        return ''
+    # Tratar múltiplas nacionalidades (ex: "Brazil, Italy")
+    country_str = str(country).split(',')[0].strip()
+    return COUNTRY_FLAGS.get(country_str, '🏳️')
+
+# ============================================
+# ESCUDOS DOS CLUBES (URLs)
+# ============================================
+CLUB_LOGOS = {
+    # Série A
+    'Atlético MG': 'https://logodetimes.com/times/atletico-mineiro/logo-atletico-mineiro-256.png',
+    'Atlético Mineiro': 'https://logodetimes.com/times/atletico-mineiro/logo-atletico-mineiro-256.png',
+    'Athletico Paranaense': 'https://logodetimes.com/times/athletico-paranaense/logo-athletico-paranaense-256.png',
+    'Athletico PR': 'https://logodetimes.com/times/athletico-paranaense/logo-athletico-paranaense-256.png',
+    'Bahia': 'https://logodetimes.com/times/bahia/logo-bahia-256.png',
+    'Botafogo': 'https://logodetimes.com/times/botafogo/logo-botafogo-256.png',
+    'Corinthians': 'https://logodetimes.com/times/corinthians/logo-corinthians-256.png',
+    'Cruzeiro': 'https://logodetimes.com/times/cruzeiro/logo-cruzeiro-256.png',
+    'Cuiabá': 'https://logodetimes.com/times/cuiaba/logo-cuiaba-256.png',
+    'Flamengo': 'https://logodetimes.com/times/flamengo/logo-flamengo-256.png',
+    'Fluminense': 'https://logodetimes.com/times/fluminense/logo-fluminense-256.png',
+    'Fortaleza': 'https://logodetimes.com/times/fortaleza/logo-fortaleza-256.png',
+    'Grêmio': 'https://logodetimes.com/times/gremio/logo-gremio-256.png',
+    'Internacional': 'https://logodetimes.com/times/internacional/logo-internacional-256.png',
+    'Juventude': 'https://logodetimes.com/times/juventude/logo-juventude-256.png',
+    'Palmeiras': 'https://logodetimes.com/times/palmeiras/logo-palmeiras-256.png',
+    'RB Bragantino': 'https://logodetimes.com/times/red-bull-bragantino/logo-red-bull-bragantino-256.png',
+    'Red Bull Bragantino': 'https://logodetimes.com/times/red-bull-bragantino/logo-red-bull-bragantino-256.png',
+    'Santos': 'https://logodetimes.com/times/santos/logo-santos-256.png',
+    'São Paulo': 'https://logodetimes.com/times/sao-paulo/logo-sao-paulo-256.png',
+    'Vasco': 'https://logodetimes.com/times/vasco-da-gama/logo-vasco-da-gama-256.png',
+    'Vasco da Gama': 'https://logodetimes.com/times/vasco-da-gama/logo-vasco-da-gama-256.png',
+    'Vitória': 'https://logodetimes.com/times/vitoria/logo-vitoria-256.png',
+    'Atlético GO': 'https://logodetimes.com/times/atletico-goianiense/logo-atletico-goianiense-256.png',
+    'Atlético Goianiense': 'https://logodetimes.com/times/atletico-goianiense/logo-atletico-goianiense-256.png',
+    'Criciúma': 'https://logodetimes.com/times/criciuma/logo-criciuma-256.png',
+    
+    # Série B
+    'Amazonas': 'https://logodetimes.com/times/amazonas-fc/logo-amazonas-fc-256.png',
+    'América Mineiro': 'https://logodetimes.com/times/america-mineiro/logo-america-mineiro-256.png',
+    'América MG': 'https://logodetimes.com/times/america-mineiro/logo-america-mineiro-256.png',
+    'Avaí': 'https://logodetimes.com/times/avai/logo-avai-256.png',
+    'Botafogo SP': 'https://logodetimes.com/times/botafogo-sp/logo-botafogo-sp-256.png',
+    'Botafogo-SP': 'https://logodetimes.com/times/botafogo-sp/logo-botafogo-sp-256.png',
+    'Brusque': 'https://logodetimes.com/times/brusque/logo-brusque-256.png',
+    'Ceará': 'https://logodetimes.com/times/ceara/logo-ceara-256.png',
+    'Chapecoense': 'https://logodetimes.com/times/chapecoense/logo-chapecoense-256.png',
+    'CRB': 'https://logodetimes.com/times/crb/logo-crb-256.png',
+    'Coritiba': 'https://logodetimes.com/times/coritiba/logo-coritiba-256.png',
+    'Goiás': 'https://logodetimes.com/times/goias/logo-goias-256.png',
+    'Guarani': 'https://logodetimes.com/times/guarani/logo-guarani-256.png',
+    'Ituano': 'https://logodetimes.com/times/ituano/logo-ituano-256.png',
+    'Mirassol': 'https://logodetimes.com/times/mirassol/logo-mirassol-256.png',
+    'Novorizontino': 'https://logodetimes.com/times/novorizontino/logo-novorizontino-256.png',
+    'Grêmio Novorizontino': 'https://logodetimes.com/times/novorizontino/logo-novorizontino-256.png',
+    'Operário': 'https://logodetimes.com/times/operario-pr/logo-operario-pr-256.png',
+    'Operário PR': 'https://logodetimes.com/times/operario-pr/logo-operario-pr-256.png',
+    'Paysandu': 'https://logodetimes.com/times/paysandu/logo-paysandu-256.png',
+    'Ponte Preta': 'https://logodetimes.com/times/ponte-preta/logo-ponte-preta-256.png',
+    'Sport': 'https://logodetimes.com/times/sport/logo-sport-256.png',
+    'Sport Recife': 'https://logodetimes.com/times/sport/logo-sport-256.png',
+    'Vila Nova': 'https://logodetimes.com/times/vila-nova/logo-vila-nova-256.png',
+    'Vila Nova GO': 'https://logodetimes.com/times/vila-nova/logo-vila-nova-256.png',
+    'Volta Redonda': 'https://logodetimes.com/times/volta-redonda/logo-volta-redonda-256.png',
+    'Remo': 'https://logodetimes.com/times/remo/logo-remo-256.png',
+    
+    # Outros
+    'Santa Cruz': 'https://logodetimes.com/times/santa-cruz/logo-santa-cruz-256.png',
+    'Náutico': 'https://logodetimes.com/times/nautico/logo-nautico-256.png',
+    'Sport Club do Recife': 'https://logodetimes.com/times/sport/logo-sport-256.png',
+    'Londrina': 'https://logodetimes.com/times/londrina/logo-londrina-256.png',
+    'ABC': 'https://logodetimes.com/times/abc/logo-abc-256.png',
+    'CSA': 'https://logodetimes.com/times/csa/logo-csa-256.png',
+    'Sampaio Corrêa': 'https://logodetimes.com/times/sampaio-correa/logo-sampaio-correa-256.png',
+    'Tombense': 'https://logodetimes.com/times/tombense/logo-tombense-256.png',
+    'Figueirense': 'https://logodetimes.com/times/figueirense/logo-figueirense-256.png',
+    'Brasil de Pelotas': 'https://logodetimes.com/times/brasil-de-pelotas/logo-brasil-de-pelotas-256.png',
+    'Confiança': 'https://logodetimes.com/times/confianca/logo-confianca-256.png',
+    'Paraná': 'https://logodetimes.com/times/parana/logo-parana-256.png',
+    'Joinville': 'https://logodetimes.com/times/joinville/logo-joinville-256.png',
+    'Luverdense': 'https://logodetimes.com/times/luverdense/logo-luverdense-256.png',
+    
+    # Internacionais - Argentina
+    'River Plate': 'https://logodetimes.com/times/river-plate/logo-river-plate-256.png',
+    'Boca Juniors': 'https://logodetimes.com/times/boca-juniors/logo-boca-juniors-256.png',
+    'Racing Club': 'https://logodetimes.com/times/racing/logo-racing-256.png',
+    'Independiente': 'https://logodetimes.com/times/independiente/logo-independiente-256.png',
+    'San Lorenzo': 'https://logodetimes.com/times/san-lorenzo/logo-san-lorenzo-256.png',
+    
+    # Outros países
+    'Peñarol': 'https://logodetimes.com/times/penarol/logo-penarol-256.png',
+    'Nacional': 'https://logodetimes.com/times/nacional-uruguai/logo-nacional-uruguai-256.png',
+}
+
+def get_club_logo(club_name):
+    """Retorna URL do escudo do clube"""
+    if pd.isna(club_name):
+        return None
+    return CLUB_LOGOS.get(str(club_name).strip(), None)
+
+def get_club_logo_html(club_name, size=20):
+    """Retorna HTML img tag para o escudo"""
+    logo_url = get_club_logo(club_name)
+    if logo_url:
+        return f'<img src="{logo_url}" width="{size}" height="{size}" style="vertical-align: middle; margin-right: 5px;">'
+    return ''
 
 # ============================================
 # CORES
@@ -182,17 +391,57 @@ SERIE_B_TEAMS = [
 # FUNÇÕES
 # ============================================
 
+@st.cache_data(ttl=300)  # Cache por 5 minutos para Google Sheets
+def load_from_google_sheets():
+    """Carrega dados diretamente do Google Sheets"""
+    sheets = {
+        'Análises': None,
+        'Oferecidos': None,
+        'SkillCorner': None,
+        'WyScout': None
+    }
+    
+    for sheet_name in sheets.keys():
+        url = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote(sheet_name)}"
+        try:
+            sheets[sheet_name] = pd.read_csv(url)
+        except Exception as e:
+            st.warning(f"Erro ao carregar {sheet_name} do Google Sheets: {e}")
+            return None
+    
+    return sheets['Análises'], sheets['Oferecidos'], sheets['SkillCorner'], sheets['WyScout']
+
 @st.cache_data
-def load_data(uploaded_file=None):
+def load_data(uploaded_file=None, use_google_sheets=True):
+    """Carrega dados do Google Sheets ou arquivo local"""
+    
+    analises, oferecidos, skillcorner, wyscout = None, None, None, None
+    
+    # Prioridade: 1) Arquivo uploaded, 2) Google Sheets, 3) Arquivo local
     if uploaded_file:
         xlsx = pd.ExcelFile(uploaded_file)
-    else:
-        xlsx = pd.ExcelFile('Banco_de_Dados___Jogadores-3.xlsx')
+        analises = pd.read_excel(xlsx, sheet_name='Análises')
+        oferecidos = pd.read_excel(xlsx, sheet_name='Oferecidos')
+        skillcorner = pd.read_excel(xlsx, sheet_name='SkillCorner')
+        wyscout = pd.read_excel(xlsx, sheet_name='WyScout')
+    elif use_google_sheets:
+        try:
+            result = load_from_google_sheets()
+            if result:
+                analises, oferecidos, skillcorner, wyscout = result
+        except:
+            pass
     
-    analises = pd.read_excel(xlsx, sheet_name='Análises')
-    oferecidos = pd.read_excel(xlsx, sheet_name='Oferecidos')
-    skillcorner = pd.read_excel(xlsx, sheet_name='SkillCorner')
-    wyscout = pd.read_excel(xlsx, sheet_name='WyScout')
+    # Fallback para arquivo local
+    if analises is None:
+        try:
+            xlsx = pd.ExcelFile('Banco_de_Dados___Jogadores-3.xlsx')
+            analises = pd.read_excel(xlsx, sheet_name='Análises')
+            oferecidos = pd.read_excel(xlsx, sheet_name='Oferecidos')
+            skillcorner = pd.read_excel(xlsx, sheet_name='SkillCorner')
+            wyscout = pd.read_excel(xlsx, sheet_name='WyScout')
+        except:
+            return None, None, None, None
     
     # Criar coluna de display para diferenciar jogadores com nomes iguais
     # Formato: "Jogador (Equipa)" ou "Jogador (Equipa, Idade)" se ainda duplicado
@@ -626,7 +875,7 @@ def main():
         <div style="text-align:center; padding: 20px 0;">
             <div style="color: #dc2626; font-size: 11px; letter-spacing: 3px; font-weight: 600;">SCOUTING</div>
             <div style="color: white; font-size: 26px; font-weight: 800; letter-spacing: -1px;">BOTAFOGO</div>
-            <div style="color: #6b7280; font-size: 10px; letter-spacing: 2px;">SA </div>
+            <div style="color: #6b7280; font-size: 10px; letter-spacing: 2px;">RIBEIRÃO PRETO</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -667,16 +916,25 @@ def main():
         if jogador:
             p = df[df['Nome'] == jogador].iloc[0]
             
+            # Obter bandeira e escudo
+            flag = get_flag(p.get('Nacionalidade', ''))
+            club_logo = get_club_logo_html(p.get('Clube', ''), size=24)
+            
             col1, col2 = st.columns([3, 1])
             
             with col1:
                 st.markdown(f"""
                 <div style="background: {COLORS['card']}; border-radius: 12px; padding: 24px; border: 1px solid {COLORS['border']};">
-                    <div style="color: {COLORS['accent']}; font-size: 12px; font-weight: 600; letter-spacing: 1px;">{p['Posição'] or 'JOGADOR'}</div>
-                    <div style="color: white; font-size: 32px; font-weight: 800; margin: 4px 0;">{p['Nome']}</div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 28px;">{flag}</span>
+                        <div>
+                            <div style="color: {COLORS['accent']}; font-size: 12px; font-weight: 600; letter-spacing: 1px;">{p['Posição'] or 'JOGADOR'}</div>
+                            <div style="color: white; font-size: 32px; font-weight: 800; margin: 4px 0;">{p['Nome']}</div>
+                        </div>
+                    </div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px;">
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Idade</div><div style="color: white; font-size: 14px;">{int(p['Idade']) if pd.notna(p['Idade']) else '-'} anos</div></div>
-                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Clube</div><div style="color: white; font-size: 14px;">{p['Clube'] or '-'}</div></div>
+                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Clube</div><div style="color: white; font-size: 14px;">{club_logo}{p['Clube'] or '-'}</div></div>
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Liga</div><div style="color: white; font-size: 14px;">{p['Liga'] or '-'}</div></div>
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Perfil</div><div style="color: white; font-size: 14px;">{p['Perfil'] or '-'}</div></div>
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Contrato</div><div style="color: white; font-size: 14px;">{str(p['Contrato']).split(' ')[0] if pd.notna(p['Contrato']) else '-'}</div></div>
@@ -739,11 +997,16 @@ def main():
         if jogador_ws:
             player_ws = wyscout[wyscout['JogadorDisplay'] == jogador_ws].iloc[0]
             
+            # Obter bandeira e escudo
+            flag_ws = get_flag(player_ws.get('País de nacionalidade', ''))
+            club_logo_ws = get_club_logo_html(player_ws.get('Equipa', ''), size=20)
+            
             st.markdown(f"""
             <div style="background: {COLORS['card']}; border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid {COLORS['border']};">
+                <span style="font-size: 20px;">{flag_ws}</span>
                 <span style="color: {COLORS['accent']}; font-weight: 600;">{player_ws['Posição']}</span> | 
                 <span style="color: white; font-weight: 700; font-size: 18px;">{player_ws['Jogador']}</span> | 
-                <span style="color: {COLORS['text_secondary']};">{player_ws['Equipa']} • {int(player_ws['Idade']) if pd.notna(player_ws['Idade']) else '-'} anos • {int(player_ws['Minutos jogados:']) if pd.notna(player_ws['Minutos jogados:']) else 0} min</span>
+                <span style="color: {COLORS['text_secondary']};">{club_logo_ws}{player_ws['Equipa']} • {int(player_ws['Idade']) if pd.notna(player_ws['Idade']) else '-'} anos • {int(player_ws['Minutos jogados:']) if pd.notna(player_ws['Minutos jogados:']) else 0} min</span>
             </div>
             """, unsafe_allow_html=True)
             
@@ -796,12 +1059,21 @@ def main():
             player_rel = wyscout[wyscout['JogadorDisplay'] == jogador_rel_display].iloc[0]
             jogador_rel = player_rel['Jogador']  # Nome original para scatter
             
+            # Obter bandeira e escudo
+            flag_rel = get_flag(player_rel.get('País de nacionalidade', ''))
+            club_logo_rel = get_club_logo_html(player_rel.get('Equipa', ''), size=24)
+            
             st.markdown(f"""
             <div style="background: {COLORS['card']}; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 2px solid {COLORS['accent']};">
-                <div style="color: {COLORS['accent']}; font-size: 13px; font-weight: 600;">{player_rel['Posição']} → AVALIANDO COMO: {posicao_rel.upper()}</div>
-                <div style="color: white; font-size: 30px; font-weight: 800; margin: 8px 0;">{jogador_rel}</div>
-                <div style="color: {COLORS['text_secondary']}; font-size: 15px;">
-                    {player_rel['Equipa']} • {int(player_rel['Idade']) if pd.notna(player_rel['Idade']) else '-'} anos • 
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 32px;">{flag_rel}</span>
+                    <div>
+                        <div style="color: {COLORS['accent']}; font-size: 13px; font-weight: 600;">{player_rel['Posição']} → AVALIANDO COMO: {posicao_rel.upper()}</div>
+                        <div style="color: white; font-size: 30px; font-weight: 800; margin: 8px 0;">{jogador_rel}</div>
+                    </div>
+                </div>
+                <div style="color: {COLORS['text_secondary']}; font-size: 15px; margin-top: 10px;">
+                    {club_logo_rel}{player_rel['Equipa']} • {int(player_rel['Idade']) if pd.notna(player_rel['Idade']) else '-'} anos • 
                     {int(player_rel['Partidas jogadas']) if pd.notna(player_rel['Partidas jogadas']) else 0} jogos • 
                     {int(player_rel['Minutos jogados:']) if pd.notna(player_rel['Minutos jogados:']) else 0} min
                 </div>
@@ -1029,6 +1301,12 @@ def main():
             j1 = p1['Jogador']  # Nome original
             j2 = p2['Jogador']  # Nome original
             
+            # Obter bandeiras e escudos
+            flag_p1 = get_flag(p1.get('País de nacionalidade', ''))
+            flag_p2 = get_flag(p2.get('País de nacionalidade', ''))
+            club_logo_p1 = get_club_logo_html(p1.get('Equipa', ''), size=18)
+            club_logo_p2 = get_club_logo_html(p2.get('Equipa', ''), size=18)
+            
             indices = INDICES_CONFIG.get(categoria_cmp, {})
             idx1 = {n: calculate_index(p1, m, wyscout) for n, m in indices.items()}
             idx2 = {n: calculate_index(p2, m, wyscout) for n, m in indices.items()}
@@ -1037,17 +1315,27 @@ def main():
             with col1:
                 st.markdown(f"""
                 <div style="background: rgba(220,38,38,0.2); border: 2px solid {COLORS['accent']}; border-radius: 12px; padding: 16px;">
-                    <div style="color: {COLORS['accent']}; font-weight: 600;">{p1['Posição']}</div>
-                    <div style="color: white; font-size: 20px; font-weight: 700;">{j1}</div>
-                    <div style="color: {COLORS['text_secondary']};">{p1['Equipa']} • {int(p1['Idade']) if pd.notna(p1['Idade']) else '-'} anos</div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 24px;">{flag_p1}</span>
+                        <div>
+                            <div style="color: {COLORS['accent']}; font-weight: 600;">{p1['Posição']}</div>
+                            <div style="color: white; font-size: 20px; font-weight: 700;">{j1}</div>
+                        </div>
+                    </div>
+                    <div style="color: {COLORS['text_secondary']}; margin-top: 8px;">{club_logo_p1}{p1['Equipa']} • {int(p1['Idade']) if pd.notna(p1['Idade']) else '-'} anos</div>
                 </div>
                 """, unsafe_allow_html=True)
             with col2:
                 st.markdown(f"""
                 <div style="background: rgba(59,130,246,0.2); border: 2px solid #3b82f6; border-radius: 12px; padding: 16px;">
-                    <div style="color: #3b82f6; font-weight: 600;">{p2['Posição']}</div>
-                    <div style="color: white; font-size: 20px; font-weight: 700;">{j2}</div>
-                    <div style="color: {COLORS['text_secondary']};">{p2['Equipa']} • {int(p2['Idade']) if pd.notna(p2['Idade']) else '-'} anos</div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 24px;">{flag_p2}</span>
+                        <div>
+                            <div style="color: #3b82f6; font-weight: 600;">{p2['Posição']}</div>
+                            <div style="color: white; font-size: 20px; font-weight: 700;">{j2}</div>
+                        </div>
+                    </div>
+                    <div style="color: {COLORS['text_secondary']}; margin-top: 8px;">{club_logo_p2}{p2['Equipa']} • {int(p2['Idade']) if pd.notna(p2['Idade']) else '-'} anos</div>
                 </div>
                 """, unsafe_allow_html=True)
             
