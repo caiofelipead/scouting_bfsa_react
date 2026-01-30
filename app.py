@@ -487,6 +487,46 @@ def load_data(uploaded_file=None, use_google_sheets=True):
     return analises, oferecidos, skillcorner, wyscout
 
 
+def safe_float(val, default=None):
+    """Converte valor para float de forma segura (Google Sheets retorna strings)"""
+    if pd.isna(val):
+        return default
+    try:
+        # Tratar vírgula como separador decimal
+        if isinstance(val, str):
+            val = val.replace(',', '.')
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_int(val, default=None):
+    """Converte valor para int de forma segura"""
+    num = safe_float(val)
+    if num is None:
+        return default
+    return int(num)
+
+
+def display_int(val, suffix='', default='-'):
+    """Retorna string formatada do inteiro ou default"""
+    num = safe_int(val)
+    if num is None:
+        return default
+    return f"{num}{suffix}"
+
+
+def safe_format(val, fmt=".2f", default="-"):
+    """Formata valor numérico de forma segura"""
+    num = safe_float(val)
+    if num is None:
+        return default
+    try:
+        return f"{num:{fmt}}"
+    except (ValueError, TypeError):
+        return default
+
+
 def get_posicao_categoria(posicao_str):
     if pd.isna(posicao_str):
         return None
@@ -555,25 +595,27 @@ def find_skillcorner_player(jogador_name, skillcorner_df):
 
 
 def calculate_percentile(value, series):
-    if pd.isna(value):
+    val = safe_float(value)
+    if val is None:
         return 50
-    valid = series.dropna()
+    # Converter série para numérico
+    valid = pd.to_numeric(series, errors='coerce').dropna()
     if len(valid) == 0:
         return 50
-    return (valid < value).sum() / len(valid) * 100
+    return float((valid < val).sum() / len(valid) * 100)
 
 
 def calculate_index(player_row, metrics, df_all):
     percentiles = []
     for metric in metrics:
         if metric in player_row.index and metric in df_all.columns:
-            val = player_row[metric]
-            if pd.notna(val):
+            val = safe_float(player_row[metric])
+            if val is not None:
                 perc = calculate_percentile(val, df_all[metric])
                 if 'Faltas/90' in metric or 'Cartões' in metric or 'sofridos' in metric.lower():
                     perc = 100 - perc
                 percentiles.append(perc)
-    return np.mean(percentiles) if percentiles else 50
+    return float(np.mean(percentiles)) if percentiles else 50.0
 
 
 def get_color(value):
@@ -933,7 +975,7 @@ def main():
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px;">
-                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Idade</div><div style="color: white; font-size: 14px;">{int(p['Idade']) if pd.notna(p['Idade']) else '-'} anos</div></div>
+                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Idade</div><div style="color: white; font-size: 14px;">{display_int(p['Idade'], ' anos')}</div></div>
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Clube</div><div style="color: white; font-size: 14px;">{club_logo}{p['Clube'] or '-'}</div></div>
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Liga</div><div style="color: white; font-size: 14px;">{p['Liga'] or '-'}</div></div>
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Perfil</div><div style="color: white; font-size: 14px;">{p['Perfil'] or '-'}</div></div>
@@ -1010,7 +1052,7 @@ def main():
                 <span style="font-size: 20px;">{flag_ws}</span>
                 <span style="color: {COLORS['accent']}; font-weight: 600;">{player_ws['Posição']}</span> | 
                 <span style="color: white; font-weight: 700; font-size: 18px;">{player_ws['Jogador']}</span> | 
-                <span style="color: {COLORS['text_secondary']};">{club_logo_ws}{player_ws['Equipa']} • {int(player_ws['Idade']) if pd.notna(player_ws['Idade']) else '-'} anos • {int(player_ws['Minutos jogados:']) if pd.notna(player_ws['Minutos jogados:']) else 0} min</span>
+                <span style="color: {COLORS['text_secondary']};">{club_logo_ws}{player_ws['Equipa']} • {display_int(player_ws['Idade'], ' anos')} • {display_int(player_ws['Minutos jogados:'], ' min', '0 min')}</span>
             </div>
             """, unsafe_allow_html=True)
             
@@ -1034,9 +1076,9 @@ def main():
                     for i, m in enumerate(metrics):
                         if m in player_ws.index:
                             val = player_ws[m]
-                            perc = calculate_percentile(val, wyscout[m]) if pd.notna(val) else 50
+                            perc = calculate_percentile(val, wyscout[m])
                             color = get_color(perc)
-                            val_fmt = f"{val:.2f}" if pd.notna(val) else "-"
+                            val_fmt = safe_format(val, ".2f", "-")
                             with cols[i % len(cols)]:
                                 st.markdown(f"""
                                 <div style="background: {COLORS['card']}; border-radius: 8px; padding: 12px; text-align: center; border-left: 3px solid {color}; margin-bottom: 8px;">
@@ -1077,9 +1119,9 @@ def main():
                     </div>
                 </div>
                 <div style="color: {COLORS['text_secondary']}; font-size: 15px; margin-top: 10px;">
-                    {club_logo_rel}{player_rel['Equipa']} • {int(player_rel['Idade']) if pd.notna(player_rel['Idade']) else '-'} anos • 
-                    {int(player_rel['Partidas jogadas']) if pd.notna(player_rel['Partidas jogadas']) else 0} jogos • 
-                    {int(player_rel['Minutos jogados:']) if pd.notna(player_rel['Minutos jogados:']) else 0} min
+                    {club_logo_rel}{player_rel['Equipa']} • {display_int(player_rel['Idade'], ' anos')} • 
+                    {display_int(player_rel['Partidas jogadas'], ' jogos', '0 jogos')} • 
+                    {display_int(player_rel['Minutos jogados:'], ' min', '0 min')}
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1208,19 +1250,17 @@ def main():
                             rank = sc_player.get(rank_col)
                             
                             # Converter valor para float (pode estar como string)
-                            val_float = None
-                            if pd.notna(val):
-                                # Verificar se não é datetime
-                                if hasattr(val, 'year'):  # É datetime
-                                    continue
-                                try:
-                                    val_float = float(str(val).replace(',', '.'))
-                                except:
-                                    continue
+                            val_float = safe_float(val)
+                            if val_float is None:
+                                continue
+                            # Verificar se não é datetime
+                            if hasattr(val, 'year'):
+                                continue
                             
-                            # Rank já é o percentil
-                            if pd.notna(rank) and val_float is not None:
-                                physical_perc[label] = float(rank)
+                            # Rank já é o percentil - converter para float
+                            rank_float = safe_float(rank)
+                            if rank_float is not None:
+                                physical_perc[label] = rank_float
                                 physical_vals[label] = val_float
                     except Exception as e:
                         continue  # Pular métricas com erro
@@ -1326,7 +1366,7 @@ def main():
                             <div style="color: white; font-size: 20px; font-weight: 700;">{j1}</div>
                         </div>
                     </div>
-                    <div style="color: {COLORS['text_secondary']}; margin-top: 8px;">{club_logo_p1}{p1['Equipa']} • {int(p1['Idade']) if pd.notna(p1['Idade']) else '-'} anos</div>
+                    <div style="color: {COLORS['text_secondary']}; margin-top: 8px;">{club_logo_p1}{p1['Equipa']} • {display_int(p1['Idade'], ' anos')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             with col2:
@@ -1339,7 +1379,7 @@ def main():
                             <div style="color: white; font-size: 20px; font-weight: 700;">{j2}</div>
                         </div>
                     </div>
-                    <div style="color: {COLORS['text_secondary']}; margin-top: 8px;">{club_logo_p2}{p2['Equipa']} • {int(p2['Idade']) if pd.notna(p2['Idade']) else '-'} anos</div>
+                    <div style="color: {COLORS['text_secondary']}; margin-top: 8px;">{club_logo_p2}{p2['Equipa']} • {display_int(p2['Idade'], ' anos')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             
