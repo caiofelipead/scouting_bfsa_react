@@ -8,7 +8,7 @@ from urllib.parse import quote
 # CONFIG
 # ============================================
 st.set_page_config(
-    page_title="Scouting Dashboard | Botafogo-SP",
+    page_title="Scouting Dashboard | Botafogo SA",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -966,7 +966,7 @@ def main():
         <div style="text-align:center; padding: 20px 0;">
             <div style="color: #dc2626; font-size: 11px; letter-spacing: 3px; font-weight: 600;">SCOUTING</div>
             <div style="color: white; font-size: 26px; font-weight: 800; letter-spacing: -1px;">BOTAFOGO</div>
-            <div style="color: #6b7280; font-size: 10px; letter-spacing: 2px;">RIBEIRÃO PRETO</div>
+            <div style="color: #6b7280; font-size: 10px; letter-spacing: 2px;">SA</div>
         </div>
         """, unsafe_allow_html=True)
         
