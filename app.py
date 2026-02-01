@@ -8,7 +8,7 @@ from urllib.parse import quote
 # CONFIG
 # ============================================
 st.set_page_config(
-    page_title="Scouting Dashboard | Botafogo-SA",
+    page_title="Scouting Dashboard | Botafogo-SP",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -429,6 +429,18 @@ def safe_format(val, fmt=".2f", default="-"):
         return f"{num:{fmt}}"
     except (ValueError, TypeError):
         return default
+
+
+def safe_str(val, default='-'):
+    """Retorna string segura - trata None, NaN, 'nan', '' como default"""
+    if val is None:
+        return default
+    if pd.isna(val):
+        return default
+    s = str(val).strip()
+    if s.lower() in ('nan', 'none', 'nat', ''):
+        return default
+    return s
 
 
 # ============================================
@@ -954,7 +966,7 @@ def main():
         <div style="text-align:center; padding: 20px 0;">
             <div style="color: #dc2626; font-size: 11px; letter-spacing: 3px; font-weight: 600;">SCOUTING</div>
             <div style="color: white; font-size: 26px; font-weight: 800; letter-spacing: -1px;">BOTAFOGO</div>
-            <div style="color: #6b7280; font-size: 10px; letter-spacing: 2px;">SA</div>
+            <div style="color: #6b7280; font-size: 10px; letter-spacing: 2px;">RIBEIRÃO PRETO</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -1007,24 +1019,24 @@ def main():
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 28px;">{flag}</span>
                         <div>
-                            <div style="color: {COLORS['accent']}; font-size: 12px; font-weight: 600; letter-spacing: 1px;">{p['Posição'] or 'JOGADOR'}</div>
+                            <div style="color: {COLORS['accent']}; font-size: 12px; font-weight: 600; letter-spacing: 1px;">{safe_str(p.get('Posição'), 'JOGADOR')}</div>
                             <div style="color: white; font-size: 32px; font-weight: 800; margin: 4px 0;">{p['Nome']}</div>
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px;">
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Idade</div><div style="color: white; font-size: 14px;">{display_int(p['Idade'], ' anos')}</div></div>
-                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Clube</div><div style="color: white; font-size: 14px;">{club_logo}{p['Clube'] or '-'}</div></div>
-                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Liga</div><div style="color: white; font-size: 14px;">{p['Liga'] or '-'}</div></div>
-                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Perfil</div><div style="color: white; font-size: 14px;">{p['Perfil'] or '-'}</div></div>
-                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Contrato</div><div style="color: white; font-size: 14px;">{str(p['Contrato']).split(' ')[0] if pd.notna(p['Contrato']) else '-'}</div></div>
-                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Modelo</div><div style="color: white; font-size: 14px;">{p['Modelo'] if pd.notna(p.get('Modelo')) else '-'}</div></div>
+                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Clube</div><div style="color: white; font-size: 14px;">{club_logo}{safe_str(p.get('Clube'))}</div></div>
+                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Liga</div><div style="color: white; font-size: 14px;">{safe_str(p.get('Liga'))}</div></div>
+                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Perfil</div><div style="color: white; font-size: 14px;">{safe_str(p.get('Perfil'))}</div></div>
+                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Contrato</div><div style="color: white; font-size: 14px;">{str(p['Contrato']).split(' ')[0] if pd.notna(p.get('Contrato')) and str(p.get('Contrato')) not in ('nan', '') else '-'}</div></div>
+                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Modelo</div><div style="color: white; font-size: 14px;">{safe_str(p.get('Modelo'))}</div></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col2:
                 nota = safe_float(p.get('Nota_Desempenho'))
-                if nota is not None:
+                if nota is not None and nota > 0:
                     st.markdown(f"""
                     <div style="background: linear-gradient(135deg, {COLORS['accent']}, #b91c1c); border-radius: 12px; padding: 20px; text-align: center;">
                         <div style="color: rgba(255,255,255,0.7); font-size: 10px; letter-spacing: 1px;">NOTA GERAL</div>
@@ -1036,37 +1048,139 @@ def main():
             
             # BUSCAR JOGADOR NO WYSCOUT PARA GRÁFICOS DETALHADOS
             nome_jogador = p['Nome']
-            clube_jogador = p.get('Clube', '')
-            posicao_jogador = p.get('Posição', '')
+            clube_jogador = safe_str(p.get('Clube', ''), '')
+            posicao_jogador = safe_str(p.get('Posição', ''), '')
             
-            # Tentar match no WyScout
+            # Tentar match automático no WyScout para pré-selecionar
+            auto_match_idx = 0
+            jogadores_ws_list = sorted(wyscout['JogadorDisplay'].dropna().unique().tolist())
+            
+            # Buscar melhor match por nome + clube
+            best_matches = []
+            nome_norm = normalize_name(nome_jogador)
+            nome_parts = set(nome_norm.split())
+            
+            for jwd in jogadores_ws_list:
+                row = wyscout[wyscout['JogadorDisplay'] == jwd].iloc[0]
+                jogador_norm = normalize_name(row['Jogador'])
+                jogador_parts = set(jogador_norm.split())
+                
+                score = 0
+                
+                # Match exato = melhor
+                if nome_norm == jogador_norm:
+                    score = 100
+                # Containment - exigir que ambos tenham mesma qtd de palavras OU nome curto tenha >= 2 palavras
+                elif nome_norm in jogador_norm or jogador_norm in nome_norm:
+                    shorter = min(nome_norm, jogador_norm, key=len)
+                    longer = max(nome_norm, jogador_norm, key=len)
+                    shorter_parts = shorter.split()
+                    longer_parts = longer.split()
+                    if len(shorter_parts) >= 2:
+                        # "Rodrigo Saravia" in "Rodrigo Saravia Santos" → alta confiança
+                        score = 80
+                    elif len(longer_parts) == 1:
+                        # Ambos 1 palavra e um contém o outro
+                        score = 70
+                    else:
+                        # 1 palavra tipo "Rodrigo" matching "Rodrigo Saravia" → baixa confiança
+                        score = 25
+                else:
+                    # Overlap de partes do nome
+                    common = nome_parts & jogador_parts
+                    if common:
+                        # Penalizar se só 1 parte comum e ambos têm mais partes
+                        overlap_ratio = len(common) / max(len(nome_parts), len(jogador_parts))
+                        if overlap_ratio >= 0.5:
+                            score = overlap_ratio * 60
+                        elif len(common) == 1 and max(len(nome_parts), len(jogador_parts)) > 1:
+                            # 1 parte em comum de várias = pouca confiança
+                            score = 15
+                
+                # Bonus se mesmo clube
+                if clube_jogador and pd.notna(row.get('Equipa')):
+                    clube_norm = normalize_name(str(clube_jogador))
+                    equipa_norm = normalize_name(str(row['Equipa']))
+                    if clube_norm and equipa_norm:
+                        if clube_norm == equipa_norm:
+                            score += 25
+                        elif clube_norm.split()[0] in equipa_norm or equipa_norm.split()[0] in clube_norm:
+                            score += 15
+                
+                if score > 30:  # Threshold mínimo para considerar
+                    best_matches.append((jwd, score))
+            
+            best_matches.sort(key=lambda x: -x[1])
+            
+            if best_matches:
+                try:
+                    auto_match_idx = jogadores_ws_list.index(best_matches[0][0])
+                except ValueError:
+                    auto_match_idx = 0
+            
+            # SELETOR MANUAL DE JOGADOR WYSCOUT
+            st.markdown(f"""
+            <div style="background: {COLORS['card']}; border-radius: 8px; padding: 8px 12px; margin: 8px 0; border: 1px solid {COLORS['border']};">
+                <span style="color: {COLORS['text_muted']}; font-size: 11px;">📊 Vincular dados Wyscout ao jogador selecionado:</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            ws_selected = st.selectbox(
+                "Jogador Wyscout", 
+                jogadores_ws_list, 
+                index=auto_match_idx,
+                key='ws_perfil_match'
+            )
+            
             ws_match = None
-            if clube_jogador:
-                ws_filter = wyscout[wyscout['Equipa'].str.contains(str(clube_jogador).split()[0], case=False, na=False)]
-                for _, row in ws_filter.iterrows():
-                    if normalize_name(nome_jogador) in normalize_name(row['Jogador']) or normalize_name(row['Jogador']) in normalize_name(nome_jogador):
-                        ws_match = row
-                        break
-            
-            if ws_match is None:
-                for _, row in wyscout.iterrows():
-                    if normalize_name(nome_jogador) in normalize_name(row['Jogador']) or normalize_name(row['Jogador']) in normalize_name(nome_jogador):
-                        ws_match = row
-                        break
+            if ws_selected:
+                ws_row = wyscout[wyscout['JogadorDisplay'] == ws_selected]
+                if not ws_row.empty:
+                    ws_match = ws_row.iloc[0]
             
             # Determinar posição para índices
             posicao_categoria = None
+            categorias_validas = list(INDICES_CONFIG.keys())  # ['Atacante', 'Extremo', 'Meia', 'Volante', 'Lateral', 'Zagueiro', 'Goleiro']
+            
             if posicao_jogador:
-                for pos in str(posicao_jogador).replace(' ', '').split(','):
-                    if pos in POSICAO_MAP:
-                        posicao_categoria = POSICAO_MAP[pos]
+                pos_str = str(posicao_jogador).strip()
+                # 1) Verificar se já é um nome de categoria válido
+                for cat in categorias_validas:
+                    if cat.lower() == pos_str.lower():
+                        posicao_categoria = cat
                         break
+                
+                # 2) Verificar aliases comuns em português
+                if posicao_categoria is None:
+                    POSICAO_ALIAS = {
+                        'centroavante': 'Atacante', 'atacante': 'Atacante', 'ponta de lança': 'Atacante', 'ca': 'Atacante', '9': 'Atacante',
+                        'ponta': 'Extremo', 'extremo': 'Extremo', 'ala': 'Extremo', 'pe': 'Extremo', 'pd': 'Extremo',
+                        'meia': 'Meia', 'meio-campista': 'Meia', 'meia ofensivo': 'Meia', 'meia-atacante': 'Meia', 'armador': 'Meia',
+                        'volante': 'Volante', 'primeiro volante': 'Volante', 'segundo volante': 'Volante', 'cabeça de área': 'Volante',
+                        'lateral': 'Lateral', 'lateral-direito': 'Lateral', 'lateral-esquerdo': 'Lateral', 'ld': 'Lateral', 'le': 'Lateral', 'ala direito': 'Lateral', 'ala esquerdo': 'Lateral',
+                        'zagueiro': 'Zagueiro', 'defensor central': 'Zagueiro', 'beque': 'Zagueiro',
+                        'goleiro': 'Goleiro', 'guarda-redes': 'Goleiro', 'gr': 'Goleiro',
+                    }
+                    if pos_str.lower() in POSICAO_ALIAS:
+                        posicao_categoria = POSICAO_ALIAS[pos_str.lower()]
+                
+                # 3) Tentar siglas Wyscout (DMF, CF, etc.)
+                if posicao_categoria is None:
+                    for pos in pos_str.replace(' ', '').split(','):
+                        if pos in POSICAO_MAP:
+                            posicao_categoria = POSICAO_MAP[pos]
+                            break
             
             if posicao_categoria is None and ws_match is not None:
                 posicao_categoria = get_posicao_categoria(ws_match.get('Posição', ''))
             
             if posicao_categoria is None:
                 posicao_categoria = 'Meia'  # Default
+            
+            # Seletor de categoria de posição (override manual)
+            categorias_disponiveis = list(INDICES_CONFIG.keys())
+            cat_idx = categorias_disponiveis.index(posicao_categoria) if posicao_categoria in categorias_disponiveis else 0
+            posicao_categoria = st.selectbox("Categoria de Posição", categorias_disponiveis, index=cat_idx, key='cat_perfil')
             
             # LEGENDA
             st.markdown(create_legend_html(), unsafe_allow_html=True)
