@@ -11,7 +11,7 @@ import re
 # CONFIG
 # ============================================
 st.set_page_config(
-    page_title="Scouting Dashboard | Botafogo-SP",
+    page_title="Scouting Dashboard | Botafogo SA",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -207,10 +207,172 @@ CLUB_LOGOS = {
     'Independiente': 'https://logodetimes.com/times/independiente/logo-independiente-256.png',
     'San Lorenzo': 'https://logodetimes.com/times/san-lorenzo/logo-san-lorenzo-256.png',
     
-    # Outros países
+    # Outros países - Uruguai
     'Peñarol': 'https://logodetimes.com/times/penarol/logo-penarol-256.png',
     'Nacional': 'https://logodetimes.com/times/nacional-uruguai/logo-nacional-uruguai-256.png',
+    
+    # Ásia - Coreia do Sul (K League)
+    'Gangwon': 'https://upload.wikimedia.org/wikipedia/en/thumb/4/4c/Gangwon_FC.svg/200px-Gangwon_FC.svg.png',
+    'Gangwon FC': 'https://upload.wikimedia.org/wikipedia/en/thumb/4/4c/Gangwon_FC.svg/200px-Gangwon_FC.svg.png',
+    'Bucheon FC': 'https://upload.wikimedia.org/wikipedia/en/thumb/d/d5/Bucheon_FC_1995_emblem.svg/200px-Bucheon_FC_1995_emblem.svg.png',
+    'Bucheon': 'https://upload.wikimedia.org/wikipedia/en/thumb/d/d5/Bucheon_FC_1995_emblem.svg/200px-Bucheon_FC_1995_emblem.svg.png',
+    'Jeonbuk': 'https://upload.wikimedia.org/wikipedia/en/thumb/e/e2/Jeonbuk_Hyundai_Motors_FC_emblem.svg/200px-Jeonbuk_Hyundai_Motors_FC_emblem.svg.png',
+    'Ulsan': 'https://upload.wikimedia.org/wikipedia/en/thumb/c/c5/Ulsan_Hyundai_FC.svg/200px-Ulsan_Hyundai_FC.svg.png',
+    'Seoul': 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/FC_Seoul_emblem.svg/200px-FC_Seoul_emblem.svg.png',
+    'FC Seoul': 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/FC_Seoul_emblem.svg/200px-FC_Seoul_emblem.svg.png',
+    
+    # Ásia - Japão (J League)
+    'Urawa': 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8b/Urawa_Red_Diamonds_logo.svg/200px-Urawa_Red_Diamonds_logo.svg.png',
+    'Urawa Reds': 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8b/Urawa_Red_Diamonds_logo.svg/200px-Urawa_Red_Diamonds_logo.svg.png',
+    'Yokohama F. Marinos': 'https://upload.wikimedia.org/wikipedia/en/thumb/e/ea/Yokohama_F._Marinos_logo.svg/200px-Yokohama_F._Marinos_logo.svg.png',
+    'Vissel Kobe': 'https://upload.wikimedia.org/wikipedia/en/thumb/6/65/Vissel_Kobe_logo.svg/200px-Vissel_Kobe_logo.svg.png',
+    'Kashima Antlers': 'https://upload.wikimedia.org/wikipedia/en/thumb/4/44/Kashima_Antlers.svg/200px-Kashima_Antlers.svg.png',
+    
+    # Ásia - China
+    'Guangzhou': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b0/Guangzhou_FC_logo.svg/200px-Guangzhou_FC_logo.svg.png',
+    'Guangdong GZ-Power': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b0/Guangzhou_FC_logo.svg/200px-Guangzhou_FC_logo.svg.png',
+    'Shanghai Port': 'https://upload.wikimedia.org/wikipedia/en/thumb/d/d3/Shanghai_Port_FC_logo.svg/200px-Shanghai_Port_FC_logo.svg.png',
+    'Shanghai Shenhua': 'https://upload.wikimedia.org/wikipedia/en/thumb/c/c9/Shanghai_Shenhua_FC_2019.svg/200px-Shanghai_Shenhua_FC_2019.svg.png',
+    
+    # Ásia - Oriente Médio
+    'Al Hilal': 'https://upload.wikimedia.org/wikipedia/en/thumb/5/56/Al_Hilal_SFC_logo.svg/200px-Al_Hilal_SFC_logo.svg.png',
+    'Al Nassr': 'https://upload.wikimedia.org/wikipedia/en/thumb/8/83/Al-Nassr_FC_Badge.png/200px-Al-Nassr_FC_Badge.png',
+    'Al Ahli': 'https://upload.wikimedia.org/wikipedia/en/thumb/1/1e/Al_Ahli_SFC_logo.svg/200px-Al_Ahli_SFC_logo.svg.png',
+    'Beitar Jerusalem': 'https://upload.wikimedia.org/wikipedia/en/thumb/7/7b/Beitar_Jerusalem_FC_logo.svg/200px-Beitar_Jerusalem_FC_logo.svg.png',
+    'Maccabi Haifa': 'https://upload.wikimedia.org/wikipedia/en/thumb/1/12/Maccabi_Haifa_FC_Logo.svg/200px-Maccabi_Haifa_FC_Logo.svg.png',
+    
+    # Europa - Principais
+    'Barcelona': 'https://logodetimes.com/times/barcelona/logo-barcelona-256.png',
+    'Real Madrid': 'https://logodetimes.com/times/real-madrid/logo-real-madrid-256.png',
+    'Manchester United': 'https://logodetimes.com/times/manchester-united/logo-manchester-united-256.png',
+    'Manchester City': 'https://logodetimes.com/times/manchester-city/logo-manchester-city-256.png',
+    'Liverpool': 'https://logodetimes.com/times/liverpool/logo-liverpool-256.png',
+    'Chelsea': 'https://logodetimes.com/times/chelsea/logo-chelsea-256.png',
+    'Arsenal': 'https://logodetimes.com/times/arsenal/logo-arsenal-256.png',
+    'Juventus': 'https://logodetimes.com/times/juventus/logo-juventus-256.png',
+    'Milan': 'https://logodetimes.com/times/milan/logo-milan-256.png',
+    'AC Milan': 'https://logodetimes.com/times/milan/logo-milan-256.png',
+    'Inter': 'https://logodetimes.com/times/inter-de-milao/logo-inter-de-milao-256.png',
+    'Inter de Milão': 'https://logodetimes.com/times/inter-de-milao/logo-inter-de-milao-256.png',
+    'Bayern': 'https://logodetimes.com/times/bayern-de-munique/logo-bayern-de-munique-256.png',
+    'Bayern Munich': 'https://logodetimes.com/times/bayern-de-munique/logo-bayern-de-munique-256.png',
+    'PSG': 'https://logodetimes.com/times/psg/logo-psg-256.png',
+    'Paris Saint-Germain': 'https://logodetimes.com/times/psg/logo-psg-256.png',
+    'Benfica': 'https://logodetimes.com/times/benfica/logo-benfica-256.png',
+    'Porto': 'https://logodetimes.com/times/porto/logo-porto-256.png',
+    'Sporting': 'https://logodetimes.com/times/sporting/logo-sporting-256.png',
+    'Ajax': 'https://logodetimes.com/times/ajax/logo-ajax-256.png',
+    'Nottingham Forest': 'https://upload.wikimedia.org/wikipedia/en/thumb/e/e5/Nottingham_Forest_F.C._logo.svg/200px-Nottingham_Forest_F.C._logo.svg.png',
+    
+    # MLS
+    'LA Galaxy': 'https://upload.wikimedia.org/wikipedia/en/thumb/7/70/Los_Angeles_Galaxy_logo.svg/200px-Los_Angeles_Galaxy_logo.svg.png',
+    'Inter Miami': 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8e/Inter_Miami_CF_logo.svg/200px-Inter_Miami_CF_logo.svg.png',
 }
+
+# ============================================
+# LOGOS DE LIGAS
+# ============================================
+LEAGUE_LOGOS = {
+    # Brasil
+    'Série A': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
+    'Serie A': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
+    'Brasileirão': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
+    'Série B': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
+    'Serie B': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
+    'Brasil | 1': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
+    'Brasil | 2': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
+    
+    # Europa
+    'Premier League': 'https://logodetimes.com/times/premier-league/logo-premier-league-256.png',
+    'England | 1': 'https://logodetimes.com/times/premier-league/logo-premier-league-256.png',
+    'Inglaterra | 1': 'https://logodetimes.com/times/premier-league/logo-premier-league-256.png',
+    'La Liga': 'https://logodetimes.com/times/la-liga/logo-la-liga-256.png',
+    'LaLiga': 'https://logodetimes.com/times/la-liga/logo-la-liga-256.png',
+    'Spain | 1': 'https://logodetimes.com/times/la-liga/logo-la-liga-256.png',
+    'Espanha | 1': 'https://logodetimes.com/times/la-liga/logo-la-liga-256.png',
+    'Serie A (Itália)': 'https://logodetimes.com/times/serie-a-italia/logo-serie-a-italia-256.png',
+    'Italy | 1': 'https://logodetimes.com/times/serie-a-italia/logo-serie-a-italia-256.png',
+    'Itália | 1': 'https://logodetimes.com/times/serie-a-italia/logo-serie-a-italia-256.png',
+    'Bundesliga': 'https://logodetimes.com/times/bundesliga/logo-bundesliga-256.png',
+    'Germany | 1': 'https://logodetimes.com/times/bundesliga/logo-bundesliga-256.png',
+    'Alemanha | 1': 'https://logodetimes.com/times/bundesliga/logo-bundesliga-256.png',
+    'Ligue 1': 'https://logodetimes.com/times/ligue-1/logo-ligue-1-256.png',
+    'France | 1': 'https://logodetimes.com/times/ligue-1/logo-ligue-1-256.png',
+    'França | 1': 'https://logodetimes.com/times/ligue-1/logo-ligue-1-256.png',
+    'Eredivisie': 'https://logodetimes.com/times/eredivisie/logo-eredivisie-256.png',
+    'Netherlands | 1': 'https://logodetimes.com/times/eredivisie/logo-eredivisie-256.png',
+    'Holanda | 1': 'https://logodetimes.com/times/eredivisie/logo-eredivisie-256.png',
+    'Primeira Liga': 'https://logodetimes.com/times/liga-portugal/logo-liga-portugal-256.png',
+    'Liga Portugal': 'https://logodetimes.com/times/liga-portugal/logo-liga-portugal-256.png',
+    'Portugal | 1': 'https://logodetimes.com/times/liga-portugal/logo-liga-portugal-256.png',
+    
+    # América do Sul
+    'Argentina | 1': 'https://logodetimes.com/times/liga-profissional-argentina/logo-liga-profissional-argentina-256.png',
+    'Liga Profesional': 'https://logodetimes.com/times/liga-profissional-argentina/logo-liga-profissional-argentina-256.png',
+    'Uruguay | 1': 'https://logodetimes.com/times/primera-division-uruguaia/logo-primera-division-uruguaia-256.png',
+    'Chile | 1': 'https://logodetimes.com/times/campeonato-chileno/logo-campeonato-chileno-256.png',
+    'Colombia | 1': 'https://logodetimes.com/times/liga-betplay/logo-liga-betplay-256.png',
+    'Peru | 1': 'https://logodetimes.com/times/liga-1-peru/logo-liga-1-peru-256.png',
+    'Paraguay | 1': 'https://logodetimes.com/times/division-profesional-paraguai/logo-division-profesional-paraguai-256.png',
+    'Bolivia | 1': 'https://logodetimes.com/times/liga-boliviana/logo-liga-boliviana-256.png',
+    'Ecuador | 1': 'https://logodetimes.com/times/liga-pro-equador/logo-liga-pro-equador-256.png',
+    'Venezuela | 1': 'https://logodetimes.com/times/liga-futve/logo-liga-futve-256.png',
+    'Mexico | 1': 'https://logodetimes.com/times/liga-mx/logo-liga-mx-256.png',
+    'Liga MX': 'https://logodetimes.com/times/liga-mx/logo-liga-mx-256.png',
+    
+    # Ásia
+    'Japan | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a5/J.League_%28logo%29.svg/200px-J.League_%28logo%29.svg.png',
+    'Japão | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a5/J.League_%28logo%29.svg/200px-J.League_%28logo%29.svg.png',
+    'J1 League': 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a5/J.League_%28logo%29.svg/200px-J.League_%28logo%29.svg.png',
+    'Korea | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/05/K_League_1_logo.svg/200px-K_League_1_logo.svg.png',
+    'Coreia | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/05/K_League_1_logo.svg/200px-K_League_1_logo.svg.png',
+    'K League 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/05/K_League_1_logo.svg/200px-K_League_1_logo.svg.png',
+    'China | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/f/fc/Chinese_Super_League_logo.svg/200px-Chinese_Super_League_logo.svg.png',
+    'Chinese Super League': 'https://upload.wikimedia.org/wikipedia/en/thumb/f/fc/Chinese_Super_League_logo.svg/200px-Chinese_Super_League_logo.svg.png',
+    'Saudi Arabia | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b7/Saudi_Pro_League_Logo.svg/200px-Saudi_Pro_League_Logo.svg.png',
+    'Saudi Pro League': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b7/Saudi_Pro_League_Logo.svg/200px-Saudi_Pro_League_Logo.svg.png',
+    'Arábia Saudita | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b7/Saudi_Pro_League_Logo.svg/200px-Saudi_Pro_League_Logo.svg.png',
+    
+    # MLS
+    'USA | 1': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/MLS_crest_logo_RGB_gradient.svg/200px-MLS_crest_logo_RGB_gradient.svg.png',
+    'MLS': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/MLS_crest_logo_RGB_gradient.svg/200px-MLS_crest_logo_RGB_gradient.svg.png',
+    
+    # Outros
+    'Israel | 1': 'https://upload.wikimedia.org/wikipedia/he/thumb/1/1e/Israeli_Premier_League_Logo.svg/200px-Israeli_Premier_League_Logo.svg.png',
+    'Turkey | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/01/S%C3%BCper_Lig_logo.svg/200px-S%C3%BCper_Lig_logo.svg.png',
+    'Turquia | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/01/S%C3%BCper_Lig_logo.svg/200px-S%C3%BCper_Lig_logo.svg.png',
+    'Greece | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/05/Super_League_Greece_logo.svg/200px-Super_League_Greece_logo.svg.png',
+    'Grécia | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/05/Super_League_Greece_logo.svg/200px-Super_League_Greece_logo.svg.png',
+    'Russia | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f2/Russian_Premier_League_logo.svg/200px-Russian_Premier_League_logo.svg.png',
+    'Rússia | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f2/Russian_Premier_League_logo.svg/200px-Russian_Premier_League_logo.svg.png',
+    'Belgium | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/07/Belgian_First_Division_A_logo.svg/200px-Belgian_First_Division_A_logo.svg.png',
+    'Bélgica | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/07/Belgian_First_Division_A_logo.svg/200px-Belgian_First_Division_A_logo.svg.png',
+    'Switzerland | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/9/9e/Swiss_Super_League_logo.svg/200px-Swiss_Super_League_logo.svg.png',
+    'Suíça | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/9/9e/Swiss_Super_League_logo.svg/200px-Swiss_Super_League_logo.svg.png',
+    'Austria | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/e/e2/Austrian_Football_Bundesliga_logo.svg/200px-Austrian_Football_Bundesliga_logo.svg.png',
+    'Áustria | 1': 'https://upload.wikimedia.org/wikipedia/en/thumb/e/e2/Austrian_Football_Bundesliga_logo.svg/200px-Austrian_Football_Bundesliga_logo.svg.png',
+}
+
+def get_league_logo(league_name):
+    """Retorna URL do logo da liga"""
+    if pd.isna(league_name):
+        return None
+    league_str = str(league_name).strip()
+    # Tentar match exato
+    if league_str in LEAGUE_LOGOS:
+        return LEAGUE_LOGOS[league_str]
+    # Tentar match parcial
+    for key, url in LEAGUE_LOGOS.items():
+        if key.lower() in league_str.lower() or league_str.lower() in key.lower():
+            return url
+    return None
+
+def get_league_logo_html(league_name, size=20):
+    """Retorna HTML img tag para o logo da liga"""
+    logo_url = get_league_logo(league_name)
+    if logo_url:
+        return f'<img src="{logo_url}" width="{size}" height="{size}" style="vertical-align: middle; margin-right: 5px;" onerror="this.style.display=\'none\'">'
+    return ''
 
 def get_club_logo(club_name):
     """Retorna URL do escudo do clube"""
@@ -504,13 +666,13 @@ def scrape_ogol_data(ogol_url):
 
 @st.cache_data(ttl=3600)
 def scrape_transfermarkt_data(tm_url):
-    """Faz scraping do Transfermarkt para obter dados do jogador"""
+    """Faz scraping do Transfermarkt para obter dados do jogador incluindo escudos"""
     if not tm_url or pd.isna(tm_url) or not str(tm_url).startswith('http'):
         return None
     
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         response = requests.get(tm_url, headers=headers, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -519,21 +681,52 @@ def scrape_transfermarkt_data(tm_url):
             'foto': None,
             'contrato': None,
             'valor': None,
-            'clube': None
+            'clube': None,
+            'clube_escudo': None,
+            'liga': None,
+            'liga_escudo': None
         }
         
-        # Extrair foto
+        # Extrair foto do jogador (portrait)
         for img in soup.find_all('img'):
             src = img.get('src', '')
-            if 'spieler' in src.lower() or 'header' in src.lower():
+            if 'portrait' in src.lower() and 'transfermarkt' in src.lower():
                 data['foto'] = src
+                break
+        
+        # Extrair escudo do clube (padrão: wappen/kaderquad ou wappen/small)
+        for img in soup.find_all('img'):
+            src = img.get('src', '')
+            alt = img.get('alt', '')
+            title = img.get('title', '')
+            if 'wappen' in src.lower() and ('kaderquad' in src.lower() or 'small' in src.lower() or 'medium' in src.lower()):
+                data['clube_escudo'] = src
+                if alt:
+                    data['clube'] = alt
+                elif title:
+                    data['clube'] = title
+                break
+        
+        # Extrair escudo da liga (procurar especificamente pelo logo com title definido)
+        for img in soup.find_all('img'):
+            src = img.get('src', '')
+            alt = img.get('alt', '')
+            title = img.get('title', '')
+            # Liga do jogador tem title definido e está em /logo/
+            if '/logo/' in src.lower() and 'tiny' in src.lower() and title and title not in ['Transfermarkt', '']:
+                # Converter para versão maior do logo
+                if 'verytiny' in src:
+                    src = src.replace('verytiny', 'medium')
+                elif 'tiny' in src:
+                    src = src.replace('tiny', 'medium')
+                data['liga_escudo'] = src
+                data['liga'] = title
                 break
         
         # Extrair contrato
         for span in soup.find_all(['span', 'div', 'li']):
             text = span.get_text(strip=True)
             if 'contrato até' in text.lower() or 'contract until' in text.lower():
-                # Extrair data do contrato
                 match = re.search(r'(\d{2}/\d{2}/\d{4})', text)
                 if match:
                     data['contrato'] = match.group(1)
@@ -542,7 +735,7 @@ def scrape_transfermarkt_data(tm_url):
         # Extrair valor de mercado
         for span in soup.find_all(['span', 'div']):
             text = span.get_text(strip=True)
-            if '€' in text and ('mi.' in text.lower() or 'mil' in text.lower()):
+            if '€' in text and ('mi.' in text.lower() or 'mil' in text.lower() or 'M' in text):
                 data['valor'] = text
                 break
         
@@ -1133,17 +1326,33 @@ def main():
         if jogador:
             p = df[df['Nome'] == jogador].iloc[0]
             
-            # Obter bandeira e escudo
+            # Obter bandeira
             flag = get_flag(p.get('Nacionalidade', ''))
-            club_logo = get_club_logo_html(p.get('Clube', ''), size=24)
             
             # Scraping de dados externos (OGol e TM)
             ogol_url = safe_str(p.get('ogol'), None)
             tm_url = safe_str(p.get('TM'), None)
             ogol_data = scrape_ogol_data(ogol_url) if ogol_url else None
+            tm_data = scrape_transfermarkt_data(tm_url) if tm_url else None
+            
+            # Obter escudos - prioridade: TM scraping > dicionário estático
+            clube_nome = safe_str(p.get('Clube'))
+            liga_nome = safe_str(p.get('Liga'))
+            
+            # Escudo do clube
+            if tm_data and tm_data.get('clube_escudo'):
+                club_logo = f'<img src="{tm_data["clube_escudo"]}" width="24" height="24" style="vertical-align: middle; margin-right: 5px; border-radius: 4px;" onerror="this.style.display=\'none\'">'
+            else:
+                club_logo = get_club_logo_html(clube_nome, size=24)
+            
+            # Escudo da liga
+            if tm_data and tm_data.get('liga_escudo'):
+                league_logo = f'<img src="{tm_data["liga_escudo"]}" width="24" height="24" style="vertical-align: middle; margin-right: 5px; border-radius: 4px;" onerror="this.style.display=\'none\'">'
+            else:
+                league_logo = get_league_logo_html(liga_nome, size=24)
             
             # Obter foto do jogador
-            foto_url = get_player_photo(p, ogol_data)
+            foto_url = get_player_photo(p, ogol_data, tm_data)
             
             # Layout: Info (3) | Foto + Nota (1)
             col1, col2 = st.columns([3, 1])
@@ -1160,8 +1369,8 @@ def main():
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px;">
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Idade</div><div style="color: white; font-size: 14px;">{display_int(p['Idade'], ' anos')}</div></div>
-                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Clube</div><div style="color: white; font-size: 14px;">{club_logo}{safe_str(p.get('Clube'))}</div></div>
-                        <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Liga</div><div style="color: white; font-size: 14px;">{safe_str(p.get('Liga'))}</div></div>
+                        <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 8px;"><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Clube</div><div style="color: white; font-size: 14px; display: flex; align-items: center; gap: 4px;">{club_logo}<span>{clube_nome}</span></div></div>
+                        <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 8px;"><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Liga</div><div style="color: white; font-size: 14px; display: flex; align-items: center; gap: 4px;">{league_logo}<span>{liga_nome}</span></div></div>
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Perfil</div><div style="color: white; font-size: 14px;">{safe_str(p.get('Perfil'))}</div></div>
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Contrato</div><div style="color: white; font-size: 14px;">{str(p['Contrato']).split(' ')[0] if pd.notna(p.get('Contrato')) and str(p.get('Contrato')) not in ('nan', '') else '-'}</div></div>
                         <div><div style="color: {COLORS['text_muted']}; font-size: 10px; text-transform: uppercase;">Modelo</div><div style="color: white; font-size: 14px;">{safe_str(p.get('Modelo'))}</div></div>
