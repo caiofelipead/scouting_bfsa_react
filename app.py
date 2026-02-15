@@ -2223,26 +2223,39 @@ def main():
             posicao_rank = st.selectbox("📍 Posição", ['Todas'] + list(INDICES_CONFIG.keys()), key='pos_ranking')
         
         with col_f2:
-            # Ligas únicas
-            ligas_unicas = sorted([str(l) for l in wyscout['Liga'].dropna().unique() if str(l) not in ('nan', '')])
-            liga_rank = st.selectbox("🏆 Liga", ['Todas'] + ligas_unicas, key='liga_ranking')
+            # Ligas únicas - verificar qual coluna existe
+            liga_col = None
+            for col_name in ['Liga', 'Competição', 'Competition', 'League']:
+                if col_name in wyscout.columns:
+                    liga_col = col_name
+                    break
+            
+            if liga_col:
+                ligas_unicas = sorted([str(l) for l in wyscout[liga_col].dropna().unique() if str(l) not in ('nan', '')])
+                liga_rank = st.selectbox("🏆 Liga", ['Todas'] + ligas_unicas, key='liga_ranking')
+            else:
+                liga_rank = 'Todas'
+                st.caption("Liga não disponível")
         
         with col_f3:
             # Clubes únicos
-            if liga_rank != 'Todas':
-                clubes_liga = sorted([str(c) for c in wyscout[wyscout['Liga'] == liga_rank]['Equipa'].dropna().unique() if str(c) not in ('nan', '')])
+            equipa_col = 'Equipa' if 'Equipa' in wyscout.columns else 'Team' if 'Team' in wyscout.columns else None
+            if equipa_col:
+                if liga_rank != 'Todas' and liga_col:
+                    clubes_liga = sorted([str(c) for c in wyscout[wyscout[liga_col] == liga_rank][equipa_col].dropna().unique() if str(c) not in ('nan', '')])
+                else:
+                    clubes_liga = sorted([str(c) for c in wyscout[equipa_col].dropna().unique() if str(c) not in ('nan', '')])
+                clube_rank = st.selectbox("🏟️ Clube", ['Todos'] + clubes_liga, key='clube_ranking')
             else:
-                clubes_liga = sorted([str(c) for c in wyscout['Equipa'].dropna().unique() if str(c) not in ('nan', '')])
-            clube_rank = st.selectbox("🏟️ Clube", ['Todos'] + clubes_liga, key='clube_ranking')
+                clube_rank = 'Todos'
         
         with col_f4:
             # Nacionalidades
-            if 'Passaporte' in wyscout.columns:
-                nac_col = 'Passaporte'
-            elif 'Nacionalidade' in wyscout.columns:
-                nac_col = 'Nacionalidade'
-            else:
-                nac_col = None
+            nac_col = None
+            for col_name in ['Passaporte', 'País de nacionalidade', 'Nacionalidade', 'Nationality']:
+                if col_name in wyscout.columns:
+                    nac_col = col_name
+                    break
             
             if nac_col:
                 nacionalidades = sorted([str(n) for n in wyscout[nac_col].dropna().unique() if str(n) not in ('nan', '')])
@@ -2305,40 +2318,42 @@ def main():
         df_rank = wyscout.copy()
         
         # Filtro de posição
-        if posicao_rank != 'Todas':
+        if posicao_rank != 'Todas' and 'Posição' in df_rank.columns:
             df_rank = df_rank[df_rank['Posição'].apply(get_posicao_categoria) == posicao_rank]
         
-        # Filtro de liga
-        if liga_rank != 'Todas':
-            df_rank = df_rank[df_rank['Liga'] == liga_rank]
+        # Filtro de liga (WyScout não tem essa coluna)
+        if liga_rank != 'Todas' and liga_col and liga_col in df_rank.columns:
+            df_rank = df_rank[df_rank[liga_col] == liga_rank]
         
         # Filtro de clube
-        if clube_rank != 'Todos':
-            df_rank = df_rank[df_rank['Equipa'] == clube_rank]
+        if clube_rank != 'Todos' and equipa_col and equipa_col in df_rank.columns:
+            df_rank = df_rank[df_rank[equipa_col] == clube_rank]
         
         # Filtro de nacionalidade
-        if nac_rank != 'Todas' and nac_col:
+        if nac_rank != 'Todas' and nac_col and nac_col in df_rank.columns:
             df_rank = df_rank[df_rank[nac_col].astype(str).str.contains(nac_rank, case=False, na=False)]
         
         # Filtro de idade
-        df_rank['Idade'] = df_rank['Idade'].apply(safe_float)
-        df_rank = df_rank[(df_rank['Idade'] >= idade_range[0]) & (df_rank['Idade'] <= idade_range[1])]
+        if 'Idade' in df_rank.columns:
+            df_rank['Idade'] = df_rank['Idade'].apply(safe_float)
+            df_rank = df_rank[(df_rank['Idade'] >= idade_range[0]) & (df_rank['Idade'] <= idade_range[1])]
         
         # Filtro de minutos
-        df_rank['Minutos jogados:'] = df_rank['Minutos jogados:'].apply(safe_float)
-        df_rank = df_rank[df_rank['Minutos jogados:'] >= min_minutos]
+        if 'Minutos jogados:' in df_rank.columns:
+            df_rank['Minutos jogados:'] = df_rank['Minutos jogados:'].apply(safe_float)
+            df_rank = df_rank[df_rank['Minutos jogados:'] >= min_minutos]
         
         # Filtro de pé
-        if pe_rank != 'Todos' and 'Pé' in wyscout.columns:
+        if pe_rank != 'Todos' and 'Pé' in df_rank.columns:
             df_rank = df_rank[df_rank['Pé'] == pe_rank]
         
         # Filtro de altura
-        if 'Altura' in wyscout.columns:
+        if 'Altura' in df_rank.columns:
             df_rank['Altura'] = df_rank['Altura'].apply(safe_float)
             df_rank = df_rank[(df_rank['Altura'] >= altura_range[0]) & (df_rank['Altura'] <= altura_range[1]) | df_rank['Altura'].isna()]
         
         # Filtro de busca por nome
-        if busca_nome:
+        if busca_nome and 'Jogador' in df_rank.columns:
             df_rank = df_rank[df_rank['Jogador'].str.contains(busca_nome, case=False, na=False)]
         
         # ===== CALCULAR E MOSTRAR RANKING =====
@@ -2384,8 +2399,7 @@ def main():
                             
                             ranking_data.append({
                                 'Jogador': row['Jogador'],
-                                'Clube': row['Equipa'],
-                                'Liga': safe_str(row.get('Liga'), '-'),
+                                'Clube': row.get('Equipa', row.get('Team', '-')),
                                 'Idade': safe_int(row.get('Idade')),
                                 'Min': safe_int(row.get('Minutos jogados:')),
                                 'Índice': round(media, 1),
@@ -2595,8 +2609,7 @@ def main():
                                 
                                 similaridades.append({
                                     'Jogador': row['Jogador'],
-                                    'Clube': row['Equipa'],
-                                    'Liga': row.get('Liga', '-'),
+                                    'Clube': row.get('Equipa', '-'),
                                     'Idade': safe_int(row.get('Idade')),
                                     'Min': safe_int(row.get('Minutos jogados:')),
                                     'Similaridade': round(similaridade, 1),
