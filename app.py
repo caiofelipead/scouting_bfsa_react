@@ -11,7 +11,7 @@ import re
 # CONFIG
 # ============================================
 st.set_page_config(
-    page_title="Scouting Dashboard | Botafogo SA",
+    page_title="Scouting Dashboard | Botafogo-SP",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
