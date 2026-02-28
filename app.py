@@ -806,13 +806,35 @@ SKILLCORNER_INDICES = {
     'Zagueiro': ['Physical & aggressive defender index', 'Ball playing central defender index'],
 }
 
-# Times da Série B 2025
+# Times da Série B 2025 (nomes exatos do dataset WyScout)
 SERIE_B_TEAMS = [
-    'Amazonas', 'América Mineiro', 'Avaí', 'Botafogo SP', 'Botafogo SP B',
-    'Chapecoense', 'CRB', 'Coritiba', 'Coritiba SE', 'Goiás', 
-    'Grêmio Novorizontino', 'Novorizontino', 'Operário', 'Operário PR', 
-    'Paysandu', 'Ponte Preta', 'Remo', 'Vila Nova', 'Vila Nova GO', 'Volta Redonda'
+    'Amazonas',
+    'América Mineiro',
+    'Athletic Club',
+    'Athletico Paranaense',
+    'Atlético GO',
+    'Avaí',
+    'Botafogo SP',
+    'Chapecoense',
+    'Coritiba',
+    'CRB',
+    'Criciúma',
+    'Cuiabá',
+    'Ferroviária',
+    'Goiás',
+    'Grêmio Novorizontino',
+    'Operário PR',
+    'Paysandu',
+    'Remo',
+    'Vila Nova',
+    'Volta Redonda',
 ]
+
+def is_serie_b_team(team_name):
+    """Verifica se o time é da Série B 2025"""
+    if pd.isna(team_name):
+        return False
+    return str(team_name).strip() in SERIE_B_TEAMS
 
 # ============================================
 # FUNÇÕES AUXILIARES DE CONVERSÃO
@@ -1939,27 +1961,40 @@ def main():
             # Seletor de categoria de posição (override manual)
             categorias_disponiveis = list(INDICES_CONFIG.keys())
             cat_idx = categorias_disponiveis.index(posicao_categoria) if posicao_categoria in categorias_disponiveis else 0
-            posicao_categoria = st.selectbox("Categoria de Posição", categorias_disponiveis, index=cat_idx, key='cat_perfil')
+            
+            col_cat, col_comp = st.columns([2, 1])
+            with col_cat:
+                posicao_categoria = st.selectbox("Categoria de Posição", categorias_disponiveis, index=cat_idx, key='cat_perfil')
+            with col_comp:
+                comparar_serie_b_t1 = st.checkbox("🇧🇷 Comparar c/ Série B", value=False, key='comp_serie_b_t1',
+                                                   help="Percentis apenas contra jogadores da Série B")
+            
+            # Dataset para cálculo de percentis
+            if comparar_serie_b_t1:
+                wyscout_percentil_t1 = wyscout[wyscout['Equipa'].apply(is_serie_b_team)].copy()
+            else:
+                wyscout_percentil_t1 = wyscout.copy()
             
             # LEGENDA
             st.markdown(create_legend_html(), unsafe_allow_html=True)
             
             if ws_match is not None:
                 # Filtrar jogadores da mesma posição
-                wyscout_pos = wyscout[wyscout['Posição'].apply(get_posicao_categoria) == posicao_categoria].copy()
+                wyscout_pos = wyscout_percentil_t1[wyscout_percentil_t1['Posição'].apply(get_posicao_categoria) == posicao_categoria].copy()
                 n_jogadores_pos = len(wyscout_pos)
                 
                 # Calcular índices compostos
                 indices = INDICES_CONFIG.get(posicao_categoria, INDICES_CONFIG['Meia'])
-                indices_values = {idx_name: calculate_index(ws_match, metrics, wyscout) for idx_name, metrics in indices.items()}
+                indices_values = {idx_name: calculate_index(ws_match, metrics, wyscout_percentil_t1) for idx_name, metrics in indices.items()}
                 
                 # Header com info do match
+                comp_label = " (vs Série B)" if comparar_serie_b_t1 else ""
                 st.markdown(f"""
                 <div style="background: {COLORS['card']}; border-radius: 8px; padding: 12px; margin: 16px 0; border: 1px solid {COLORS['border']}; text-align: center;">
                     <span style="color: {COLORS['accent']}; font-weight: 600;">Dados Wyscout:</span>
                     <span style="color: white; font-weight: 600;"> {ws_match['Jogador']}</span>
                     <span style="color: {COLORS['text_secondary']};"> • {ws_match['Equipa']} • {display_int(ws_match['Minutos jogados:'], ' min', '0 min')}</span>
-                    <span style="color: {COLORS['text_muted']};"> | Comparando com {n_jogadores_pos} {posicao_categoria.lower()}s</span>
+                    <span style="color: {COLORS['text_muted']};"> | Comparando com {n_jogadores_pos} {posicao_categoria.lower()}s{comp_label}</span>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -1981,8 +2016,8 @@ def main():
                     top_metrics = all_metrics[:12]
                     metrics_perc = {}
                     for m in top_metrics:
-                        if m in ws_match.index and m in wyscout.columns:
-                            perc = calculate_percentile(ws_match[m], wyscout[m])
+                        if m in ws_match.index and m in wyscout_percentil_t1.columns:
+                            perc = calculate_percentile(ws_match[m], wyscout_percentil_t1[m])
                             # Nome curto para o radar
                             short_name = m.replace('/90', '').replace(', %', '%').replace('Duelos ', '').replace('ganhos', '%')[:15]
                             metrics_perc[short_name] = perc
@@ -1999,7 +2034,7 @@ def main():
                     try:
                         idx_vals = []
                         for metrics in indices.values():
-                            idx_val = calculate_index(row, metrics, wyscout)
+                            idx_val = calculate_index(row, metrics, wyscout_percentil_t1)
                             if pd.notna(idx_val) and isinstance(idx_val, (int, float)):
                                 idx_vals.append(float(idx_val))
                         
@@ -2557,6 +2592,27 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
+        # ===== OPÇÃO DE COMPARATIVO =====
+        col_comp1, col_comp2 = st.columns([1, 3])
+        with col_comp1:
+            comparar_serie_b = st.checkbox("🇧🇷 Comparar com Série B", value=False, key='comp_serie_b',
+                                           help="Calcula percentis apenas contra jogadores da Série B 2025")
+        
+        # Dataset para cálculo de percentis
+        if comparar_serie_b:
+            # Filtrar apenas jogadores de times da Série B
+            wyscout_percentil = wyscout[wyscout['Equipa'].apply(is_serie_b_team)].copy()
+            with col_comp2:
+                st.markdown(f"""
+                <div style="background: #1a3a1a; border-radius: 6px; padding: 8px 12px; display: inline-block;">
+                    <span style="color: #22c55e; font-size: 12px;">
+                        ✓ Percentis calculados contra {len(wyscout_percentil)} jogadores da Série B 2025
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            wyscout_percentil = wyscout.copy()
+        
         # ===== FILTROS LINHA 1 =====
         col_f1, col_f2, col_f3, col_f4 = st.columns(4)
         
@@ -2728,7 +2784,8 @@ def main():
                         try:
                             idx_vals = {}
                             for idx_name, metrics in indices_cfg.items():
-                                idx_val = calculate_index(row, metrics, wyscout)
+                                # Usar wyscout_percentil para cálculo (pode ser filtrado para Série B)
+                                idx_val = calculate_index(row, metrics, wyscout_percentil)
                                 if pd.notna(idx_val):
                                     idx_vals[idx_name] = float(idx_val)
                             
