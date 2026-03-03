@@ -24,7 +24,7 @@ st.set_page_config(
 # ============================================
 # GOOGLE SHEETS CONFIG
 # ============================================
-GOOGLE_SHEET_ID = "1IlCBif0Um_gGXPMa-VV9riYxkX3qAqeKxgQZppSlrjU"
+GOOGLE_SHEET_ID = "1aRjJAxYHJED4FyPnq4PfcrzhhRhzw-vNQ9Vg1pIlak0"
 
 # ============================================
 # BANDEIRAS DE NACIONALIDADE
