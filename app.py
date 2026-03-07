@@ -15,14 +15,13 @@ from similarity import (
     POSITION_WEIGHTS, INVERTED_METRICS
 )
 
-# Motor preditivo (usa calibration.py automaticamente)
+# Motor Preditivo v3 (calibração acadêmica)
 try:
     from predictive_engine import (
         ScoutScorePreditivo,
         ContractSuccessPredictor,
         compute_advanced_similarity,
         calculate_overall_score_v3,
-        AdvancedSimilarity,
         TacticalClusterer,
         DataPreprocessor,
         POSITION_PROFILES,
@@ -1650,6 +1649,22 @@ def create_scatter_plot(df, x_col, y_col, highlight=None, title=""):
 # MAIN
 # ============================================
 
+# ============================================
+# MOTOR PREDITIVO — CACHE
+# ============================================
+@st.cache_resource
+def get_ssp_engine(_df_cols_hash, df, position):
+    """Treina o motor preditivo uma vez por posição (cached)."""
+    if not HAS_PREDICTIVE:
+        return None
+    try:
+        engine = ScoutScorePreditivo()
+        engine.fit(df=df, position=position, min_minutes=500)
+        return engine
+    except Exception:
+        return None
+
+
 def main():
     with st.sidebar:
         st.markdown("""
@@ -1693,7 +1708,7 @@ def main():
         st.caption(f"📊 {len(analises)} análises | 📈 {len(wyscout)} Wyscout")
         st.caption(f"🏃 {len(skillcorner)} SkillCorner ({sc_with_idx} com índices)")
     
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📊 Perfil", "📈 Índices", "📋 Relatório", "🔄 Comparativo", "🗂️ Dados", "🏆 Ranking", "🔍 Similaridade"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["📊 Perfil", "📈 Índices", "📋 Relatório", "🔄 Comparativo", "🗂️ Dados", "🏆 Ranking", "🔍 Similaridade", "🎯 Predição", "🧬 Clusters"])
     
     # ===== TAB 1: PERFIL =====
     with tab1:
@@ -2768,14 +2783,37 @@ def main():
                 df_rank_limited = df_rank.head(500)
                 
                 with st.spinner(f'Calculando ranking ponderado para {len(df_rank_limited)} jogadores...'):
-                    df_ranked = rank_players_weighted(
-                        df_rank_limited,
-                        posicao_calc,
-                        wyscout_percentil,
-                        indices_config=indices_cfg,
-                        min_minutes=0,
-                        include_indices=True
-                    )
+                    # Motor preditivo v3 (se disponível)
+                    ssp_engine = None
+                    if HAS_PREDICTIVE:
+                        ssp_engine = get_ssp_engine(
+                            hash(tuple(wyscout_percentil.columns)),
+                            wyscout_percentil, posicao_calc
+                        )
+
+                    if ssp_engine is not None:
+                        df_ranked = ssp_engine.rank_players(
+                            df_rank_limited, wyscout_percentil, min_minutes=0
+                        )
+                        # Compatibilizar coluna Score
+                        if 'SSP' in df_ranked.columns and 'Score' not in df_ranked.columns:
+                            df_ranked['Score'] = df_ranked['SSP']
+                        # Adicionar índices compostos (backward compat)
+                        for idx_name, metrics in indices_cfg.items():
+                            if idx_name not in df_ranked.columns:
+                                for ridx, row in df_ranked.iterrows():
+                                    df_ranked.loc[ridx, idx_name] = calculate_weighted_index(
+                                        row, metrics, wyscout_percentil, posicao_calc
+                                    )
+                    else:
+                        df_ranked = rank_players_weighted(
+                            df_rank_limited,
+                            posicao_calc,
+                            wyscout_percentil,
+                            indices_config=indices_cfg,
+                            min_minutes=0,
+                            include_indices=True
+                        )
 
                 if len(df_ranked) > 0:
                     sc_lookup = create_skillcorner_lookup(skillcorner)
@@ -2789,6 +2827,10 @@ def main():
                             'Min': safe_int(row.get('Minutos jogados:')),
                             'Score': row['Score'],
                         }
+                        # Colunas SSP (motor preditivo)
+                        for ssp_col in ['WP', 'Efficiency', 'Cluster', 'Percentile']:
+                            if ssp_col in row.index and pd.notna(row.get(ssp_col)):
+                                entry[ssp_col] = row[ssp_col]
                         for idx_name in indices_cfg.keys():
                             if idx_name in row.index and pd.notna(row[idx_name]):
                                 entry[idx_name] = row[idx_name]
@@ -2823,6 +2865,9 @@ def main():
                             '#': st.column_config.NumberColumn(width='small'),
                             'Score': st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f"),
                         }
+                        for ssp_c in ['WP', 'Efficiency', 'Cluster', 'Percentile']:
+                            if ssp_c in df_resultado.columns:
+                                column_config[ssp_c] = st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f")
                         for col in df_resultado.columns:
                             if col in list(indices_cfg.keys()):
                                 column_config[col] = st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f")
@@ -2930,16 +2975,28 @@ def main():
                 
                 with st.spinner(f'Calculando similaridade ponderada para {len(wyscout_pool)} candidatos...'):
                     try:
-                        similar_players = compute_weighted_cosine_similarity(
-                            target_player=row_ref,
-                            comparison_pool=wyscout_pool,
-                            position=categoria_sim,
-                            top_n=top_n_sim,
-                            min_minutes=min_min_sim,
-                            minutes_col='Minutos jogados:',
-                            player_display_col='JogadorDisplay',
-                            percentile_base=percentile_base_sim,
-                        )
+                        if HAS_PREDICTIVE:
+                            similar_players = compute_advanced_similarity(
+                                target_player=row_ref,
+                                comparison_pool=wyscout_pool,
+                                position=categoria_sim,
+                                top_n=top_n_sim,
+                                min_minutes=min_min_sim,
+                                minutes_col='Minutos jogados:',
+                                player_display_col='JogadorDisplay',
+                                percentile_base=percentile_base_sim,
+                            )
+                        else:
+                            similar_players = compute_weighted_cosine_similarity(
+                                target_player=row_ref,
+                                comparison_pool=wyscout_pool,
+                                position=categoria_sim,
+                                top_n=top_n_sim,
+                                min_minutes=min_min_sim,
+                                minutes_col='Minutos jogados:',
+                                player_display_col='JogadorDisplay',
+                                percentile_base=percentile_base_sim,
+                            )
                     except Exception as e:
                         st.error(f"Erro no cálculo de similaridade: {e}")
                         similar_players = None
@@ -2962,7 +3019,7 @@ def main():
                             {display_int(row_ref.get('Minutos jogados:'), ' min')} | {categoria_sim}
                         </div>
                         <div style="color: rgba(255,255,255,0.6); font-size: 11px; margin-top: 6px;">
-                            Cosine Similarity ponderada (70%) + Proximity Bonus (30%) | 
+                            {'Mahalanobis + RF Proximity + Cluster Fit' if HAS_PREDICTIVE else 'Cosine Similarity ponderada (70%) + Proximity Bonus (30%)'} | 
                             {len(wyscout_pool)} candidatos {comp_label_sim}
                         </div>
                     </div>
@@ -2991,6 +3048,11 @@ def main():
                             show_cols.append(c)
                     
                     show_cols.extend(['similarity_pct', 'matched_metrics'])
+                    # Colunas do motor avançado
+                    for adv_col in ['mahalanobis_sim', 'rf_proximity']:
+                        if adv_col in df_sim_display.columns:
+                            show_cols.append(adv_col)
+                            col_rename[adv_col] = adv_col.replace('_', ' ').title()
                     show_cols = [c for c in show_cols if c in df_sim_display.columns]
                     
                     df_sim_show = df_sim_display[show_cols].rename(columns=col_rename)
@@ -3113,6 +3175,168 @@ def main():
                     st.warning("Nenhum jogador similar encontrado com os critérios especificados")
             else:
                 st.warning("Selecione um jogador de referência")
+
+    # ===== TAB 8: PREDIÇÃO DE CONTRATAÇÃO =====
+    with tab8:
+        st.markdown("### 🎯 Predição de Sucesso de Contratação")
+        if not HAS_PREDICTIVE:
+            st.warning("Motor preditivo não disponível. Instale as dependências: `pip install scikit-learn scipy statsmodels xgboost`")
+        else:
+            st.caption("Modelo baseado em SSP + idade + nível da liga + minutagem (Nunes, 2025; Buso, 2025)")
+            
+            # Seleção do jogador
+            jogadores_ws_pred = sorted(wyscout['JogadorDisplay'].dropna().unique().tolist())
+            jogador_pred = st.selectbox("Jogador", jogadores_ws_pred, key='jogador_pred')
+            
+            if jogador_pred:
+                row_pred = wyscout[wyscout['JogadorDisplay'] == jogador_pred].iloc[0]
+                pos_pred = get_posicao_categoria(row_pred.get('Posição', ''))
+                if pos_pred is None:
+                    pos_pred = 'Meia'
+                
+                col_p1, col_p2, col_p3 = st.columns(3)
+                with col_p1:
+                    idade_pred = st.number_input("Idade", 16, 42, int(safe_float(row_pred.get('Idade'), 24)), key='idade_pred')
+                with col_p2:
+                    ligas_br = ['Serie A Brasil', 'Serie B Brasil', 'Serie C Brasil', 'Serie D Brasil',
+                                'Paulista A1', 'Paulista A2']
+                    liga_origem = st.selectbox("Liga Origem", ligas_br, key='liga_orig')
+                with col_p3:
+                    ligas_alvo = ['Serie A Brasil', 'Serie B Brasil', 'Premier League', 'La Liga',
+                                  'Bundesliga', 'Serie A Italia', 'Ligue 1', 'Liga Portugal',
+                                  'Eredivisie', 'MLS', 'Liga MX', 'Championship',
+                                  'Superliga Argentina']
+                    liga_alvo = st.selectbox("Liga Alvo", ligas_alvo, key='liga_alvo')
+                
+                if st.button("🔮 Calcular Predição", type='primary', key='btn_pred'):
+                    # Obter engine
+                    ssp_engine_pred = get_ssp_engine(
+                        hash(tuple(wyscout.columns)), wyscout, pos_pred
+                    )
+                    
+                    if ssp_engine_pred is not None:
+                        ssp_result = ssp_engine_pred.score_player(row_pred, wyscout)
+                        ssp_val = ssp_result.get('ssp', 50.0)
+                    else:
+                        ssp_val = calculate_overall_score(row_pred, pos_pred, wyscout) or 50.0
+                    
+                    minutes = safe_float(row_pred.get('Minutos jogados:'), 0)
+                    
+                    predictor = ContractSuccessPredictor()
+                    pred = predictor.predict_success_unsupervised(
+                        ssp_score=ssp_val,
+                        age=idade_pred,
+                        league_origin=liga_origem,
+                        league_target=liga_alvo,
+                        minutes=minutes,
+                    )
+                    
+                    # Header do jogador
+                    flag_pred = get_flag(row_pred.get('País de nacionalidade', ''))
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 12px; padding: 20px; margin: 16px 0;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 32px;">{flag_pred}</span>
+                            <div>
+                                <div style="color: white; font-size: 22px; font-weight: 700;">{row_pred['Jogador']}</div>
+                                <div style="color: #94a3b8; font-size: 13px;">{row_pred.get('Equipa', '-')} | {pos_pred} | {idade_pred} anos</div>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Métricas principais
+                    risk_colors = {'baixo': '#22c55e', 'medio': '#eab308', 'alto': '#ef4444'}
+                    risk_color = risk_colors.get(pred['risk_level'], '#6b7280')
+                    
+                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                    col_m1.metric("SSP (Score Preditivo)", f"{ssp_val:.1f}/100")
+                    col_m2.metric("P(Sucesso)", f"{pred['success_probability']:.1%}")
+                    col_m3.metric("Nível de Risco", pred['risk_level'].upper())
+                    col_m4.metric("Minutagem", f"{minutes:.0f} min")
+                    
+                    # Componentes
+                    st.markdown("**Decomposição dos Fatores:**")
+                    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+                    col_f1.metric("Performance (SSP)", f"{pred['ssp_contribution']:.2f}")
+                    col_f2.metric("Fator Idade", f"{pred['age_factor']:.2f}")
+                    col_f3.metric("Fator Liga", f"{pred['league_factor']:.2f}")
+                    col_f4.metric("Fator Minutos", f"{pred['minutes_factor']:.2f}")
+                    
+                    if ssp_engine_pred is not None:
+                        st.markdown("**Componentes do SSP:**")
+                        col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                        col_s1.metric("Win-Prob", f"{ssp_result.get('wp_component', 0):.1f}")
+                        col_s2.metric("Eficiência xG", f"{ssp_result.get('efficiency_component', 0):.1f}")
+                        col_s3.metric("Cluster Fit", f"{ssp_result.get('cluster_component', 0):.1f}")
+                        col_s4.metric("Percentil", f"{ssp_result.get('percentile_component', 0):.1f}")
+
+    # ===== TAB 9: CLUSTERS TÁTICOS =====
+    with tab9:
+        st.markdown("### 🧬 Perfis Táticos por Clusterização")
+        if not HAS_PREDICTIVE:
+            st.warning("Motor preditivo não disponível. Instale as dependências: `pip install scikit-learn scipy statsmodels xgboost`")
+        else:
+            st.caption("K-Means + Gaussian Mixture + Random Forest (Ferra, 2025; Nunes, 2025)")
+            
+            categorias_cluster = list(POSITION_WEIGHTS.keys())
+            posicao_cluster = st.selectbox("Posição para Clusterização", categorias_cluster, key='pos_cluster')
+            
+            min_min_cluster = st.number_input("Minutos Mínimos", 0, 5000, 500, 100, key='min_cluster')
+            
+            if st.button("🧬 Identificar Perfis", type='primary', key='btn_cluster'):
+                pp = DataPreprocessor()
+                features = pp.get_available_features(wyscout, posicao_cluster)
+                
+                if len(features) < 5:
+                    st.error(f"Features insuficientes para {posicao_cluster}: {len(features)}")
+                else:
+                    try:
+                        df_f, X, available = pp.prepare_matrix(wyscout, features, min_minutes=min_min_cluster)
+                        
+                        if len(df_f) < 15:
+                            st.warning(f"Jogadores insuficientes para clustering: {len(df_f)} (mínimo: 15)")
+                        else:
+                            with st.spinner(f'Clusterizando {len(df_f)} jogadores...'):
+                                tc = TacticalClusterer()
+                                tc.fit(X, available)
+                                
+                                result = tc.predict(X)
+                                df_f['Cluster'] = result['labels']
+                                df_f['Prob_Cluster'] = (result['probabilities'].max(axis=1) * 100).round(1)
+                            
+                            st.success(f"**{tc.optimal_k} perfis táticos** identificados em {len(df_f)} {posicao_cluster.lower()}s")
+                            
+                            # Resumo por cluster
+                            for k in range(tc.optimal_k):
+                                mask = df_f['Cluster'] == k
+                                df_cluster = df_f[mask]
+                                profile = tc.cluster_profiles.get(k, {})
+                                
+                                with st.expander(f"Perfil {k+1} — {profile.get('size', 0)} jogadores", expanded=(k==0)):
+                                    # Top jogadores do cluster
+                                    jogadores_cluster = df_cluster.head(10)
+                                    show_cols_cl = ['Jogador', 'Equipa', 'Prob_Cluster']
+                                    for c in ['Idade', 'Minutos jogados:']:
+                                        if c in jogadores_cluster.columns:
+                                            show_cols_cl.append(c)
+                                    show_cols_cl = [c for c in show_cols_cl if c in jogadores_cluster.columns]
+                                    
+                                    if show_cols_cl:
+                                        st.dataframe(jogadores_cluster[show_cols_cl], hide_index=True, width='stretch')
+                                    
+                                    # Características do cluster
+                                    if 'centroid' in profile:
+                                        top_feats = sorted(
+                                            profile['centroid'].items(),
+                                            key=lambda x: -abs(x[1])
+                                        )[:8]
+                                        feat_df = pd.DataFrame(top_feats, columns=['Métrica', 'Centróide (z-score)'])
+                                        feat_df['Centróide (z-score)'] = feat_df['Centróide (z-score)'].round(2)
+                                        st.dataframe(feat_df, hide_index=True)
+                    
+                    except Exception as e:
+                        st.error(f"Erro na clusterização: {e}")
 
 
 if __name__ == "__main__":
