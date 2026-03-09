@@ -3201,24 +3201,55 @@ def main():
                 
                 col_p1, col_p2, col_p3 = st.columns(3)
                 with col_p1:
-                    idade_pred = st.number_input("Idade", 16, 42, int(safe_float(row_pred.get('Idade'), 24)), key='idade_pred')
+                    # Idade puxada automaticamente do jogador selecionado
+                    idade_auto = int(safe_float(row_pred.get('Idade'), 24))
+                    st.metric("Idade", f"{idade_auto} anos")
+                    idade_pred = idade_auto
                 with col_p2:
-                    ligas_br = ['Serie A Brasil', 'Serie B Brasil', 'Serie C Brasil', 'Serie D Brasil',
-                                'Paulista A1', 'Paulista A2', 'Paulista A3',
-                                'Carioca A1', 'Gaucho A1', 'Mineiro A1',
-                                'Copa do Brasil', 'Copa do Nordeste']
-                    liga_origem = st.selectbox("Liga Origem", ligas_br, key='liga_orig')
+                    ligas_origem_all = [
+                        # Brasil
+                        'Serie A Brasil', 'Serie B Brasil', 'Serie C Brasil', 'Serie D Brasil',
+                        # Estaduais
+                        'Paulista A1', 'Paulista A2', 'Paulista A3',
+                        'Carioca A1', 'Gaucho A1', 'Mineiro A1',
+                        'Paranaense A1', 'Cearense A1', 'Pernambucano A1', 'Baiano A1',
+                        # Copas Brasil
+                        'Copa do Brasil', 'Copa do Nordeste',
+                        # Top 5 Europa
+                        'Premier League', 'La Liga', 'Bundesliga', 'Serie A Italia', 'Ligue 1',
+                        # 2ª Divisões Europa
+                        'Championship', 'La Liga 2', 'Serie B Italia', '2. Bundesliga', 'Ligue 2',
+                        # Europa Tier 2
+                        'Liga Portugal', 'Liga Portugal 2', 'Eredivisie', 'Belgian Pro League',
+                        'Super Lig', 'Scottish Premiership', 'Russian Premier League',
+                        'Austrian Bundesliga', 'Swiss Super League', 'Danish Superliga',
+                        'Greek Super League', 'Ukrainian Premier League',
+                        'Czech First League', 'Croatian First League', 'Serbian Super Liga',
+                        'Polish Ekstraklasa', 'Romanian Liga I',
+                        'Norwegian Eliteserien', 'Swedish Allsvenskan',
+                        'Israeli Premier League', 'Bulgarian First League', 'Cypriot First Division',
+                        # Américas
+                        'Liga Argentina', 'Liga Argentina B', 'MLS', 'Liga MX',
+                        'Liga Colombia', 'Liga Chile', 'Liga Uruguai', 'Liga Peru',
+                        'Liga Equador', 'Liga Paraguai', 'Liga Bolivia', 'Liga Venezuela',
+                        # Copas Continentais
+                        'Copa Libertadores', 'Copa Sudamericana',
+                        # Ásia / Oriente Médio
+                        'J1 League', 'J2 League', 'K-League 1',
+                        'Saudi Pro League', 'Qatar Stars League', 'UAE Pro League',
+                        'Chinese Super League', 'Indian Super League', 'Thai League',
+                        # África
+                        'Egyptian Premier League', 'Moroccan Botola', 'Tunisian Ligue 1',
+                        'South African Premier',
+                        # Oceania
+                        'A-League',
+                    ]
+                    liga_origem = st.selectbox("Liga Origem", ligas_origem_all, key='liga_orig')
                 with col_p3:
-                    ligas_alvo = ['Serie A Brasil', 'Serie B Brasil',
-                                  'Premier League', 'La Liga', 'Bundesliga',
-                                  'Serie A Italia', 'Ligue 1',
-                                  'Championship', 'La Liga 2', 'Serie B Italia', '2. Bundesliga', 'Ligue 2',
-                                  'Liga Portugal', 'Liga Portugal 2', 'Eredivisie',
-                                  'Belgian Pro League', 'Super Lig',
-                                  'MLS', 'Liga MX', 'Liga Argentina',
-                                  'J1 League', 'Saudi Pro League',
-                                  'Serie C Brasil', 'Paulista A1']
-                    liga_alvo = st.selectbox("Liga Alvo", ligas_alvo, key='liga_alvo')
+                    ligas_alvo_all = ligas_origem_all.copy()
+                    liga_alvo = st.selectbox("Liga Alvo", ligas_alvo_all,
+                                             index=ligas_alvo_all.index('Serie B Brasil') if 'Serie B Brasil' in ligas_alvo_all else 0,
+                                             key='liga_alvo')
                 
                 if st.button("🔮 Calcular Predição", type='primary', key='btn_pred'):
                     # Obter engine
