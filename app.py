@@ -1658,8 +1658,13 @@ def get_ssp_engine(_df_cols_hash, df, position):
     if not HAS_PREDICTIVE:
         return None
     try:
+        # Pré-filtrar por posição usando mapeamento correto (CF→Atacante, etc.)
+        df_pos = df[df['Posição'].apply(get_posicao_categoria) == position].copy()
+        if len(df_pos) < 15:
+            return None
         engine = ScoutScorePreditivo()
-        engine.fit(df=df, position=position, min_minutes=500)
+        # pos_col='_prefiltrado_' evita re-filtro interno (já filtrado acima)
+        engine.fit(df=df_pos, position=position, min_minutes=500, pos_col='_prefiltrado_')
         return engine
     except Exception:
         return None
@@ -3299,13 +3304,15 @@ def main():
             
             if st.button("🧬 Identificar Perfis", type='primary', key='btn_cluster'):
                 pp = DataPreprocessor()
-                features = pp.get_available_features(wyscout, posicao_cluster)
+                # Filtrar por posição antes de clusterizar
+                wyscout_cluster = wyscout[wyscout['Posição'].apply(get_posicao_categoria) == posicao_cluster].copy()
+                features = pp.get_available_features(wyscout_cluster, posicao_cluster)
                 
                 if len(features) < 5:
                     st.error(f"Features insuficientes para {posicao_cluster}: {len(features)}")
                 else:
                     try:
-                        df_f, X, available = pp.prepare_matrix(wyscout, features, min_minutes=min_min_cluster)
+                        df_f, X, available = pp.prepare_matrix(wyscout_cluster, features, min_minutes=min_min_cluster)
                         
                         if len(df_f) < 15:
                             st.warning(f"Jogadores insuficientes para clustering: {len(df_f)} (mínimo: 15)")
