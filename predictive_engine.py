@@ -812,9 +812,94 @@ class ScoutScorePreditivo:
 # ================================================================
 
 class ContractSuccessPredictor:
+    # Tiers baseados no Opta Power Rankings (Jun/2025, The Analyst)
+    # Escala 0-10, normalizada: EPL avg 92.6 → 10.0
     LEAGUE_TIERS = {
-        'Serie A Brasil': 7, 'Serie B Brasil': 5, 'Serie C Brasil': 3, 'Serie D Brasil': 1.5,
-        'Premier League': 10, 'La Liga': 9.5, 'Serie A Italia': 9, 'Bundesliga': 9, 'Ligue 1': 8,
+        # === TOP 5 EUROPEIAS ===
+        'Premier League': 10.0,
+        'La Liga': 9.4,
+        'Serie A Italia': 9.4,
+        'Bundesliga': 9.3,
+        'Ligue 1': 9.2,
+        # === 2ª DIVISÕES TOP 5 ===
+        'Championship': 8.9,
+        'La Liga 2': 7.5,
+        'Serie B Italia': 7.5,
+        '2. Bundesliga': 7.5,
+        'Ligue 2': 7.0,
+        # === EUROPA — TIER 2 ===
+        'Liga Portugal': 8.6,
+        'Liga Portugal 2': 6.0,
+        'Belgian Pro League': 8.5,
+        'Eredivisie': 8.5,
+        'Super Lig': 8.3,
+        'Scottish Premiership': 8.2,
+        'Russian Premier League': 8.2,
+        'Austrian Bundesliga': 8.1,
+        'Swiss Super League': 8.1,
+        'Danish Superliga': 8.0,
+        'Greek Super League': 7.9,
+        'Ukrainian Premier League': 7.9,
+        'Czech First League': 7.5,
+        'Croatian First League': 7.3,
+        'Serbian Super Liga': 7.3,
+        'Polish Ekstraklasa': 7.3,
+        'Romanian Liga I': 7.2,
+        'Norwegian Eliteserien': 7.2,
+        'Swedish Allsvenskan': 7.2,
+        'Israeli Premier League': 7.0,
+        'Bulgarian First League': 6.8,
+        'Cypriot First Division': 6.8,
+        # === AMÉRICAS ===
+        'Serie A Brasil': 8.6,
+        'Serie B Brasil': 6.0,
+        'Serie C Brasil': 4.0,
+        'Serie D Brasil': 2.0,
+        'Liga Argentina': 8.5,
+        'Liga Argentina B': 5.5,
+        'MLS': 8.5,
+        'Liga MX': 8.5,
+        'Liga Colombia': 7.5,
+        'Liga Chile': 7.0,
+        'Liga Uruguai': 7.0,
+        'Liga Peru': 6.5,
+        'Liga Equador': 7.0,
+        'Liga Paraguai': 6.5,
+        'Liga Bolivia': 5.5,
+        'Liga Venezuela': 6.0,
+        # === ÁSIA / ORIENTE MÉDIO ===
+        'J1 League': 8.0,
+        'J2 League': 6.0,
+        'K-League 1': 7.8,
+        'Saudi Pro League': 7.9,
+        'Qatar Stars League': 7.3,
+        'UAE Pro League': 7.0,
+        'Chinese Super League': 6.5,
+        'Indian Super League': 5.5,
+        'Thai League': 5.5,
+        # === ÁFRICA ===
+        'Egyptian Premier League': 7.0,
+        'South African Premier': 6.0,
+        'Moroccan Botola': 6.5,
+        'Tunisian Ligue 1': 6.0,
+        # === OCEANIA ===
+        'A-League': 7.0,
+        # === ESTADUAIS BRASIL ===
+        'Paulista A1': 4.5,
+        'Paulista A2': 3.0,
+        'Paulista A3': 2.0,
+        'Carioca A1': 4.5,
+        'Gaucho A1': 4.0,
+        'Mineiro A1': 4.0,
+        'Paranaense A1': 3.5,
+        'Cearense A1': 3.0,
+        'Pernambucano A1': 3.0,
+        'Baiano A1': 3.0,
+        # === COPAS ===
+        'Copa do Brasil': 7.0,
+        'Copa do Nordeste': 4.0,
+        'Copa Libertadores': 9.0,
+        'Copa Sudamericana': 7.5,
     }
 
     def predict_success_unsupervised(self, ssp_score: float, age: float, league_origin: str, league_target: str, minutes: float, max_minutes: float = 3000) -> Dict[str, Any]:
