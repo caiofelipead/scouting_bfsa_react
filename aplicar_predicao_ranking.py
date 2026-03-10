@@ -172,14 +172,16 @@ def resolve_league_to_tier(league_name, team_name=None):
     # =================================================================
     # PATCH 2: Checkbox "Incluir P(Sucesso)" + seletor Liga Alvo
     # Inserido ANTES de "# ===== APLICAR FILTROS ====="
+    # Idempotente: não aplica se o bloco já existir no código
     # =================================================================
     P2_ANCHOR = '        # ===== APLICAR FILTROS =====\n        df_rank = wyscout.copy()'
+    P2_GUARD = "key=f'inc_pred_rank_{posicao_rank}'"
 
     P2_INSERT = """        # ===== FILTRO: LIGA ALVO (predição de sucesso) =====
         if HAS_PREDICTIVE:
             col_pred1, col_pred2 = st.columns([1, 3])
             with col_pred1:
-                incluir_predicao = st.checkbox("\U0001f3af Incluir P(Sucesso)", value=False, key='inc_pred_rank',
+                incluir_predicao = st.checkbox("\U0001f3af Incluir P(Sucesso)", value=False, key=f'inc_pred_rank_{posicao_rank}',
                                                 help="Calcula probabilidade de sucesso contratual para cada jogador")
             with col_pred2:
                 if incluir_predicao:
@@ -194,7 +196,7 @@ def resolve_league_to_tier(league_name, team_name=None):
                         'K-League 1', 'A-League',
                     ]
                     liga_alvo_rank = st.selectbox("Liga Alvo (contratação)", ligas_alvo_ranking,
-                                                   index=0, key='liga_alvo_rank')
+                                                   index=0, key=f'liga_alvo_rank_{posicao_rank}')
                 else:
                     liga_alvo_rank = 'Serie B Brasil'
         else:
@@ -203,7 +205,12 @@ def resolve_league_to_tier(league_name, team_name=None):
 
         """ + P2_ANCHOR
 
-    code, ok = apply(code, P2_ANCHOR, P2_INSERT, 'P2: Checkbox + seletor Liga Alvo')
+    if P2_GUARD in code:
+        print(f'  [\033[93mSKIP\033[0m] P2: Checkbox + seletor Liga Alvo — já aplicado (idempotente)')
+        ok_count += 1
+    else:
+        code, ok = apply(code, P2_ANCHOR, P2_INSERT, 'P2: Checkbox + seletor Liga Alvo')
+        if ok: ok_count += 1
     if ok: ok_count += 1
 
     # =================================================================

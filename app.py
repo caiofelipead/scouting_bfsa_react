@@ -2973,7 +2973,7 @@ def main():
         if HAS_PREDICTIVE:
             col_pred1, col_pred2 = st.columns([1, 3])
             with col_pred1:
-                incluir_predicao = st.checkbox("🎯 Incluir P(Sucesso)", value=False, key='inc_pred_rank',
+                incluir_predicao = st.checkbox("🎯 Incluir P(Sucesso)", value=False, key=f'inc_pred_rank_{posicao_rank}',
                                                 help="Calcula probabilidade de sucesso contratual para cada jogador")
             with col_pred2:
                 if incluir_predicao:
@@ -2988,7 +2988,7 @@ def main():
                         'K-League 1', 'A-League',
                     ]
                     liga_alvo_rank = st.selectbox("Liga Alvo (contratação)", ligas_alvo_ranking,
-                                                   index=0, key='liga_alvo_rank')
+                                                   index=0, key=f'liga_alvo_rank_{posicao_rank}')
                 else:
                     liga_alvo_rank = 'Serie B Brasil'
         else:
