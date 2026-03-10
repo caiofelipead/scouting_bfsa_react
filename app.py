@@ -2,7 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
+import html as html_module
+import logging
+import os
 import requests
 from bs4 import BeautifulSoup
 import re
@@ -30,6 +33,47 @@ try:
 except Exception:
     HAS_PREDICTIVE = False
 
+# ============================================
+# LOGGING
+# ============================================
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+logger = logging.getLogger(__name__)
+
+# ============================================
+# SANITIZAÇÃO DE URLs E HTML
+# ============================================
+_ALLOWED_URL_SCHEMES = {'http', 'https'}
+_ALLOWED_IMG_DOMAINS = {
+    'logodetimes.com', 'upload.wikimedia.org', 'cdn-img.zerozero.pt',
+    'img.a.transfermarkt.technology', 'tmssl.akamaized.net',
+    'www.ogol.com.br', 'ogol.com.br', 'zerozero.pt',
+}
+
+def sanitize_url(url: str) -> str:
+    """Valida e sanitiza URL para uso seguro em HTML.
+    Retorna string vazia se a URL não for segura."""
+    if not url or not isinstance(url, str):
+        return ''
+    url = url.strip()
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in _ALLOWED_URL_SCHEMES:
+            return ''
+        if not parsed.netloc:
+            return ''
+        return url
+    except Exception:
+        return ''
+
+def escape_html(text: str) -> str:
+    """Escapa texto para uso seguro em HTML."""
+    if text is None:
+        return ''
+    return html_module.escape(str(text))
 
 # ============================================
 # CONFIG
@@ -44,7 +88,11 @@ st.set_page_config(
 # ============================================
 # GOOGLE SHEETS CONFIG
 # ============================================
-GOOGLE_SHEET_ID = "1aRjJAxYHJED4FyPnq4PfcrzhhRhzw-vNQ9Vg1pIlak0"
+GOOGLE_SHEET_ID = os.environ.get(
+    "GOOGLE_SHEET_ID",
+    st.secrets.get("GOOGLE_SHEET_ID", "1aRjJAxYHJED4FyPnq4PfcrzhhRhzw-vNQ9Vg1pIlak0")
+    if hasattr(st, 'secrets') and st.secrets else "1aRjJAxYHJED4FyPnq4PfcrzhhRhzw-vNQ9Vg1pIlak0"
+)
 
 # ============================================
 # BANDEIRAS DE NACIONALIDADE
@@ -401,7 +449,9 @@ def get_league_logo_html(league_name, size=20):
     """Retorna HTML img tag para o logo da liga"""
     logo_url = get_league_logo(league_name)
     if logo_url:
-        return f'<img src="{logo_url}" width="{size}" height="{size}" style="vertical-align: middle; margin-right: 5px;" onerror="this.style.display=\'none\'">'
+        safe_url = sanitize_url(logo_url)
+        if safe_url:
+            return f'<img src="{escape_html(safe_url)}" width="{int(size)}" height="{int(size)}" style="vertical-align: middle; margin-right: 5px;" onerror="this.style.display=\'none\'">'
     return ''
 
 def get_club_logo(club_name):
@@ -414,7 +464,9 @@ def get_club_logo_html(club_name, size=20):
     """Retorna HTML img tag para o escudo"""
     logo_url = get_club_logo(club_name)
     if logo_url:
-        return f'<img src="{logo_url}" width="{size}" height="{size}" style="vertical-align: middle; margin-right: 5px;">'
+        safe_url = sanitize_url(logo_url)
+        if safe_url:
+            return f'<img src="{escape_html(safe_url)}" width="{int(size)}" height="{int(size)}" style="vertical-align: middle; margin-right: 5px;">'
     return ''
 
 # ============================================
@@ -1145,7 +1197,11 @@ def scrape_ogol_data(ogol_url):
                 break
         
         return data
+    except requests.RequestException as e:
+        logger.warning("Erro no scraping OGol (%s): %s", ogol_url, e)
+        return None
     except Exception as e:
+        logger.error("Erro inesperado no scraping OGol: %s", e)
         return None
 
 
@@ -1225,7 +1281,11 @@ def scrape_transfermarkt_data(tm_url):
                 break
         
         return data
+    except requests.RequestException as e:
+        logger.warning("Erro no scraping Transfermarkt (%s): %s", tm_url, e)
+        return None
     except Exception as e:
+        logger.error("Erro inesperado no scraping Transfermarkt: %s", e)
         return None
 
 
@@ -1233,17 +1293,23 @@ def get_player_photo(p, ogol_data=None, tm_data=None):
     """Retorna URL da foto do jogador priorizando: planilha > OGol > TM"""
     # 1. Verificar se tem foto na planilha
     foto_planilha = safe_str(p.get('Foto'), None)
-    if foto_planilha and foto_planilha.startswith('http'):
-        return foto_planilha
-    
+    if foto_planilha:
+        safe_url = sanitize_url(foto_planilha)
+        if safe_url:
+            return safe_url
+
     # 2. Verificar OGol
     if ogol_data and ogol_data.get('foto'):
-        return ogol_data['foto']
-    
+        safe_url = sanitize_url(ogol_data['foto'])
+        if safe_url:
+            return safe_url
+
     # 3. Verificar Transfermarkt
     if tm_data and tm_data.get('foto'):
-        return tm_data['foto']
-    
+        safe_url = sanitize_url(tm_data['foto'])
+        if safe_url:
+            return safe_url
+
     return None
 
 
@@ -1326,6 +1392,7 @@ def load_from_google_sheets():
         try:
             sheets[sheet_name] = pd.read_csv(url)
         except Exception as e:
+            logger.warning("Erro ao carregar '%s' do Google Sheets: %s", sheet_name, e)
             st.warning(f"Erro ao carregar {sheet_name} do Google Sheets: {e}")
             return None
     
@@ -1349,8 +1416,8 @@ def load_data(uploaded_file=None, use_google_sheets=True):
             result = load_from_google_sheets()
             if result:
                 analises, oferecidos, skillcorner, wyscout = result
-        except:
-            pass
+        except (IOError, pd.errors.ParserError, ValueError) as e:
+            logger.warning("Falha ao carregar Google Sheets: %s", e)
     
     # Fallback para arquivo local
     if analises is None:
@@ -1360,7 +1427,8 @@ def load_data(uploaded_file=None, use_google_sheets=True):
             oferecidos = pd.read_excel(xlsx, sheet_name='Oferecidos')
             skillcorner = pd.read_excel(xlsx, sheet_name='SkillCorner')
             wyscout = pd.read_excel(xlsx, sheet_name='WyScout')
-        except:
+        except (FileNotFoundError, ValueError, KeyError) as e:
+            logger.error("Falha ao carregar arquivo local: %s", e)
             return None, None, None, None
     
     # CONVERTER COLUNAS NUMÉRICAS DO WYSCOUT (Google Sheets retorna strings)
@@ -1849,8 +1917,9 @@ def main():
         
         try:
             analises, oferecidos, skillcorner, wyscout = load_data(uploaded)
-        except:
-            st.error("⚠️ Faça upload do Excel")
+        except Exception as e:
+            logger.error("Erro ao carregar dados: %s", e)
+            st.error(f"⚠️ Erro ao carregar dados: {e}. Faça upload do Excel ou verifique a conexão.")
             return
         
         st.divider()
@@ -1896,13 +1965,21 @@ def main():
             
             # Escudo do clube
             if tm_data and tm_data.get('clube_escudo'):
-                club_logo = f'<img src="{tm_data["clube_escudo"]}" width="24" height="24" style="vertical-align: middle; margin-right: 5px; border-radius: 4px;" onerror="this.style.display=\'none\'">'
+                safe_clube_url = sanitize_url(tm_data["clube_escudo"])
+                if safe_clube_url:
+                    club_logo = f'<img src="{escape_html(safe_clube_url)}" width="24" height="24" style="vertical-align: middle; margin-right: 5px; border-radius: 4px;" onerror="this.style.display=\'none\'">'
+                else:
+                    club_logo = get_club_logo_html(clube_nome, size=24)
             else:
                 club_logo = get_club_logo_html(clube_nome, size=24)
-            
+
             # Escudo da liga
             if tm_data and tm_data.get('liga_escudo'):
-                league_logo = f'<img src="{tm_data["liga_escudo"]}" width="24" height="24" style="vertical-align: middle; margin-right: 5px; border-radius: 4px;" onerror="this.style.display=\'none\'">'
+                safe_liga_url = sanitize_url(tm_data["liga_escudo"])
+                if safe_liga_url:
+                    league_logo = f'<img src="{escape_html(safe_liga_url)}" width="24" height="24" style="vertical-align: middle; margin-right: 5px; border-radius: 4px;" onerror="this.style.display=\'none\'">'
+                else:
+                    league_logo = get_league_logo_html(liga_nome, size=24)
             else:
                 league_logo = get_league_logo_html(liga_nome, size=24)
             
@@ -1918,8 +1995,8 @@ def main():
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 28px;">{flag}</span>
                         <div>
-                            <div style="color: {COLORS['accent']}; font-size: 12px; font-weight: 600; letter-spacing: 1px;">{safe_str(p.get('Posição'), 'JOGADOR')}</div>
-                            <div style="color: white; font-size: 32px; font-weight: 800; margin: 4px 0;">{p['Nome']}</div>
+                            <div style="color: {COLORS['accent']}; font-size: 12px; font-weight: 600; letter-spacing: 1px;">{escape_html(safe_str(p.get('Posição'), 'JOGADOR'))}</div>
+                            <div style="color: white; font-size: 32px; font-weight: 800; margin: 4px 0;">{escape_html(str(p['Nome']))}</div>
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px;">
@@ -1938,7 +2015,7 @@ def main():
                 if foto_url:
                     st.markdown(f"""
                     <div style="background: {COLORS['card']}; border-radius: 12px; padding: 8px; border: 1px solid {COLORS['border']}; text-align: center;">
-                        <img src="{foto_url}" style="width: 100%; max-height: 180px; object-fit: contain; border-radius: 8px;" onerror="this.style.display='none'"/>
+                        <img src="{escape_html(foto_url)}" style="width: 100%; max-height: 180px; object-fit: contain; border-radius: 8px;" onerror="this.style.display='none'"/>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
@@ -1964,25 +2041,31 @@ def main():
             relatorio_url = safe_str(p.get('Relatório'), None)
             
             links_html = []
+            link_style = f'background: {COLORS["card"]}; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 12px; border: 1px solid {COLORS["border"]};'
             # Vídeo - pode ser URL ou nome de arquivo
             if video_url:
-                if video_url.startswith('http'):
-                    links_html.append(f'<a href="{video_url}" target="_blank" style="background: {COLORS["card"]}; color: {COLORS["accent"]}; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 12px; border: 1px solid {COLORS["border"]};">🎬 Vídeo</a>')
+                safe_video = sanitize_url(video_url)
+                if safe_video:
+                    links_html.append(f'<a href="{escape_html(safe_video)}" target="_blank" rel="noopener noreferrer" style="{link_style} color: {COLORS["accent"]};">🎬 Vídeo</a>')
                 else:
-                    # Nome de arquivo - mostrar como indicador (sem link)
-                    links_html.append(f'<span style="background: {COLORS["card"]}; color: {COLORS["accent"]}; padding: 8px 16px; border-radius: 6px; font-size: 12px; border: 1px solid {COLORS["border"]};" title="{video_url}">🎬 Vídeo ✓</span>')
-            
+                    links_html.append(f'<span style="{link_style} color: {COLORS["accent"]};" title="{escape_html(video_url)}">🎬 Vídeo ✓</span>')
+
             # Relatório - pode ser URL ou nome de arquivo
             if relatorio_url:
-                if relatorio_url.startswith('http'):
-                    links_html.append(f'<a href="{relatorio_url}" target="_blank" style="background: {COLORS["card"]}; color: {COLORS["accent"]}; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 12px; border: 1px solid {COLORS["border"]};">📄 Relatório</a>')
+                safe_relatorio = sanitize_url(relatorio_url)
+                if safe_relatorio:
+                    links_html.append(f'<a href="{escape_html(safe_relatorio)}" target="_blank" rel="noopener noreferrer" style="{link_style} color: {COLORS["accent"]};">📄 Relatório</a>')
                 else:
-                    links_html.append(f'<span style="background: {COLORS["card"]}; color: {COLORS["accent"]}; padding: 8px 16px; border-radius: 6px; font-size: 12px; border: 1px solid {COLORS["border"]};" title="{relatorio_url}">📄 Relatório ✓</span>')
-            
+                    links_html.append(f'<span style="{link_style} color: {COLORS["accent"]};" title="{escape_html(relatorio_url)}">📄 Relatório ✓</span>')
+
             if tm_url:
-                links_html.append(f'<a href="{tm_url}" target="_blank" style="background: {COLORS["card"]}; color: #00b386; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 12px; border: 1px solid {COLORS["border"]};">🔗 Transfermarkt</a>')
+                safe_tm = sanitize_url(tm_url)
+                if safe_tm:
+                    links_html.append(f'<a href="{escape_html(safe_tm)}" target="_blank" rel="noopener noreferrer" style="{link_style} color: #00b386;">🔗 Transfermarkt</a>')
             if ogol_url:
-                links_html.append(f'<a href="{ogol_url}" target="_blank" style="background: {COLORS["card"]}; color: #3b82f6; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 12px; border: 1px solid {COLORS["border"]};">⚽ OGol</a>')
+                safe_ogol = sanitize_url(ogol_url)
+                if safe_ogol:
+                    links_html.append(f'<a href="{escape_html(safe_ogol)}" target="_blank" rel="noopener noreferrer" style="{link_style} color: #3b82f6;">⚽ OGol</a>')
             
             if links_html:
                 st.markdown(f"""
@@ -2457,7 +2540,7 @@ def main():
                 try:
                     count_match = int(float(count_match)) if pd.notna(count_match) else 0
                     min_per_match = float(min_per_match) if pd.notna(min_per_match) else 0
-                except:
+                except (ValueError, TypeError):
                     count_match = 0
                     min_per_match = 0
                 
@@ -2556,7 +2639,7 @@ def main():
                             # rank JÁ É o percentil (rank 100 = melhor)
                             try:
                                 sc_style_perc[label] = float(rank)
-                            except:
+                            except (ValueError, TypeError):
                                 pass
                 
                 if sc_style_perc:
@@ -2700,7 +2783,7 @@ def main():
                             try:
                                 phys1[label] = float(r1)
                                 phys2[label] = float(r2)
-                            except:
+                            except (ValueError, TypeError):
                                 pass
                 
                 if phys1 and phys2:
