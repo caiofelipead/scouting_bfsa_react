@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ArrowUpDown } from 'lucide-react';
 import { useRankings } from '../hooks/usePlayers';
@@ -12,6 +12,7 @@ export default function RankingsPage() {
   const [league, setLeague] = useState('');
   const [positions, setPositions] = useState<string[]>([]);
   const [leagues, setLeagues] = useState<string[]>([]);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
     api.get('/config/positions').then((r) => setPositions(r.data.positions)).catch(() => {});
@@ -19,7 +20,7 @@ export default function RankingsPage() {
   }, []);
 
   useEffect(() => {
-    fetchRankings(position, minMinutes, league || undefined, 50);
+    fetchRankings(position, minMinutes, league || undefined, 50).then(() => { hasFetched.current = true; });
   }, [position, minMinutes, league, fetchRankings]);
 
   return (
@@ -94,7 +95,7 @@ export default function RankingsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading || (!rankings && !hasFetched.current) ? (
                 Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
                     {Array.from({ length: 6 }).map((_, j) => (

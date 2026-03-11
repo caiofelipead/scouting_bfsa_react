@@ -23,7 +23,8 @@ api.interceptors.response.use(
       console.warn('[api] 401 received – clearing session', err.config?.url);
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
-      // Let React re-render instead of forcing a hard reload loop
+      // Force reload to show login screen and clear stale React state
+      window.location.reload();
     }
     return Promise.reject(err);
   }
