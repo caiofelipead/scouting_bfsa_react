@@ -79,7 +79,7 @@ export default function ClustersPage() {
                 >
                   <div className="flex items-center gap-3">
                     {expandedCluster === cluster.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <span className="font-[var(--font-display)] font-bold">Perfil {cluster.id + 1}</span>
+                    <span className="font-[var(--font-display)] font-bold">{cluster.name || `Perfil ${cluster.id + 1}`}</span>
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-muted)' }}>
                       {cluster.size} jogadores
                     </span>

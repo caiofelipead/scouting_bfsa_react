@@ -527,6 +527,83 @@ async def get_rankings(
     return RankingResponse(position=position, total=len(entries), players=entries)
 
 
+@app.post("/api/rankings/prediction")
+async def get_prediction_rankings(
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """Ranking by P(Sucesso) prediction — includes SSP, risk, probability."""
+    df = _get_wyscout()
+    position = get_posicao_categoria(req.get("position", "Atacante"))
+    min_minutes = req.get("min_minutes", 500)
+    league_filter = req.get("league", None)
+    league_target = req.get("league_target", "Serie B Brasil")
+    top_n = req.get("top_n", 50)
+
+    if "Posição" in df.columns:
+        pool = df[df["Posição"].apply(lambda p: get_posicao_categoria(p) == position if pd.notna(p) else False)].copy()
+    else:
+        pool = df.copy()
+
+    if league_filter and "liga_tier" in pool.columns:
+        pool = pool[pool["liga_tier"] == league_filter]
+
+    # Filter by min minutes
+    pool["_min"] = pool.get("Minutos jogados:", pd.Series(dtype=float)).apply(_safe_float)
+    pool = pool[pool["_min"] >= min_minutes]
+    pool = pool.drop(columns=["_min"])
+
+    if len(pool) == 0:
+        return {"position": position, "league_target": league_target, "total": 0, "players": []}
+
+    predictor = ContractSuccessPredictor()
+    results = []
+
+    for idx, row in pool.iterrows():
+        ssp = calculate_overall_score(row, position, df)
+        if ssp is None:
+            continue
+        age = _safe_float(row.get("Idade")) or 24
+        minutes = _safe_float(row.get("Minutos jogados:")) or 0
+        league_origin = str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else "Serie B Brasil"
+
+        pred = predictor.predict_success_unsupervised(
+            ssp_score=ssp, age=age,
+            league_origin=league_origin, league_target=league_target,
+            minutes=minutes,
+        )
+
+        results.append({
+            "name": str(row.get("Jogador", "")),
+            "display_name": str(row.get("JogadorDisplay", row.get("Jogador", ""))),
+            "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
+            "age": age,
+            "league": league_origin,
+            "minutes": minutes,
+            "ssp": round(ssp, 1),
+            "p_success": round(pred["success_probability"], 3),
+            "risk_level": pred["risk_level"],
+            "league_gap": round(pred["league_gap"], 1),
+            "tier_origin": pred["tier_origin"],
+            "tier_target": pred["tier_target"],
+        })
+
+    # Sort by P(Sucesso) descending
+    results.sort(key=lambda x: -x["p_success"])
+    results = results[:top_n]
+
+    # Add rank
+    for i, r in enumerate(results, 1):
+        r["rank"] = i
+
+    return {
+        "position": position,
+        "league_target": league_target,
+        "total": len(results),
+        "players": results,
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════
 # SIMILARITY ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════
@@ -978,6 +1055,94 @@ async def predict_contract_success(
 # CLUSTERS (tactical clustering)
 # ══════════════════════════════════════════════════════════════════════
 
+# Metric-to-label mapping for cluster naming
+_METRIC_LABELS = {
+    # Offensive
+    "Golos esperados/90": "Finalizador",
+    "Golos/90": "Goleador",
+    "xG/Chute": "Eficiente",
+    "Assistências esperadas/90": "Criador",
+    "Assistências/90": "Assistente",
+    "Passes decisivos/90": "Decisivo",
+    "Dribles/90": "Driblador",
+    "Dribles com sucesso, %": "Habilidoso",
+    "Toques na área/90": "Presenca de Area",
+    "Chutes/90": "Artilheiro",
+    # Passing
+    "Passes progressivos/90": "Progressivo",
+    "Passes para frente/90": "Vertical",
+    "Passes para terço final/90": "Ofensivo",
+    "Passes longos/90": "Lancador",
+    "Precisão passes longos, %": "Preciso",
+    "Precisão passes, %": "Seguro",
+    "Passes inteligentes/90": "Criativo",
+    # Defensive
+    "Duelos defensivos/90": "Combativo",
+    "Duelos defensivos ganhos, %": "Robusto",
+    "Interceptações/90": "Interceptador",
+    "Recuperações de bola/90": "Recuperador",
+    "Duelos aéreos/90": "Aereo",
+    "Duelos aéreos ganhos, %": "Dominante Aereo",
+    "Faltas/90": "Aggressivo",
+    # Physical / Progression
+    "Corridas progressivas/90": "Dinamico",
+    "Acelerações/90": "Explosivo",
+    "Cruzamentos/90": "Cruzador",
+    "Cruzamentos precisos, %": "Cruzador Preciso",
+}
+
+
+def _generate_cluster_name(centroid: dict, position: str, cluster_id: int) -> str:
+    """Generate a descriptive name for a cluster based on its top centroid features."""
+    if not centroid:
+        return f"Perfil {cluster_id + 1}"
+
+    # Get top 3 positive (dominant) features
+    sorted_feats = sorted(centroid.items(), key=lambda x: -x[1])
+    top_positive = [(m, z) for m, z in sorted_feats if z > 0.3][:3]
+
+    if not top_positive:
+        return f"Equilibrado ({position})"
+
+    # Map metrics to labels
+    labels = []
+    for metric, zscore in top_positive:
+        label = _METRIC_LABELS.get(metric)
+        if not label:
+            # Try partial match
+            metric_lower = metric.lower()
+            if "gol" in metric_lower or "chute" in metric_lower:
+                label = "Finalizador"
+            elif "assist" in metric_lower or "decisiv" in metric_lower:
+                label = "Criador"
+            elif "drible" in metric_lower:
+                label = "Driblador"
+            elif "duel" in metric_lower and "defens" in metric_lower:
+                label = "Combativo"
+            elif "intercep" in metric_lower or "recuper" in metric_lower:
+                label = "Recuperador"
+            elif "pass" in metric_lower and "progress" in metric_lower:
+                label = "Progressivo"
+            elif "corrid" in metric_lower or "progress" in metric_lower:
+                label = "Dinamico"
+            elif "cruz" in metric_lower:
+                label = "Cruzador"
+            elif "aere" in metric_lower:
+                label = "Aereo"
+            elif "pass" in metric_lower:
+                label = "Passador"
+            else:
+                label = metric.split("/")[0].split(",")[0][:15]
+        if label not in labels:
+            labels.append(label)
+
+    if len(labels) >= 2:
+        return f"{labels[0]}-{labels[1]}"
+    return labels[0] if labels else f"Perfil {cluster_id + 1}"
+
+
+
+
 @app.post("/api/clusters")
 async def get_clusters(
     req: dict,
@@ -1032,8 +1197,12 @@ async def get_clusters(
         centroid = profile.get("centroid", {})
         top_features = sorted(centroid.items(), key=lambda x: -abs(x[1]))[:8]
 
+        # Auto-name the cluster profile based on top centroid features
+        profile_name = _generate_cluster_name(centroid, position, k)
+
         clusters.append({
             "id": k,
+            "name": profile_name,
             "size": int(profile.get("size", mask.sum())),
             "players": top_players,
             "features": [{"metric": m, "zscore": round(v, 2)} for m, v in top_features],

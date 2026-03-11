@@ -160,6 +160,7 @@ export interface ClusterPlayer {
 
 export interface ClusterResult {
   id: number;
+  name?: string;
   size: number;
   players: ClusterPlayer[];
   features: { metric: string; zscore: number }[];
