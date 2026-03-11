@@ -1004,32 +1004,386 @@ _WYSCOUT_LEAGUE_MAP_NORM = {
     padronizar_string(k): v for k, v in WYSCOUT_LEAGUE_MAP.items()
 }
 
-# Dicionário clube → liga para fallback via merge
 # Mapeamento clube → liga para fallback no cálculo do Gap Liga
+# Cobre clubes de TODAS as ligas presentes no LEAGUE_TIERS do motor preditivo
 CLUB_LEAGUE_MAP = {}
+
+# ── Brasil — Série B ──
 for team in SERIE_B_TEAMS:
     CLUB_LEAGUE_MAP[team] = 'Serie B Brasil'
 
-# Série A 2025
-_SERIE_A_TEAMS = [
+# ── Brasil — Série A ──
+for t in [
     'Atlético MG', 'Atlético Mineiro', 'Athletico Paranaense', 'Athletico PR',
-    'Bahia', 'Botafogo', 'Corinthians', 'Cruzeiro', 'Flamengo', 'Fluminense',
-    'Fortaleza', 'Grêmio', 'Internacional', 'Juventude', 'Palmeiras',
-    'RB Bragantino', 'Red Bull Bragantino', 'Santos', 'São Paulo',
-    'Vasco', 'Vasco da Gama', 'Vitória', 'Sport', 'Sport Recife',
-    'Ceará', 'Mirassol', 'Novorizontino', 'Grêmio Novorizontino',
-]
-for team in _SERIE_A_TEAMS:
-    CLUB_LEAGUE_MAP[team] = 'Serie A Brasil'
+    'Bahia', 'Botafogo', 'Corinthians', 'Cruzeiro', 'Cuiabá',
+    'Flamengo', 'Fluminense', 'Fortaleza', 'Grêmio', 'Internacional',
+    'Juventude', 'Palmeiras', 'RB Bragantino', 'Red Bull Bragantino',
+    'Santos', 'São Paulo', 'Vasco', 'Vasco da Gama', 'Vitória',
+    'Sport', 'Sport Recife', 'Ceará', 'Mirassol', 'Novorizontino',
+    'Grêmio Novorizontino', 'Atlético GO', 'Atlético Goianiense', 'Criciúma',
+]:
+    CLUB_LEAGUE_MAP[t] = 'Serie A Brasil'
 
-# Clubes internacionais conhecidos
-_INTL_CLUBS = {
-    'River Plate': 'Liga Argentina', 'Boca Juniors': 'Liga Argentina',
-    'Racing Club': 'Liga Argentina', 'Independiente': 'Liga Argentina',
-    'San Lorenzo': 'Liga Argentina',
-    'Peñarol': 'Liga Uruguai', 'Nacional': 'Liga Uruguai',
+# ── Brasil — Série C ──
+for t in [
+    'ABC', 'Aparecidense', 'Athletic Club', 'Botafogo PB', 'Confiança',
+    'CSA', 'Ferroviária', 'Ferroviário', 'Figueirense', 'Floresta',
+    'Londrina', 'Náutico', 'Remo', 'Sampaio Corrêa', 'Santa Cruz',
+    'São Bernardo', 'São José RS', 'Tombense', 'Volta Redonda', 'Ypiranga',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Serie C Brasil')
+
+# ── Inglaterra — Premier League ──
+for t in [
+    'Arsenal', 'Aston Villa', 'Bournemouth', 'Brentford', 'Brighton',
+    'Brighton & Hove Albion', 'Chelsea', 'Crystal Palace', 'Everton',
+    'Fulham', 'Ipswich', 'Ipswich Town', 'Leicester', 'Leicester City',
+    'Liverpool', 'Manchester City', 'Manchester United', 'Newcastle',
+    'Newcastle United', 'Nottingham Forest', 'Southampton', 'Tottenham',
+    'Tottenham Hotspur', 'West Ham', 'West Ham United', 'Wolverhampton',
+    'Wolves',
+]:
+    CLUB_LEAGUE_MAP[t] = 'Premier League'
+
+# ── Inglaterra — Championship ──
+for t in [
+    'Blackburn', 'Blackburn Rovers', 'Bristol City', 'Burnley', 'Cardiff',
+    'Cardiff City', 'Coventry', 'Coventry City', 'Derby', 'Derby County',
+    'Hull', 'Hull City', 'Leeds', 'Leeds United', 'Luton', 'Luton Town',
+    'Middlesbrough', 'Millwall', 'Norwich', 'Norwich City', 'Oxford United',
+    'Plymouth', 'Plymouth Argyle', 'Portsmouth', 'Preston', 'Preston North End',
+    'QPR', 'Queens Park Rangers', 'Sheffield United', 'Sheffield Wednesday',
+    'Stoke', 'Stoke City', 'Sunderland', 'Swansea', 'Swansea City',
+    'Watford', 'West Brom', 'West Bromwich Albion',
+]:
+    CLUB_LEAGUE_MAP[t] = 'Championship'
+
+# ── Espanha — La Liga ──
+for t in [
+    'Alavés', 'Athletic Bilbao', 'Athletic Club Bilbao', 'Atlético Madrid',
+    'Atlético de Madrid', 'Barcelona', 'Real Betis', 'Betis', 'Celta',
+    'Celta de Vigo', 'Espanyol', 'Getafe', 'Girona', 'Las Palmas',
+    'Leganés', 'Mallorca', 'Osasuna', 'Rayo Vallecano', 'Real Madrid',
+    'Real Sociedad', 'Sevilla', 'Valencia', 'Valladolid', 'Real Valladolid',
+    'Villarreal',
+]:
+    CLUB_LEAGUE_MAP[t] = 'La Liga'
+
+# ── Itália — Serie A ──
+for t in [
+    'Atalanta', 'Bologna', 'Cagliari', 'Como', 'Como 1907', 'Empoli',
+    'Fiorentina', 'Genoa', 'Hellas Verona', 'Verona', 'Inter',
+    'Inter de Milão', 'Internazionale', 'Juventus', 'Lazio', 'Lecce',
+    'Milan', 'AC Milan', 'Monza', 'Napoli', 'Parma', 'Roma', 'AS Roma',
+    'Salernitana', 'Sassuolo', 'Torino', 'Udinese', 'Venezia',
+]:
+    CLUB_LEAGUE_MAP[t] = 'Serie A Italia'
+
+# ── Alemanha — Bundesliga ──
+for t in [
+    'Augsburg', 'Bayer Leverkusen', 'Leverkusen', 'Bayern', 'Bayern Munich',
+    'Bayern de Munique', 'Borussia Dortmund', 'Dortmund', 'BVB',
+    'Borussia Mönchengladbach', 'Mönchengladbach', 'Eintracht Frankfurt',
+    'Frankfurt', 'Freiburg', 'SC Freiburg', 'Heidenheim', '1. FC Heidenheim',
+    'Hoffenheim', 'TSG Hoffenheim', 'Holstein Kiel', 'Mainz', 'Mainz 05',
+    'RB Leipzig', 'Leipzig', 'St. Pauli', 'FC St. Pauli', 'Stuttgart',
+    'VfB Stuttgart', 'Union Berlin', '1. FC Union Berlin', 'Werder Bremen',
+    'Bremen', 'Wolfsburg', 'VfL Wolfsburg',
+]:
+    CLUB_LEAGUE_MAP[t] = 'Bundesliga'
+
+# ── França — Ligue 1 ──
+for t in [
+    'Angers', 'Auxerre', 'AJ Auxerre', 'Brest', 'Stade Brestois', 'Le Havre',
+    'Lens', 'RC Lens', 'Lille', 'LOSC Lille', 'Lyon', 'Olympique Lyonnais',
+    'Marseille', 'Olympique de Marseille', 'Monaco', 'AS Monaco', 'Montpellier',
+    'Montpellier HSC', 'Nantes', 'FC Nantes', 'Nice', 'OGC Nice',
+    'PSG', 'Paris Saint-Germain', 'Paris SG', 'Reims', 'Stade de Reims',
+    'Rennes', 'Stade Rennais', 'Saint-Étienne', 'AS Saint-Étienne',
+    'Strasbourg', 'RC Strasbourg', 'Toulouse', 'Toulouse FC',
+]:
+    CLUB_LEAGUE_MAP[t] = 'Ligue 1'
+
+# ── Portugal — Liga Portugal ──
+for t in [
+    'Arouca', 'AVS', 'Benfica', 'SL Benfica', 'Boavista', 'Braga',
+    'SC Braga', 'Sporting Braga', 'Casa Pia', 'Estoril', 'Estoril Praia',
+    'Estrela Amadora', 'Famalicão', 'Gil Vicente', 'Moreirense',
+    'Nacional', 'CD Nacional', 'Porto', 'FC Porto', 'Rio Ave',
+    'Santa Clara', 'Sporting', 'Sporting CP', 'Vitória Guimarães',
+    'Vitória SC', 'Vizela',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Portugal')
+
+# ── Holanda — Eredivisie ──
+for t in [
+    'Ajax', 'AZ', 'AZ Alkmaar', 'Feyenoord', 'PSV', 'PSV Eindhoven',
+    'FC Twente', 'Twente', 'FC Utrecht', 'Utrecht', 'Go Ahead Eagles',
+    'Heerenveen', 'SC Heerenveen', 'NEC', 'NEC Nijmegen', 'PEC Zwolle',
+    'RKC Waalwijk', 'Sparta Rotterdam', 'Fortuna Sittard', 'Groningen',
+    'FC Groningen', 'Heracles', 'Heracles Almelo', 'Willem II',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Eredivisie')
+
+# ── Bélgica — Belgian Pro League ──
+for t in [
+    'Anderlecht', 'RSC Anderlecht', 'Antwerp', 'Royal Antwerp',
+    'Club Brugge', 'Club Bruges', 'Cercle Brugge', 'Gent', 'KAA Gent',
+    'Genk', 'KRC Genk', 'Standard Liège', 'Standard Liege',
+    'Mechelen', 'KV Mechelen', 'Charleroi', 'Sporting Charleroi',
+    'Union Saint-Gilloise', 'Union SG', 'Sint-Truiden', 'STVV',
+    'Kortrijk', 'KV Kortrijk', 'Westerlo', 'OH Leuven', 'Leuven',
+]:
+    CLUB_LEAGUE_MAP[t] = 'Belgian Pro League'
+
+# ── Turquia — Süper Lig ──
+for t in [
+    'Galatasaray', 'Fenerbahçe', 'Fenerbahce', 'Beşiktaş', 'Besiktas',
+    'Trabzonspor', 'Başakşehir', 'Istanbul Basaksehir', 'Adana Demirspor',
+    'Alanyaspor', 'Antalyaspor', 'Çaykur Rizespor', 'Rizespor',
+    'Gaziantep FK', 'Hatayspor', 'Kasımpaşa', 'Kasimpasa',
+    'Kayserispor', 'Konyaspor', 'Pendikspor', 'Samsunspor', 'Sivasspor',
+]:
+    CLUB_LEAGUE_MAP[t] = 'Super Lig'
+
+# ── Argentina — Liga Profesional ──
+for t in [
+    'River Plate', 'Boca Juniors', 'Racing Club', 'Racing', 'Independiente',
+    'San Lorenzo', 'Vélez Sarsfield', 'Vélez', 'Lanús', 'Lanus',
+    'Estudiantes', 'Estudiantes LP', 'Defensa y Justicia', 'Argentinos Juniors',
+    'Tigre', 'Huracán', 'Huracan', 'Banfield', 'Talleres', 'Talleres Córdoba',
+    'Godoy Cruz', 'Belgrano', 'Colón', 'Colon', 'Rosario Central',
+    'Newell\'s Old Boys', 'Newells', 'Central Córdoba', 'Unión Santa Fe',
+    'Atlético Tucumán', 'Atletico Tucuman', 'Platense', 'Gimnasia LP',
+    'Instituto', 'Sarmiento', 'Barracas Central',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Argentina')
+
+# ── México — Liga MX ──
+for t in [
+    'América', 'Club América', 'Atlas', 'Chivas', 'Guadalajara',
+    'Cruz Azul', 'León', 'Leon', 'Monterrey', 'CF Monterrey', 'Pachuca',
+    'Pumas UNAM', 'Pumas', 'Santos Laguna', 'Tigres', 'Tigres UANL',
+    'Toluca', 'Mazatlán', 'Mazatlan', 'Necaxa', 'Puebla', 'Querétaro',
+    'Queretaro', 'San Luis', 'Atlético San Luis', 'Tijuana', 'Club Tijuana',
+    'Juárez', 'FC Juárez',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga MX')
+
+# ── EUA — MLS ──
+for t in [
+    'Atlanta United', 'Austin FC', 'Charlotte FC', 'Chicago Fire',
+    'FC Cincinnati', 'Cincinnati', 'Colorado Rapids', 'Columbus Crew',
+    'FC Dallas', 'D.C. United', 'Houston Dynamo', 'Inter Miami',
+    'LA Galaxy', 'Los Angeles FC', 'LAFC', 'Minnesota United',
+    'CF Montréal', 'Montreal', 'Nashville SC', 'New England Revolution',
+    'New York City FC', 'NYCFC', 'New York Red Bulls', 'NY Red Bulls',
+    'Orlando City', 'Philadelphia Union', 'Portland Timbers',
+    'Real Salt Lake', 'San Jose Earthquakes', 'Seattle Sounders',
+    'Sporting Kansas City', 'St. Louis City', 'Toronto FC',
+    'Vancouver Whitecaps',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'MLS')
+
+# ── Colômbia ──
+for t in [
+    'Atlético Nacional', 'Atletico Nacional', 'Millonarios', 'Junior',
+    'Junior Barranquilla', 'América de Cali', 'America de Cali', 'Santa Fe',
+    'Independiente Santa Fe', 'Deportivo Cali', 'Deportes Tolima', 'Tolima',
+    'Once Caldas', 'Bucaramanga', 'Atlético Bucaramanga',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Colombia')
+
+# ── Chile ──
+for t in [
+    'Colo-Colo', 'Colo Colo', 'Universidad de Chile', 'U. de Chile',
+    'Universidad Católica', 'U. Católica', 'Unión Española', 'Cobreloa',
+    'Huachipato', 'Cobresal', 'Palestino', 'Everton de Viña del Mar',
+    'O\'Higgins', 'Audax Italiano',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Chile')
+
+# ── Uruguai ──
+for t in [
+    'Peñarol', 'Nacional', 'Defensor Sporting', 'Danubio', 'River Plate Montevideo',
+    'Liverpool Montevideo', 'Wanderers', 'Plaza Colonia', 'Cerro Largo',
+    'Boston River', 'Fénix',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Uruguai')
+
+# ── Peru ──
+for t in [
+    'Alianza Lima', 'Universitario', 'Sporting Cristal', 'Cienciano',
+    'Melgar', 'FBC Melgar', 'ADT', 'Sport Huancayo', 'César Vallejo',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Peru')
+
+# ── Equador ──
+for t in [
+    'Barcelona SC', 'Barcelona de Guayaquil', 'LDU Quito', 'Liga de Quito',
+    'Emelec', 'Independiente del Valle', 'IDV', 'El Nacional',
+    'Deportivo Cuenca', 'Aucas',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Equador')
+
+# ── Paraguai ──
+for t in [
+    'Olimpia', 'Cerro Porteño', 'Cerro Porteno', 'Libertad', 'Guaraní',
+    'Nacional Asunción', 'Sol de América', 'Sportivo Luqueño',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Paraguai')
+
+# ── Bolívia ──
+for t in [
+    'Bolívar', 'Bolivar', 'The Strongest', 'Jorge Wilstermann',
+    'Wilstermann', 'Always Ready', 'Blooming', 'Oriente Petrolero',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Bolivia')
+
+# ── Venezuela ──
+for t in [
+    'Caracas FC', 'Deportivo Táchira', 'Tachira', 'Zamora FC',
+    'Monagas SC', 'Metropolitanos', 'Deportivo La Guaira',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Venezuela')
+
+# ── Japão — J1 League ──
+for t in [
+    'Vissel Kobe', 'Yokohama F. Marinos', 'Yokohama F Marinos',
+    'Kawasaki Frontale', 'Kashima Antlers', 'Urawa', 'Urawa Reds',
+    'Urawa Red Diamonds', 'FC Tokyo', 'Cerezo Osaka', 'Gamba Osaka',
+    'Nagoya Grampus', 'Sanfrecce Hiroshima', 'Kashiwa Reysol',
+    'Sagan Tosu', 'Consadole Sapporo', 'Shonan Bellmare', 'Avispa Fukuoka',
+    'Albirex Niigata', 'Kyoto Sanga',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'J1 League')
+
+# ── Coreia do Sul — K-League 1 ──
+for t in [
+    'Jeonbuk', 'Jeonbuk Hyundai', 'Ulsan', 'Ulsan Hyundai', 'Ulsan HD',
+    'FC Seoul', 'Seoul', 'Pohang Steelers', 'Suwon', 'Suwon Samsung',
+    'Gangwon', 'Gangwon FC', 'Daegu', 'Daegu FC', 'Incheon United',
+    'Jeju United', 'Gwangju FC', 'Daejeon Citizen',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'K-League 1')
+
+# ── Arábia Saudita — Saudi Pro League ──
+for t in [
+    'Al Hilal', 'Al-Hilal', 'Al Nassr', 'Al-Nassr', 'Al Ahli', 'Al-Ahli',
+    'Al Ittihad', 'Al-Ittihad', 'Al Shabab', 'Al-Shabab', 'Al Fateh',
+    'Al Fayha', 'Al Taawoun', 'Al Raed', 'Al Riyadh', 'Al Wehda',
+    'Al Khaleej', 'Al Ettifaq', 'Damac', 'Abha',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Saudi Pro League')
+
+# ── Qatar ──
+for t in [
+    'Al Sadd', 'Al-Sadd', 'Al Duhail', 'Al-Duhail', 'Al Rayyan',
+    'Al-Rayyan', 'Al Arabi', 'Al Gharafa', 'Qatar SC', 'Al Wakrah',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Qatar Stars League')
+
+# ── Emirados Árabes ──
+for t in [
+    'Al Ain', 'Al-Ain', 'Shabab Al Ahli', 'Al Wasl', 'Al Jazira',
+    'Sharjah FC', 'Bani Yas', 'Ajman',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'UAE Pro League')
+
+# ── China — Chinese Super League ──
+for t in [
+    'Guangzhou', 'Guangzhou FC', 'Guangdong GZ-Power', 'Shanghai Port',
+    'Shanghai Shenhua', 'Shandong Taishan', 'Beijing Guoan',
+    'Chengdu Rongcheng', 'Wuhan Three Towns', 'Tianjin Jinmen Tiger',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Chinese Super League')
+
+# ── Austrália — A-League ──
+for t in [
+    'Melbourne Victory', 'Melbourne City', 'Sydney FC', 'Western Sydney',
+    'Western Sydney Wanderers', 'Brisbane Roar', 'Central Coast Mariners',
+    'Adelaide United', 'Perth Glory', 'Wellington Phoenix',
+    'Macarthur FC', 'Western United', 'Newcastle Jets',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'A-League')
+
+# ── Escócia — Scottish Premiership ──
+for t in [
+    'Celtic', 'Rangers', 'Aberdeen', 'Hearts', 'Heart of Midlothian',
+    'Hibernian', 'Dundee', 'Dundee United', 'Kilmarnock', 'Motherwell',
+    'Ross County', 'St Mirren', 'St Johnstone', 'Livingston',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Scottish Premiership')
+
+# ── Áustria — Austrian Bundesliga ──
+for t in [
+    'Red Bull Salzburg', 'RB Salzburg', 'Salzburg', 'Sturm Graz',
+    'SK Sturm Graz', 'Rapid Wien', 'Rapid Vienna', 'Austria Wien',
+    'Austria Vienna', 'LASK', 'LASK Linz', 'Wolfsberger AC', 'WAC',
+    'Hartberg', 'TSV Hartberg', 'Blau-Weiß Linz', 'Altach',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Austrian Bundesliga')
+
+# ── Suíça — Swiss Super League ──
+for t in [
+    'Young Boys', 'BSC Young Boys', 'Basel', 'FC Basel', 'Zürich',
+    'FC Zürich', 'FC Zurich', 'Lugano', 'FC Lugano', 'Servette',
+    'Servette FC', 'St. Gallen', 'FC St. Gallen', 'Luzern', 'FC Luzern',
+    'Grasshoppers', 'Grasshopper', 'Lausanne-Sport', 'Winterthur',
+    'FC Winterthur', 'Yverdon',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Swiss Super League')
+
+# ── Dinamarca — Danish Superliga ──
+for t in [
+    'FC Copenhagen', 'Copenhagen', 'FC Midtjylland', 'Midtjylland',
+    'Brøndby', 'Brondby', 'Brøndby IF', 'FC Nordsjælland', 'Nordsjaelland',
+    'AGF', 'Aarhus AGF', 'Silkeborg', 'Silkeborg IF', 'Randers FC',
+    'Viborg', 'Viborg FF', 'Lyngby', 'Lyngby BK', 'Hvidovre',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Danish Superliga')
+
+# ── Grécia — Greek Super League ──
+for t in [
+    'Olympiacos', 'Olympiakos', 'Panathinaikos', 'AEK Athens', 'AEK',
+    'PAOK', 'PAOK Thessaloniki', 'Aris Thessaloniki', 'Aris',
+    'Atromitos', 'Volos', 'Volos NFC', 'OFI Crete', 'Asteras Tripolis',
+    'Lamia', 'Giannina', 'PAS Giannina',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Greek Super League')
+
+# ── Egito — Egyptian Premier League ──
+for t in [
+    'Al Ahly', 'Zamalek', 'Pyramids FC', 'Future FC',
+    'Ceramica Cleopatra', 'Ismaily', 'ENPPI', 'Smouha',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Egyptian Premier League')
+
+# ── Marrocos — Moroccan Botola ──
+for t in [
+    'Wydad', 'Wydad Casablanca', 'Raja', 'Raja Casablanca',
+    'RS Berkane', 'FAR Rabat', 'AS FAR', 'FUS Rabat',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Moroccan Botola')
+
+# ── África do Sul — South African Premier ──
+for t in [
+    'Mamelodi Sundowns', 'Sundowns', 'Orlando Pirates', 'Kaizer Chiefs',
+    'Stellenbosch', 'Cape Town City', 'SuperSport United', 'AmaZulu',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'South African Premier')
+
+# ── Israel — Israeli Premier League ──
+for t in [
+    'Maccabi Tel Aviv', 'Maccabi Haifa', 'Hapoel Beer Sheva',
+    'Hapoel Tel Aviv', 'Beitar Jerusalem', 'Maccabi Netanya',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Israeli Premier League')
+
+# Dicionário normalizado para lookup rápido no merge por clube
+_CLUB_LEAGUE_MAP_NORM = {
+    padronizar_string(k): v for k, v in CLUB_LEAGUE_MAP.items()
 }
-CLUB_LEAGUE_MAP.update(_INTL_CLUBS)
 
 
 def resolve_league_to_tier(league_name, team_name=None):
@@ -1051,18 +1405,16 @@ def resolve_league_to_tier(league_name, team_name=None):
         for key_norm, val in _WYSCOUT_LEAGUE_MAP_NORM.items():
             if key_norm and (key_norm in league_norm or league_norm in key_norm):
                 return val
-    # 4. Fallback por clube
+    # 4. Fallback por clube (lookup normalizado O(1))
     if team_name is not None:
         try:
             if pd.notna(team_name):
                 team_str = str(team_name).strip()
                 if team_str in CLUB_LEAGUE_MAP:
                     return CLUB_LEAGUE_MAP[team_str]
-                # Tentar normalizado
                 team_norm = padronizar_string(team_str)
-                for club, league in CLUB_LEAGUE_MAP.items():
-                    if padronizar_string(club) == team_norm:
-                        return league
+                if team_norm in _CLUB_LEAGUE_MAP_NORM:
+                    return _CLUB_LEAGUE_MAP_NORM[team_norm]
         except Exception:
             pass
     return None
@@ -1109,10 +1461,10 @@ def mapear_ligas_vetorizado(df, liga_col, equipa_col, liga_alvo_rank):
     # === ETAPA 2: Fallback por clube normalizado (registros sem liga) ===
     mask_null = liga_origin.isna()
     if mask_null.any() and equipa_col and equipa_col in df.columns:
-        # Criar dataframe de referência clube→liga normalizado
+        # Usar _CLUB_LEAGUE_MAP_NORM pré-computado (O(1) lookup)
         ref_clubes = pd.DataFrame([
-            {'clube_key': padronizar_string(club), 'liga_tier': league}
-            for club, league in CLUB_LEAGUE_MAP.items()
+            {'clube_key': k, 'liga_tier': v}
+            for k, v in _CLUB_LEAGUE_MAP_NORM.items()
         ]).drop_duplicates(subset='clube_key')
 
         df_clube_key = df.loc[mask_null, equipa_col].apply(padronizar_string)
