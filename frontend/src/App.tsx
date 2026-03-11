@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuth } from './hooks/useAuth';
 import LoginPage from './components/LoginPage';
 import Layout, { type TabId } from './components/Layout';
@@ -51,6 +52,7 @@ function App() {
         </AnimatePresence>
       </Layout>
       <Analytics />
+      <SpeedInsights />
     </>
   );
 }
