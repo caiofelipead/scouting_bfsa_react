@@ -3,7 +3,7 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
-  timeout: 30_000, // 30s timeout for slow cold starts
+  timeout: 60_000, // 60s timeout — backend may need time to load Google Sheets on cold start
 });
 
 api.interceptors.request.use((config) => {
@@ -14,19 +14,30 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Status codes that indicate cold start / transient backend issues
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const config = err.config;
+    if (!config) return Promise.reject(err);
 
-    // Retry on network errors (not 4xx/5xx) up to 2 times
-    if (!err.response && config && !config._retryCount) {
-      config._retryCount = (config._retryCount || 0) + 1;
-      if (config._retryCount <= 2) {
-        const delay = config._retryCount * 1000;
-        await new Promise((r) => setTimeout(r, delay));
-        return api(config);
-      }
+    // Initialize retry state
+    config._retryCount = config._retryCount || 0;
+
+    // Retry on network errors OR 502/503/504 (cold start) up to 3 times
+    const isNetworkError = !err.response;
+    const isColdStartError = RETRYABLE_STATUSES.has(err.response?.status);
+
+    if ((isNetworkError || isColdStartError) && config._retryCount < 3) {
+      config._retryCount += 1;
+      const delay = config._retryCount * 2000; // 2s, 4s, 6s
+      console.warn(
+        `[api] ${isNetworkError ? 'Network error' : err.response?.status} on ${config.url} — retry ${config._retryCount}/3 in ${delay}ms`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+      return api(config);
     }
 
     if (
@@ -39,7 +50,7 @@ api.interceptors.response.use(
       window.location.reload();
     }
     return Promise.reject(err);
-  }
+  },
 );
 
 export default api;
