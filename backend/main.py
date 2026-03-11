@@ -63,6 +63,7 @@ from services.calibration import (
 from services.predictive_engine import ContractSuccessPredictor
 from services.fuzzy_match import build_skillcorner_index, find_skillcorner_player
 from config.mappings import (
+    CLUB_LEAGUE_MAP,
     CLUB_LOGOS,
     COUNTRY_FLAGS,
     INDICES_CONFIG,
@@ -71,12 +72,37 @@ from config.mappings import (
     POSICOES_DISPLAY,
     SKILLCORNER_INDICES,
     WYSCOUT_LEAGUE_MAP,
+    _CLUB_LEAGUE_MAP_NORM,
     get_posicao_categoria,
+    padronizar_string,
     resolve_league_to_tier,
 )
-# Note: WYSCOUT_LEAGUE_MAP already imported above
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_actual_league(team_name: str, fallback_liga_tier: str = None) -> str:
+    """Resolve a player's actual current league based on their club name.
+
+    The WyScout data often has the scouting pool league (e.g. 'Brasil | 2')
+    in the Liga column, which is the same for all players in the dataset.
+    For GAP calculation we need the player's REAL current league.
+
+    Priority: CLUB_LEAGUE_MAP (exact) → normalized → fallback_liga_tier → default.
+    """
+    if team_name and pd.notna(team_name):
+        team_str = str(team_name).strip()
+        # Exact match
+        if team_str in CLUB_LEAGUE_MAP:
+            return CLUB_LEAGUE_MAP[team_str]
+        # Normalized match
+        team_norm = padronizar_string(team_str)
+        if team_norm in _CLUB_LEAGUE_MAP_NORM:
+            return _CLUB_LEAGUE_MAP_NORM[team_norm]
+    # Fallback to the liga_tier column (scouting pool league)
+    if fallback_liga_tier and pd.notna(fallback_liga_tier):
+        return str(fallback_liga_tier)
+    return None
 
 
 # ── Simple TTL cache for heavy endpoint results ──────────────────────
@@ -465,7 +491,10 @@ async def list_players(
             "position": pos_raw,
             "age": _safe_float(row.get("Idade")),
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
-            "league": str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
+            "league": resolve_actual_league(
+                row.get("Equipa"),
+                fallback_liga_tier=str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
+            ),
             "minutes_played": _safe_float(row.get("Minutos jogados:")),
             "score": round(score, 1) if score else None,
         })
@@ -540,14 +569,15 @@ async def get_player_profile(
 
     # P(Sucesso) prediction using ContractSuccessPredictor + LEAGUE_TIERS
     prediction = None
-    league_raw = str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None
+    liga_tier_raw = str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None
+    league_actual = resolve_actual_league(row.get("Equipa"), fallback_liga_tier=liga_tier_raw)
     minutes_val = _safe_float(row.get("Minutos jogados:")) or 0
-    if score is not None and age is not None and league_raw:
+    if score is not None and age is not None and league_actual:
         predictor = ContractSuccessPredictor()
         prediction = predictor.predict_success_unsupervised(
             ssp_score=score,
             age=age,
-            league_origin=league_raw,
+            league_origin=league_actual,
             league_target="Serie A Brasil",  # Botafogo-SP target league
             minutes=minutes_val,
         )
@@ -561,7 +591,7 @@ async def get_player_profile(
             "position": position,
             "age": age,
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
-            "league": str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
+            "league": league_actual or (str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None),
             "minutes_played": _safe_float(row.get("Minutos jogados:")),
             "score": round(score, 1) if score else None,
         },
@@ -632,7 +662,10 @@ async def get_rankings(
             display_name=str(row.get("JogadorDisplay", row.get("Jogador", ""))),
             team=str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
             age=_safe_float(row.get("Idade")),
-            league=str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
+            league=resolve_actual_league(
+                row.get("Equipa"),
+                fallback_liga_tier=str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
+            ),
             minutes=_safe_float(row.get("Minutos jogados:")),
             score=round(float(row.get("Score", 0)), 1),
             indices=idx_values,
@@ -694,7 +727,11 @@ async def get_prediction_rankings(
             continue
         age = _safe_float(row.get("Idade")) or 24
         minutes = _safe_float(row.get("Minutos jogados:")) or 0
-        league_origin = str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else "Serie B Brasil"
+        # Resolve actual current league by club name (not scouting pool league)
+        liga_tier_raw = str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None
+        league_origin = resolve_actual_league(
+            row.get("Equipa"), fallback_liga_tier=liga_tier_raw
+        ) or league_target  # last resort: assume same as target
 
         pred = predictor.predict_success_unsupervised(
             ssp_score=ssp, age=age,
@@ -1157,9 +1194,12 @@ async def predict_contract_success(
     age = _safe_float(row_data.get("Idade")) or 24
     minutes = _safe_float(row_data.get("Minutos jogados:")) or 0
 
-    # Use provided league_origin or detect from data
+    # Use provided league_origin or detect from club → actual league
     if not league_origin:
-        league_origin = str(row_data.get("liga_tier", "")) if pd.notna(row_data.get("liga_tier")) else "Serie B Brasil"
+        liga_tier_raw = str(row_data.get("liga_tier", "")) if pd.notna(row_data.get("liga_tier")) else None
+        league_origin = resolve_actual_league(
+            row_data.get("Equipa"), fallback_liga_tier=liga_tier_raw
+        ) or league_target
 
     predictor = ContractSuccessPredictor()
     pred = predictor.predict_success_unsupervised(
