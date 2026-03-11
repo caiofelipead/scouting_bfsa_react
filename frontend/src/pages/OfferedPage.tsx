@@ -1,14 +1,14 @@
 import { motion } from 'framer-motion';
-import { FileText } from 'lucide-react';
+import { FileText, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 
 export default function OfferedPage() {
-  const { data: players = [], isLoading: loading } = useQuery({
+  const { data: players = [], isLoading: loading, error } = useQuery({
     queryKey: ['offered'],
     queryFn: async () => {
       const r = await api.get('/offered');
-      return r.data.players as Record<string, string>[];
+      return (r.data.players ?? []) as Record<string, string>[];
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -26,6 +26,17 @@ export default function OfferedPage() {
           {players.length} jogadores na lista de oferecidos
         </p>
       </div>
+
+      {/* Error display */}
+      {error && (
+        <div
+          className="flex items-center gap-2 px-4 py-3 rounded text-sm"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
+        >
+          <AlertCircle size={16} />
+          <span>Erro ao carregar oferecidos: {(error as Error).message || 'Erro desconhecido'}</span>
+        </div>
+      )}
 
       <div className="card-glass rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
@@ -68,7 +79,7 @@ export default function OfferedPage() {
               ) : (
                 <tr>
                   <td colSpan={columns.length || 1} className="px-3 py-8 text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    Nenhum jogador oferecido
+                    {error ? 'Erro ao carregar dados' : 'Nenhum jogador oferecido'}
                   </td>
                 </tr>
               )}

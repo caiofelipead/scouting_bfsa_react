@@ -1,14 +1,14 @@
 import { motion } from 'framer-motion';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 
 export default function AnalysesPage() {
-  const { data: analyses = [], isLoading: loading } = useQuery({
+  const { data: analyses = [], isLoading: loading, error } = useQuery({
     queryKey: ['analyses'],
     queryFn: async () => {
       const r = await api.get('/analyses');
-      return r.data.analyses as Record<string, string>[];
+      return (r.data.analyses ?? []) as Record<string, string>[];
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -26,6 +26,17 @@ export default function AnalysesPage() {
           {analyses.length} analises registradas pela equipe de scouting
         </p>
       </div>
+
+      {/* Error display */}
+      {error && (
+        <div
+          className="flex items-center gap-2 px-4 py-3 rounded text-sm"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
+        >
+          <AlertCircle size={16} />
+          <span>Erro ao carregar analises: {(error as Error).message || 'Erro desconhecido'}</span>
+        </div>
+      )}
 
       <div className="card-glass rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
@@ -68,7 +79,7 @@ export default function AnalysesPage() {
               ) : (
                 <tr>
                   <td colSpan={columns.length || 1} className="px-3 py-8 text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    Nenhuma analise registrada
+                    {error ? 'Erro ao carregar dados' : 'Nenhuma analise registrada'}
                   </td>
                 </tr>
               )}

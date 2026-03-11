@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../lib/api';
 import type {
   PlayerSummary,
@@ -41,7 +41,13 @@ export function usePositions() {
     queryKey: configKeys.positions,
     queryFn: async () => {
       const res = await api.get('/config/positions');
-      return res.data.positions as string[];
+      // Backend returns { positions: [...], position_map: {...}, indices: {...}, ... }
+      const positions = res.data?.positions;
+      if (!Array.isArray(positions)) {
+        console.warn('[usePositions] Unexpected response:', res.data);
+        return [] as string[];
+      }
+      return positions as string[];
     },
     staleTime: STALE_TIME,
   });
@@ -52,7 +58,13 @@ export function useLeagues() {
     queryKey: configKeys.leagues,
     queryFn: async () => {
       const res = await api.get('/config/leagues');
-      return res.data.leagues as string[];
+      // Backend returns { leagues: [...], league_logos: {...} }
+      const leagues = res.data?.leagues;
+      if (!Array.isArray(leagues)) {
+        console.warn('[useLeagues] Unexpected response:', res.data);
+        return [] as string[];
+      }
+      return leagues as string[];
     },
     staleTime: STALE_TIME,
   });
@@ -93,7 +105,10 @@ export function useRadarData(displayName: string | null) {
     queryKey: playerKeys.radar(displayName ?? ''),
     queryFn: async () => {
       const res = await api.get(`/players/${encodeURIComponent(displayName!)}/radar`);
-      return { labels: res.data.labels as string[], values: res.data.values as number[] };
+      return {
+        labels: (res.data?.labels ?? []) as string[],
+        values: (res.data?.values ?? []) as number[],
+      };
     },
     enabled: !!displayName,
     staleTime: STALE_TIME,

@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Users, Percent } from 'lucide-react';
+import { Search, Users, AlertCircle } from 'lucide-react';
 import { usePlayers, useSimilarity, usePositions } from '../hooks/usePlayers';
-import { formatNumber } from '../lib/utils';
 
 export default function SimilarityPage() {
   const similarity = useSimilarity();
@@ -14,7 +13,7 @@ export default function SimilarityPage() {
   const [minMinutes, setMinMinutes] = useState(500);
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: positions = [] } = usePositions();
+  const { data: positions = [], error: posErr } = usePositions();
 
   const searchParams = useMemo(() => ({
     search: debouncedSearch || undefined,
@@ -46,6 +45,7 @@ export default function SimilarityPage() {
 
   const result = similarity.data;
   const simLoading = similarity.isPending;
+  const simError = similarity.error || posErr;
 
   return (
     <div className="space-y-5">
@@ -55,9 +55,20 @@ export default function SimilarityPage() {
           Similaridade
         </h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-          Encontre jogadores similares por perfil de desempenho ponderado
+          Cosine similarity ponderada por posicao + proximity bonus (POSITION_WEIGHTS)
         </p>
       </div>
+
+      {/* Error display */}
+      {simError && (
+        <div
+          className="flex items-center gap-2 px-4 py-3 rounded text-sm"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
+        >
+          <AlertCircle size={16} />
+          <span>Erro: {(simError as Error).message || 'Erro ao buscar jogadores similares'}</span>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="card-glass rounded-lg p-5 space-y-4">
@@ -99,7 +110,19 @@ export default function SimilarityPage() {
           <div>
             <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
             <select value={position} onChange={(e) => setPosition(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
-              {positions.map((p) => <option key={p} value={p}>{p}</option>)}
+              {positions.length > 0 ? (
+                positions.map((p) => <option key={p} value={p}>{p}</option>)
+              ) : (
+                <>
+                  <option value="Atacante">Atacante</option>
+                  <option value="Extremo">Extremo</option>
+                  <option value="Meia">Meia</option>
+                  <option value="Volante">Volante</option>
+                  <option value="Lateral">Lateral</option>
+                  <option value="Zagueiro">Zagueiro</option>
+                  <option value="Goleiro">Goleiro</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -129,7 +152,7 @@ export default function SimilarityPage() {
         <div className="card-glass rounded-lg overflow-hidden">
           <div className="px-4 py-2.5" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
             <span className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
-              SIMILARES A {result.reference_player} ({result.position})
+              SIMILARES A {result.reference_player} ({result.position}) — {result.similar_players.length} resultados
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -175,6 +198,18 @@ export default function SimilarityPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Initial state — no search yet */}
+      {!result && !simLoading && !simError && (
+        <div
+          className="card-glass rounded-lg p-8 text-center"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
+          <Search size={32} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Selecione um jogador e clique em BUSCAR</p>
+          <p className="text-xs mt-1 opacity-60">Algoritmo: cosine similarity + proximity bonus ponderados por POSITION_WEIGHTS</p>
         </div>
       )}
     </div>
