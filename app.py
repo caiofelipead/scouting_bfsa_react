@@ -911,70 +911,6 @@ SERIE_B_TEAMS = [
 # MAPEAMENTO LIGA WYSCOUT → LEAGUE_TIERS
 # ============================================
 WYSCOUT_LEAGUE_MAP = {
-    'Brasil | 1': 'Serie A Brasil', 'Brasil | 2': 'Serie B Brasil',
-    'Brasil | 3': 'Serie C Brasil', 'Brasil | 4': 'Serie D Brasil',
-    'Série A': 'Serie A Brasil', 'Serie A': 'Serie A Brasil',
-    'Série B': 'Serie B Brasil', 'Serie B': 'Serie B Brasil',
-    'England | 1': 'Premier League', 'Inglaterra | 1': 'Premier League',
-    'England | 2': 'Championship',
-    'Spain | 1': 'La Liga', 'Espanha | 1': 'La Liga', 'La Liga': 'La Liga',
-    'Spain | 2': 'La Liga 2',
-    'Italy | 1': 'Serie A Italia', 'Itália | 1': 'Serie A Italia',
-    'Italy | 2': 'Serie B Italia',
-    'Germany | 1': 'Bundesliga', 'Alemanha | 1': 'Bundesliga',
-    'Germany | 2': '2. Bundesliga',
-    'France | 1': 'Ligue 1', 'França | 1': 'Ligue 1',
-    'France | 2': 'Ligue 2',
-    'Portugal | 1': 'Liga Portugal', 'Liga Portugal': 'Liga Portugal',
-    'Portugal | 2': 'Liga Portugal 2',
-    'Netherlands | 1': 'Eredivisie', 'Holanda | 1': 'Eredivisie',
-    'Belgium | 1': 'Belgian Pro League', 'Bélgica | 1': 'Belgian Pro League',
-    'Turkey | 1': 'Super Lig', 'Turquia | 1': 'Super Lig',
-    'Russia | 1': 'Russian Premier League', 'Rússia | 1': 'Russian Premier League',
-    'Austria | 1': 'Austrian Bundesliga', 'Áustria | 1': 'Austrian Bundesliga',
-    'Switzerland | 1': 'Swiss Super League', 'Suíça | 1': 'Swiss Super League',
-    'Denmark | 1': 'Danish Superliga',
-    'Greece | 1': 'Greek Super League', 'Grécia | 1': 'Greek Super League',
-    'Argentina | 1': 'Liga Argentina', 'Liga Profesional': 'Liga Argentina',
-    'Argentina | 2': 'Liga Argentina B',
-    'USA | 1': 'MLS', 'MLS': 'MLS',
-    'Mexico | 1': 'Liga MX', 'Liga MX': 'Liga MX',
-    'Colombia | 1': 'Liga Colombia', 'Chile | 1': 'Liga Chile',
-    'Uruguay | 1': 'Liga Uruguai', 'Peru | 1': 'Liga Peru',
-    'Ecuador | 1': 'Liga Equador', 'Paraguay | 1': 'Liga Paraguai',
-    'Bolivia | 1': 'Liga Bolivia', 'Venezuela | 1': 'Liga Venezuela',
-    'Japan | 1': 'J1 League', 'Japão | 1': 'J1 League',
-    'Japan | 2': 'J2 League',
-    'Korea | 1': 'K-League 1', 'Coreia | 1': 'K-League 1',
-    'Saudi Arabia | 1': 'Saudi Pro League', 'Arábia Saudita | 1': 'Saudi Pro League',
-    'China | 1': 'Chinese Super League',
-    'Australia | 1': 'A-League',
-    'Paulista A1': 'Paulista A1', 'Paulista A2': 'Paulista A2',
-    'Carioca A1': 'Carioca A1',
-}
-
-
-def resolve_league_to_tier(league_name, team_name=None):
-    """Resolve nome de liga WyScout para chave do LEAGUE_TIERS."""
-    if pd.isna(league_name) and team_name is None:
-        return None
-    if pd.notna(league_name):
-        league_str = str(league_name).strip()
-        if league_str in WYSCOUT_LEAGUE_MAP:
-            return WYSCOUT_LEAGUE_MAP[league_str]
-        for key, val in WYSCOUT_LEAGUE_MAP.items():
-            if key.lower() in league_str.lower() or league_str.lower() in key.lower():
-                return val
-    if team_name and not pd.isna(team_name):
-        if str(team_name).strip() in SERIE_B_TEAMS:
-            return 'Serie B Brasil'
-    return None
-
-
-# ============================================
-# MAPEAMENTO LIGA WYSCOUT → LEAGUE_TIERS
-# ============================================
-WYSCOUT_LEAGUE_MAP = {
     # Brasil
     'Brasil | 1': 'Serie A Brasil', 'Brasil | 2': 'Serie B Brasil',
     'Brasil | 3': 'Serie C Brasil', 'Brasil | 4': 'Serie D Brasil',
@@ -3153,7 +3089,12 @@ def main():
                             _equipa = row.get('Equipa', row.get('Team'))
                             _liga_origin = resolve_league_to_tier(_liga_ws, _equipa)
                             if _liga_origin is None:
-                                _liga_origin = liga_alvo_rank
+                                # Tentar usar a liga do filtro se o jogador foi filtrado por liga específica
+                                if liga_rank != 'Todas' and liga_col:
+                                    _liga_origin = resolve_league_to_tier(liga_rank)
+                                # Se ainda None, usar a liga da row diretamente como string
+                                if _liga_origin is None and _liga_ws is not None and pd.notna(_liga_ws):
+                                    _liga_origin = str(_liga_ws).strip()
                             try:
                                 _pred = ContractSuccessPredictor().predict_success_unsupervised(
                                     ssp_score=_ssp, age=_age,
