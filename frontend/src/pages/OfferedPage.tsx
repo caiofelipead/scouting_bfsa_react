@@ -10,7 +10,9 @@ export default function OfferedPage() {
       const r = await api.get('/offered');
       return (r.data.players ?? []) as Record<string, string>[];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const columns = players.length > 0 ? Object.keys(players[0]).slice(0, 8) : [];

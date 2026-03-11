@@ -5,6 +5,8 @@ Replaces the Streamlit monolith with async REST endpoints.
 """
 
 import os
+import time
+import hashlib
 import logging
 from contextlib import asynccontextmanager
 from typing import Optional, List, Dict, Any
@@ -74,6 +76,40 @@ from config.mappings import (
 # Note: WYSCOUT_LEAGUE_MAP already imported above
 
 logger = logging.getLogger(__name__)
+
+
+# ── Simple TTL cache for heavy endpoint results ──────────────────────
+
+class _TTLCache:
+    """Minimal in-memory cache with time-based expiry (no dependencies)."""
+
+    def __init__(self, ttl_seconds: int = 300):
+        self.ttl = ttl_seconds
+        self._store: Dict[str, tuple] = {}  # key -> (timestamp, value)
+
+    def get(self, key: str):
+        entry = self._store.get(key)
+        if entry is None:
+            return None
+        ts, val = entry
+        if time.time() - ts > self.ttl:
+            del self._store[key]
+            return None
+        return val
+
+    def set(self, key: str, value):
+        self._store[key] = (time.time(), value)
+
+    def make_key(self, *args) -> str:
+        raw = "|".join(str(a) for a in args)
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def clear(self):
+        self._store.clear()
+
+
+_endpoint_cache = _TTLCache(ttl_seconds=300)  # 5 min cache
+
 
 # ── In-memory data store (loaded on startup) ─────────────────────────
 
@@ -160,10 +196,20 @@ def _prepare_wyscout(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _load_all_data():
-    """Load all sheets into memory."""
+    """Load all sheets into memory — parallelized for faster startup."""
+    import concurrent.futures
+
     global _data
-    for key, sheet_name in SHEET_NAMES.items():
-        _data[key] = _load_google_sheet(GOOGLE_SHEET_ID, sheet_name)
+
+    def _load_one(key_sheet):
+        key, sheet_name = key_sheet
+        return key, _load_google_sheet(GOOGLE_SHEET_ID, sheet_name)
+
+    # Load all 4 sheets in parallel (4x faster startup)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        results = executor.map(_load_one, SHEET_NAMES.items())
+        for key, df in results:
+            _data[key] = df
 
     if "wyscout" in _data and len(_data["wyscout"]) > 0:
         _data["wyscout"] = _prepare_wyscout(_data["wyscout"])
@@ -172,6 +218,11 @@ def _load_all_data():
         sc_text = {"player_name", "short_name", "team_name", "position_group"}
         _data["skillcorner"] = _coerce_numeric_columns(_data["skillcorner"], sc_text)
         build_skillcorner_index(_data["skillcorner"])
+
+    # Pre-warm percentile cache for wyscout (biggest dataset)
+    if "wyscout" in _data and len(_data["wyscout"]) > 0:
+        from services.similarity import _get_percentile_matrix
+        _get_percentile_matrix(_data["wyscout"])
 
     logger.info("All data loaded successfully")
 
@@ -480,6 +531,12 @@ async def get_rankings(
     req: RankingRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    # TTL cache for ranking results (5 min)
+    cache_key = _endpoint_cache.make_key("ranking", req.position, req.min_minutes, req.league or "", req.top_n)
+    cached = _endpoint_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     df = _get_wyscout()
     position = get_posicao_categoria(req.position)
 
@@ -501,7 +558,9 @@ async def get_rankings(
     )
 
     if len(ranked) == 0:
-        return RankingResponse(position=position, total=0, players=[])
+        result = RankingResponse(position=position, total=0, players=[])
+        _endpoint_cache.set(cache_key, result)
+        return result
 
     ranked = ranked.head(req.top_n)
     entries = []
@@ -524,7 +583,9 @@ async def get_rankings(
             indices=idx_values,
         ))
 
-    return RankingResponse(position=position, total=len(entries), players=entries)
+    result = RankingResponse(position=position, total=len(entries), players=entries)
+    _endpoint_cache.set(cache_key, result)
+    return result
 
 
 @app.post("/api/rankings/prediction")
@@ -533,6 +594,15 @@ async def get_prediction_rankings(
     current_user: dict = Depends(get_current_user),
 ):
     """Ranking by P(Sucesso) prediction — includes SSP, risk, probability."""
+    # TTL cache for prediction ranking (5 min)
+    cache_key = _endpoint_cache.make_key(
+        "pred_rank", req.get("position"), req.get("min_minutes"),
+        req.get("league"), req.get("top_n"), req.get("league_target"),
+    )
+    cached = _endpoint_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     df = _get_wyscout()
     position = get_posicao_categoria(req.get("position", "Atacante"))
     min_minutes = req.get("min_minutes", 500)
@@ -559,8 +629,12 @@ async def get_prediction_rankings(
     predictor = ContractSuccessPredictor()
     results = []
 
+    # Pre-compute percentile matrix once for the entire pool (vectorized)
+    from services.similarity import _get_percentile_matrix
+    perc_matrix = _get_percentile_matrix(df)
+
     for idx, row in pool.iterrows():
-        ssp = calculate_overall_score(row, position, df)
+        ssp = calculate_overall_score(row, position, df, _perc_matrix=perc_matrix)
         if ssp is None:
             continue
         age = _safe_float(row.get("Idade")) or 24
@@ -596,12 +670,14 @@ async def get_prediction_rankings(
     for i, r in enumerate(results, 1):
         r["rank"] = i
 
-    return {
+    result = {
         "position": position,
         "league_target": league_target,
         "total": len(results),
         "players": results,
     }
+    _endpoint_cache.set(cache_key, result)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════

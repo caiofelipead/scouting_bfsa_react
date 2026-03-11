@@ -29,10 +29,16 @@ export const configKeys = {
   leagues: ['config', 'leagues'] as const,
 };
 
-// ── Shared staleTime for Wyscout/SkillCorner data (10 minutes) ──
-// Prevents cache invalidation when switching tabs via AnimatePresence
+// ── Shared cache config ──
+// staleTime: data considered fresh for 10 min (no refetch on tab switch)
+// gcTime: keep inactive cache in memory for 30 min (prevents re-fetch after returning)
 
-const STALE_TIME = 10 * 60 * 1000;
+const STALE_TIME = 10 * 60 * 1000;   // 10 minutes
+const GC_TIME = 30 * 60 * 1000;      // 30 minutes
+
+// Config data is very stable — cache for longer
+const CONFIG_STALE = 30 * 60 * 1000;  // 30 minutes
+const CONFIG_GC = 60 * 60 * 1000;     // 60 minutes
 
 // ── Config hooks ──
 
@@ -41,7 +47,6 @@ export function usePositions() {
     queryKey: configKeys.positions,
     queryFn: async () => {
       const res = await api.get('/config/positions');
-      // Backend returns { positions: [...], position_map: {...}, indices: {...}, ... }
       const positions = res.data?.positions;
       if (!Array.isArray(positions)) {
         console.warn('[usePositions] Unexpected response:', res.data);
@@ -49,7 +54,10 @@ export function usePositions() {
       }
       return positions as string[];
     },
-    staleTime: STALE_TIME,
+    staleTime: CONFIG_STALE,
+    gcTime: CONFIG_GC,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -58,7 +66,6 @@ export function useLeagues() {
     queryKey: configKeys.leagues,
     queryFn: async () => {
       const res = await api.get('/config/leagues');
-      // Backend returns { leagues: [...], league_logos: {...} }
       const leagues = res.data?.leagues;
       if (!Array.isArray(leagues)) {
         console.warn('[useLeagues] Unexpected response:', res.data);
@@ -66,7 +73,10 @@ export function useLeagues() {
       }
       return leagues as string[];
     },
-    staleTime: STALE_TIME,
+    staleTime: CONFIG_STALE,
+    gcTime: CONFIG_GC,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -80,6 +90,7 @@ export function usePlayers(params: PlayersQueryParams) {
       return res.data as { total: number; players: PlayerSummary[] };
     },
     staleTime: STALE_TIME,
+    gcTime: GC_TIME,
     placeholderData: (prev) => prev,
   });
 }
@@ -95,6 +106,7 @@ export function usePlayerProfile(displayName: string | null) {
     },
     enabled: !!displayName,
     staleTime: STALE_TIME,
+    gcTime: GC_TIME,
   });
 }
 
@@ -112,6 +124,7 @@ export function useRadarData(displayName: string | null) {
     },
     enabled: !!displayName,
     staleTime: STALE_TIME,
+    gcTime: GC_TIME,
   });
 }
 
@@ -130,6 +143,8 @@ export function useRankings(params: RankingsQueryParams) {
       return res.data as RankingResponse;
     },
     staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+    placeholderData: (prev) => prev,
   });
 }
 

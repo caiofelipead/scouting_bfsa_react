@@ -32,7 +32,9 @@ export default function DataBrowserPage() {
       const res = await api.get(`/data/${source}`, { params });
       return res.data as DataTableResponse;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const handleExportCSV = () => {

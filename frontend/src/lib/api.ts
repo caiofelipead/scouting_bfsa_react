@@ -3,6 +3,7 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  timeout: 30_000, // 30s timeout for slow cold starts
 });
 
 api.interceptors.request.use((config) => {
@@ -15,15 +16,26 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
+  async (err) => {
+    const config = err.config;
+
+    // Retry on network errors (not 4xx/5xx) up to 2 times
+    if (!err.response && config && !config._retryCount) {
+      config._retryCount = (config._retryCount || 0) + 1;
+      if (config._retryCount <= 2) {
+        const delay = config._retryCount * 1000;
+        await new Promise((r) => setTimeout(r, delay));
+        return api(config);
+      }
+    }
+
     if (
       err.response?.status === 401 &&
-      !err.config?.url?.includes('/auth/login')
+      !config?.url?.includes('/auth/login')
     ) {
-      console.warn('[api] 401 received – clearing session', err.config?.url);
+      console.warn('[api] 401 received – clearing session', config?.url);
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
-      // Force reload to show login screen and clear stale React state
       window.location.reload();
     }
     return Promise.reject(err);

@@ -68,7 +68,9 @@ export default function RankingsPage() {
       return res.data as { position: string; league_target: string; total: number; players: PredictionRankingEntry[] };
     },
     enabled: mode === 'prediction',
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const isLoading = mode === 'ssp' ? sspLoading : predLoading;

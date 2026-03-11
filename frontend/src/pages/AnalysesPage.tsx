@@ -10,7 +10,9 @@ export default function AnalysesPage() {
       const r = await api.get('/analyses');
       return (r.data.analyses ?? []) as Record<string, string>[];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const columns = analyses.length > 0 ? Object.keys(analyses[0]).slice(0, 10) : [];

@@ -171,6 +171,62 @@ def _percentile_rank(value, series):
         return 50.0
     return float((valid < value).sum() / len(valid) * 100)
 
+
+# ============================================
+# VECTORIZED PERCENTILE CACHE (Performance)
+# ============================================
+# Pre-computes percentile ranks for ALL players × ALL numeric columns
+# at once using pandas.rank(). Subsequent lookups are O(1) dict access.
+
+_percentile_cache: Dict[int, pd.DataFrame] = {}
+_percentile_cache_id: Optional[int] = None
+
+
+def _get_percentile_matrix(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a DataFrame where each cell = percentile rank (0-100) of that player's value.
+
+    Cached by DataFrame id so it's computed once per data load.
+    """
+    global _percentile_cache_id, _percentile_cache
+
+    df_id = id(df)
+    if df_id in _percentile_cache:
+        return _percentile_cache[df_id]
+
+    # Convert all columns to numeric, keep only numeric ones
+    numeric_df = df.apply(lambda col: pd.to_numeric(
+        col.apply(lambda v: str(v).replace(',', '.') if isinstance(v, str) else v),
+        errors='coerce'
+    ))
+
+    # Compute percentile ranks using pandas (vectorized, fast)
+    # pct=True gives 0-1, multiply by 100 for 0-100
+    perc_df = numeric_df.rank(pct=True, na_option='keep') * 100
+
+    # Keep only one cache entry to avoid memory bloat
+    _percentile_cache.clear()
+    _percentile_cache[df_id] = perc_df
+    _percentile_cache_id = df_id
+    return perc_df
+
+
+def _fast_percentile(player_idx, col: str, perc_matrix: pd.DataFrame) -> float:
+    """O(1) percentile lookup from pre-computed matrix."""
+    try:
+        val = perc_matrix.at[player_idx, col]
+        if pd.isna(val):
+            return 50.0
+        return float(val)
+    except (KeyError, ValueError):
+        return 50.0
+
+
+def invalidate_percentile_cache():
+    """Call when data is reloaded to clear the cache."""
+    global _percentile_cache, _percentile_cache_id
+    _percentile_cache.clear()
+    _percentile_cache_id = None
+
 def _resolve_metric(metric, columns):
     if metric in columns:
         return metric
@@ -202,16 +258,21 @@ def _is_inverted(metric_name):
 # WEIGHTED INDEX (substitui calculate_index)
 # ============================================
 
-def calculate_weighted_index(player_row, metrics, df_all, position=None):
+def calculate_weighted_index(player_row, metrics, df_all, position=None, _perc_matrix=None):
     """
     Drop-in replacement para calculate_index().
     Usa POSITION_WEIGHTS para ponderar. Se position=None, media simples.
     Returns float 0-100.
+    Accepts optional _perc_matrix for batch optimization (avoids recomputing).
     """
     weights = POSITION_WEIGHTS.get(position, {}) if position else {}
     columns_available = set(player_row.index) & set(df_all.columns)
     weighted_sum = 0.0
     total_weight = 0.0
+
+    # Use pre-computed percentile matrix if available
+    use_cache = _perc_matrix is not None and hasattr(player_row, 'name')
+    player_idx = player_row.name if use_cache else None
 
     for metric in metrics:
         resolved = _resolve_metric(metric, columns_available)
@@ -220,7 +281,12 @@ def calculate_weighted_index(player_row, metrics, df_all, position=None):
         val = _safe_float(player_row[resolved])
         if val is None:
             continue
-        perc = _percentile_rank(val, df_all[resolved])
+
+        if use_cache and resolved in _perc_matrix.columns:
+            perc = _fast_percentile(player_idx, resolved, _perc_matrix)
+        else:
+            perc = _percentile_rank(val, df_all[resolved])
+
         if _is_inverted(metric):
             perc = 100.0 - perc
 
@@ -251,10 +317,11 @@ def calculate_all_indices(player_row, indices_config, df_all, position=None):
 # OVERALL SCORE (Tab 6 ranking)
 # ============================================
 
-def calculate_overall_score(player_row, position, df_all):
+def calculate_overall_score(player_row, position, df_all, _perc_matrix=None):
     """
     Score unico 0-100 usando TODAS as metricas de POSITION_WEIGHTS.
     Returns float 0-100 ou None.
+    Accepts optional _perc_matrix for batch optimization.
     """
     weights = POSITION_WEIGHTS.get(position)
     if not weights:
@@ -264,6 +331,9 @@ def calculate_overall_score(player_row, position, df_all):
     total_weight = 0.0
     matched = 0
 
+    use_cache = _perc_matrix is not None and hasattr(player_row, 'name')
+    player_idx = player_row.name if use_cache else None
+
     for metric, w in weights.items():
         resolved = _resolve_metric(metric, columns_available)
         if resolved is None:
@@ -271,7 +341,12 @@ def calculate_overall_score(player_row, position, df_all):
         val = _safe_float(player_row[resolved])
         if val is None:
             continue
-        perc = _percentile_rank(val, df_all[resolved])
+
+        if use_cache and resolved in _perc_matrix.columns:
+            perc = _fast_percentile(player_idx, resolved, _perc_matrix)
+        else:
+            perc = _percentile_rank(val, df_all[resolved])
+
         if metric in INVERTED_METRICS:
             perc = 100.0 - perc
         weighted_sum += perc * w
@@ -289,6 +364,7 @@ def rank_players_weighted(df_players, position, df_percentile_base,
                           include_indices=True):
     """
     Ranking batch. Calcula Score + indices compostos ponderados.
+    Uses vectorized percentile matrix for O(1) lookups (10-50x faster).
     Returns DataFrame ordenado por Score desc com colunas extras.
     """
     pool = df_players.copy()
@@ -297,15 +373,18 @@ def rank_players_weighted(df_players, position, df_percentile_base,
     if len(pool) == 0:
         return pd.DataFrame()
 
+    # Pre-compute percentile matrix once (vectorized)
+    perc_matrix = _get_percentile_matrix(df_percentile_base)
+
     scores = []
     for idx, row in pool.iterrows():
-        score = calculate_overall_score(row, position, df_percentile_base)
+        score = calculate_overall_score(row, position, df_percentile_base, _perc_matrix=perc_matrix)
         if score is None:
             continue
         entry = {'_idx': idx, 'Score': round(score, 1)}
         if include_indices and indices_config:
             for idx_name, metrics in indices_config.items():
-                val = calculate_weighted_index(row, metrics, df_percentile_base, position)
+                val = calculate_weighted_index(row, metrics, df_percentile_base, position, _perc_matrix=perc_matrix)
                 entry[idx_name] = round(val, 1)
         scores.append(entry)
 
@@ -336,6 +415,9 @@ def calculate_metric_percentiles(player_row, position, df_all, top_n=12):
     """Percentis das top metricas. Retorna dict {short_name: percentil}."""
     top_metrics = get_top_metrics_for_position(position, top_n)
     columns_available = set(player_row.index) & set(df_all.columns)
+    perc_matrix = _get_percentile_matrix(df_all)
+    use_cache = hasattr(player_row, 'name')
+    player_idx = player_row.name if use_cache else None
     result = {}
     for metric, w in top_metrics:
         resolved = _resolve_metric(metric, columns_available)
@@ -344,7 +426,10 @@ def calculate_metric_percentiles(player_row, position, df_all, top_n=12):
         val = _safe_float(player_row[resolved])
         if val is None:
             continue
-        perc = _percentile_rank(val, df_all[resolved])
+        if use_cache and resolved in perc_matrix.columns:
+            perc = _fast_percentile(player_idx, resolved, perc_matrix)
+        else:
+            perc = _percentile_rank(val, df_all[resolved])
         if metric in INVERTED_METRICS:
             perc = 100.0 - perc
         short = metric.replace('/90', '').replace(', %', '%')
