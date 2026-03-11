@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, ChevronRight } from 'lucide-react';
 import PlayerProfile from '../components/PlayerProfile';
@@ -14,16 +14,24 @@ export default function DashboardPage() {
   const [league, setLeague] = useState('');
   const [positions, setPositions] = useState<string[]>([]);
   const [leagues, setLeagues] = useState<string[]>([]);
+  const isFirstMount = useRef(true);
 
   useEffect(() => {
     api.get('/config/positions').then((res) => setPositions(res.data.positions)).catch(() => {});
     api.get('/config/leagues').then((res) => setLeagues(res.data.leagues)).catch(() => {});
   }, []);
 
+  // Fetch immediately on mount (no debounce), debounce only on filter changes
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      fetchPlayers({ search, position: position || undefined, league: league || undefined, min_minutes: 0, limit: 60 });
-    }, 300);
+    const params = { search, position: position || undefined, league: league || undefined, min_minutes: 0, limit: 60 };
+
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      fetchPlayers(params);
+      return;
+    }
+
+    const timeout = setTimeout(() => fetchPlayers(params), 300);
     return () => clearTimeout(timeout);
   }, [search, position, league, fetchPlayers]);
 
@@ -115,7 +123,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="max-h-[65vh] overflow-y-auto">
-            {loading ? (
+            {loading || (players.length === 0 && total === 0 && isFirstMount.current) ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="skeleton-table-row px-4">
                   <div /><div /><div /><div /><div />
