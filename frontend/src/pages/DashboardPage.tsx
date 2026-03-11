@@ -1,39 +1,45 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, ChevronRight } from 'lucide-react';
+import { Search, Filter, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import PlayerProfile from '../components/PlayerProfile';
-import { usePlayers } from '../hooks/usePlayers';
-import api from '../lib/api';
+import { usePlayers, usePositions, useLeagues } from '../hooks/usePlayers';
 import { cn, getScoreColor, formatNumber } from '../lib/utils';
+import type { PlayersQueryParams } from '../types/api';
 
 export default function DashboardPage() {
-  const { players, total, loading, fetchPlayers } = usePlayers();
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [position, setPosition] = useState('');
   const [league, setLeague] = useState('');
-  const [positions, setPositions] = useState<string[]>([]);
-  const [leagues, setLeagues] = useState<string[]>([]);
-  const isFirstMount = useRef(true);
+  const [minAge, setMinAge] = useState('');
+  const [maxAge, setMaxAge] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  useEffect(() => {
-    api.get('/config/positions').then((res) => setPositions(res.data.positions)).catch(() => {});
-    api.get('/config/leagues').then((res) => setLeagues(res.data.leagues)).catch(() => {});
-  }, []);
+  const { data: positions = [] } = usePositions();
+  const { data: leagues = [] } = useLeagues();
 
-  // Fetch immediately on mount (no debounce), debounce only on filter changes
-  useEffect(() => {
-    const params = { search, position: position || undefined, league: league || undefined, min_minutes: 0, limit: 60 };
+  // Debounce search input
+  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    if (debounceTimer) clearTimeout(debounceTimer);
+    setDebounceTimer(setTimeout(() => setDebouncedSearch(value), 300));
+  };
 
-    if (isFirstMount.current) {
-      isFirstMount.current = false;
-      fetchPlayers(params);
-      return;
-    }
+  const queryParams = useMemo<PlayersQueryParams>(() => ({
+    search: debouncedSearch || undefined,
+    position: position || undefined,
+    league: league || undefined,
+    min_age: minAge ? Number(minAge) : undefined,
+    max_age: maxAge ? Number(maxAge) : undefined,
+    min_minutes: 0,
+    limit: 60,
+  }), [debouncedSearch, position, league, minAge, maxAge]);
 
-    const timeout = setTimeout(() => fetchPlayers(params), 300);
-    return () => clearTimeout(timeout);
-  }, [search, position, league, fetchPlayers]);
+  const { data, isLoading, isFetching } = usePlayers(queryParams);
+  const players = data?.players ?? [];
+  const total = data?.total ?? 0;
 
   return (
     <div className="space-y-5">
@@ -46,61 +52,114 @@ export default function DashboardPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: 'var(--color-text-muted)' }}
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar jogador..."
-            className="w-full pl-9 pr-3 py-2 rounded text-sm outline-none transition-colors"
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2"
+              style={{ color: 'var(--color-text-muted)' }}
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Buscar jogador..."
+              className="w-full pl-9 pr-3 py-2 rounded text-sm outline-none transition-colors"
+              style={{
+                background: 'var(--color-surface-1)',
+                border: '1px solid var(--color-border-subtle)',
+                color: 'var(--color-text-primary)',
+                fontFamily: 'var(--font-body)',
+              }}
+            />
+          </div>
+
+          <select
+            value={position}
+            onChange={(e) => setPosition(e.target.value)}
+            className="px-3 py-2 rounded text-sm cursor-pointer outline-none"
             style={{
               background: 'var(--color-surface-1)',
               border: '1px solid var(--color-border-subtle)',
-              color: 'var(--color-text-primary)',
+              color: 'var(--color-text-secondary)',
               fontFamily: 'var(--font-body)',
             }}
-          />
+          >
+            <option value="">Todas posicoes</option>
+            {positions.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+
+          <select
+            value={league}
+            onChange={(e) => setLeague(e.target.value)}
+            className="px-3 py-2 rounded text-sm cursor-pointer outline-none"
+            style={{
+              background: 'var(--color-surface-1)',
+              border: '1px solid var(--color-border-subtle)',
+              color: 'var(--color-text-secondary)',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            <option value="">Todas ligas</option>
+            {leagues.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded text-sm transition-colors cursor-pointer"
+            style={{
+              background: showAdvanced ? 'var(--color-accent-glow)' : 'var(--color-surface-1)',
+              border: `1px solid ${showAdvanced ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
+              color: showAdvanced ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            <SlidersHorizontal size={13} />
+            Filtros
+          </button>
         </div>
 
-        <select
-          value={position}
-          onChange={(e) => setPosition(e.target.value)}
-          className="px-3 py-2 rounded text-sm cursor-pointer outline-none"
-          style={{
-            background: 'var(--color-surface-1)',
-            border: '1px solid var(--color-border-subtle)',
-            color: 'var(--color-text-secondary)',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          <option value="">Todas posicoes</option>
-          {positions.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-
-        <select
-          value={league}
-          onChange={(e) => setLeague(e.target.value)}
-          className="px-3 py-2 rounded text-sm cursor-pointer outline-none"
-          style={{
-            background: 'var(--color-surface-1)',
-            border: '1px solid var(--color-border-subtle)',
-            color: 'var(--color-text-secondary)',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          <option value="">Todas ligas</option>
-          {leagues.map((l) => (
-            <option key={l} value={l}>{l}</option>
-          ))}
-        </select>
+        {/* Advanced filters row */}
+        {showAdvanced && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex flex-wrap items-end gap-3 overflow-hidden"
+          >
+            <div>
+              <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                IDADE MIN
+              </label>
+              <input
+                type="number"
+                value={minAge}
+                onChange={(e) => setMinAge(e.target.value)}
+                placeholder="16"
+                className="w-20 px-3 py-2 rounded text-sm outline-none"
+                style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                IDADE MAX
+              </label>
+              <input
+                type="number"
+                value={maxAge}
+                onChange={(e) => setMaxAge(e.target.value)}
+                placeholder="40"
+                className="w-20 px-3 py-2 rounded text-sm outline-none"
+                style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}
+              />
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* Content: list + profile */}
@@ -117,13 +176,18 @@ export default function DashboardPage() {
             >
               RESULTADOS
             </span>
-            <span className="text-[10px] font-[var(--font-mono)]" style={{ color: 'var(--color-text-muted)' }}>
-              {total}
-            </span>
+            <div className="flex items-center gap-2">
+              {isFetching && !isLoading && (
+                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" style={{ color: 'var(--color-accent)' }} />
+              )}
+              <span className="text-[10px] font-[var(--font-mono)]" style={{ color: 'var(--color-text-muted)' }}>
+                {total}
+              </span>
+            </div>
           </div>
 
           <div className="max-h-[65vh] overflow-y-auto">
-            {loading || (players.length === 0 && total === 0 && isFirstMount.current) ? (
+            {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="skeleton-table-row px-4">
                   <div /><div /><div /><div /><div />
@@ -135,7 +199,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               players.map((player, i) => {
-                const isSelected = selectedPlayer === player.display_name;
+                const isSelected = selectedPlayer === (player.display_name || player.name);
                 return (
                   <motion.button
                     key={player.id + '-' + i}
@@ -183,6 +247,16 @@ export default function DashboardPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Score badge */}
+                    {player.score != null && (
+                      <span
+                        className="text-[10px] font-[var(--font-mono)] font-bold px-1.5 py-0.5 rounded"
+                        style={{ color: getScoreColor(player.score), background: `${getScoreColor(player.score)}15` }}
+                      >
+                        {player.score.toFixed(1)}
+                      </span>
+                    )}
 
                     {/* Minutes */}
                     {player.minutes_played && (

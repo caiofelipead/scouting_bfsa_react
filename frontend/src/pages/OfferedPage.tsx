@@ -1,18 +1,17 @@
-import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FileText } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 
 export default function OfferedPage() {
-  const [players, setPlayers] = useState<Record<string, string>[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.get('/offered')
-      .then((r) => setPlayers(r.data.players))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: players = [], isLoading: loading } = useQuery({
+    queryKey: ['offered'],
+    queryFn: async () => {
+      const r = await api.get('/offered');
+      return r.data.players as Record<string, string>[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const columns = players.length > 0 ? Object.keys(players[0]).slice(0, 8) : [];
 

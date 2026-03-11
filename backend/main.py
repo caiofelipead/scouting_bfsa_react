@@ -309,11 +309,14 @@ async def list_players(
     league: Optional[str] = None,
     search: Optional[str] = None,
     min_minutes: int = 0,
+    min_age: Optional[int] = None,
+    max_age: Optional[int] = None,
     limit: int = 100,
     offset: int = 0,
     current_user: dict = Depends(get_current_user),
 ):
     df = _get_wyscout()
+    df_all = df  # keep full df for score calculation
 
     if position:
         cat = get_posicao_categoria(position)
@@ -327,6 +330,12 @@ async def list_players(
         df["_min"] = df["Minutos jogados:"].apply(_safe_float)
         df = df[df["_min"] >= min_minutes]
 
+    if min_age is not None and "Idade" in df.columns:
+        df = df[df["Idade"].apply(lambda a: _safe_float(a) is not None and _safe_float(a) >= min_age)]
+
+    if max_age is not None and "Idade" in df.columns:
+        df = df[df["Idade"].apply(lambda a: _safe_float(a) is not None and _safe_float(a) <= max_age)]
+
     if search and "JogadorDisplay" in df.columns:
         search_lower = search.lower()
         df = df[df["JogadorDisplay"].str.lower().str.contains(search_lower, na=False)]
@@ -336,16 +345,21 @@ async def list_players(
 
     players = []
     for idx, row in df.iterrows():
+        pos_raw = str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else None
+        pos_cat = get_posicao_categoria(pos_raw) if pos_raw else None
+        score = calculate_overall_score(row, pos_cat, df_all) if pos_cat else None
+
         players.append({
             "id": int(idx) if isinstance(idx, (int, np.integer)) else hash(str(idx)) % 10**8,
             "name": str(row.get("Jogador", "")),
             "display_name": str(row.get("JogadorDisplay", row.get("Jogador", ""))),
             "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
-            "position": str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else None,
+            "position": pos_raw,
             "age": _safe_float(row.get("Idade")),
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
             "league": str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
             "minutes_played": _safe_float(row.get("Minutos jogados:")),
+            "score": round(score, 1) if score else None,
         })
 
     return {"total": total, "players": players}
@@ -408,6 +422,14 @@ async def get_player_profile(
 
     idx_val = int(row.name) if isinstance(row.name, (int, np.integer)) else hash(str(row.name)) % 10**8
 
+    # Projection score (PDI) — young + high score = high resale potential
+    age = _safe_float(row.get("Idade"))
+    projection_score = None
+    if score is not None and age is not None and age > 0:
+        # Age factor: peaks at 19, linear decay until 35
+        age_factor = max(0, min(1.0, (35 - age) / 16))
+        projection_score = round(score * 0.6 + score * age_factor * 0.4, 1)
+
     return {
         "summary": {
             "id": idx_val,
@@ -415,7 +437,7 @@ async def get_player_profile(
             "display_name": str(row.get("JogadorDisplay", "")),
             "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
             "position": position,
-            "age": _safe_float(row.get("Idade")),
+            "age": age,
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
             "league": str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
             "minutes_played": _safe_float(row.get("Minutos jogados:")),
@@ -427,6 +449,7 @@ async def get_player_profile(
         "scout_score": round(score, 1) if score else None,
         "performance_class": perf_class,
         "skillcorner": sc_data,
+        "projection_score": projection_score,
     }
 
 

@@ -1,117 +1,134 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import type { PlayerSummary, PlayerProfile, RankingResponse, SimilarityResponse } from '../types/api';
+import type {
+  PlayerSummary,
+  PlayerProfile,
+  RankingResponse,
+  SimilarityResponse,
+  PlayersQueryParams,
+  RankingsQueryParams,
+  SimilarityQueryParams,
+} from '../types/api';
 
-export function usePlayers() {
-  const [players, setPlayers] = useState<PlayerSummary[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+// ── Query key factories (consistent keys prevent cache resets on tab switch) ──
 
-  const fetchPlayers = useCallback(async (params: {
-    position?: string;
-    league?: string;
-    search?: string;
-    min_minutes?: number;
-    limit?: number;
-    offset?: number;
-  } = {}) => {
-    setLoading(true);
-    try {
-      const res = await api.get('/players', { params });
-      setPlayers(res.data.players);
-      setTotal(res.data.total);
-    } catch (err) {
-      console.error('Failed to fetch players:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+export const playerKeys = {
+  all: ['players'] as const,
+  list: (params: PlayersQueryParams) => ['players', 'list', params] as const,
+  profile: (displayName: string) => ['players', 'profile', displayName] as const,
+  radar: (displayName: string) => ['players', 'radar', displayName] as const,
+};
 
-  return { players, total, loading, fetchPlayers };
+export const rankingKeys = {
+  all: ['rankings'] as const,
+  list: (params: RankingsQueryParams) => ['rankings', 'list', params] as const,
+};
+
+export const configKeys = {
+  positions: ['config', 'positions'] as const,
+  leagues: ['config', 'leagues'] as const,
+};
+
+// ── Shared staleTime for Wyscout/SkillCorner data (5 minutes) ──
+
+const STALE_TIME = 5 * 60 * 1000;
+
+// ── Config hooks ──
+
+export function usePositions() {
+  return useQuery({
+    queryKey: configKeys.positions,
+    queryFn: async () => {
+      const res = await api.get('/config/positions');
+      return res.data.positions as string[];
+    },
+    staleTime: STALE_TIME,
+  });
 }
+
+export function useLeagues() {
+  return useQuery({
+    queryKey: configKeys.leagues,
+    queryFn: async () => {
+      const res = await api.get('/config/leagues');
+      return res.data.leagues as string[];
+    },
+    staleTime: STALE_TIME,
+  });
+}
+
+// ── Players list ──
+
+export function usePlayers(params: PlayersQueryParams) {
+  return useQuery({
+    queryKey: playerKeys.list(params),
+    queryFn: async () => {
+      const res = await api.get('/players', { params });
+      return res.data as { total: number; players: PlayerSummary[] };
+    },
+    staleTime: STALE_TIME,
+    placeholderData: (prev) => prev,
+  });
+}
+
+// ── Player profile ──
 
 export function usePlayerProfile(displayName: string | null) {
-  const [profile, setProfile] = useState<PlayerProfile | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!displayName) {
-      setProfile(null);
-      return;
-    }
-    setLoading(true);
-    api.get(`/players/${encodeURIComponent(displayName)}/profile`)
-      .then((res) => setProfile(res.data))
-      .catch((err) => console.error('Failed to fetch profile:', err))
-      .finally(() => setLoading(false));
-  }, [displayName]);
-
-  return { profile, loading };
+  return useQuery({
+    queryKey: playerKeys.profile(displayName ?? ''),
+    queryFn: async () => {
+      const res = await api.get(`/players/${encodeURIComponent(displayName!)}/profile`);
+      return res.data as PlayerProfile;
+    },
+    enabled: !!displayName,
+    staleTime: STALE_TIME,
+  });
 }
 
-export function useRankings() {
-  const [rankings, setRankings] = useState<RankingResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchRankings = useCallback(async (position: string, minMinutes: number = 0, league?: string, topN: number = 50) => {
-    setLoading(true);
-    try {
-      const res = await api.post('/rankings', {
-        position,
-        min_minutes: minMinutes,
-        league: league || null,
-        top_n: topN,
-      });
-      setRankings(res.data);
-    } catch (err) {
-      console.error('Failed to fetch rankings:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { rankings, loading, fetchRankings };
-}
-
-export function useSimilarity() {
-  const [result, setResult] = useState<SimilarityResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const findSimilar = useCallback(async (playerName: string, position: string, topN: number = 20, minMinutes: number = 500) => {
-    setLoading(true);
-    try {
-      const res = await api.post('/similarity', {
-        player_name: playerName,
-        position,
-        top_n: topN,
-        min_minutes: minMinutes,
-      });
-      setResult(res.data);
-    } catch (err) {
-      console.error('Failed to find similar:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { result, loading, findSimilar };
-}
+// ── Radar data ──
 
 export function useRadarData(displayName: string | null) {
-  const [data, setData] = useState<{ labels: string[]; values: number[] } | null>(null);
-  const [loading, setLoading] = useState(false);
+  return useQuery({
+    queryKey: playerKeys.radar(displayName ?? ''),
+    queryFn: async () => {
+      const res = await api.get(`/players/${encodeURIComponent(displayName!)}/radar`);
+      return { labels: res.data.labels as string[], values: res.data.values as number[] };
+    },
+    enabled: !!displayName,
+    staleTime: STALE_TIME,
+  });
+}
 
-  useEffect(() => {
-    if (!displayName) {
-      setData(null);
-      return;
-    }
-    setLoading(true);
-    api.get(`/players/${encodeURIComponent(displayName)}/radar`)
-      .then((res) => setData({ labels: res.data.labels, values: res.data.values }))
-      .catch((err) => console.error('Failed to fetch radar:', err))
-      .finally(() => setLoading(false));
-  }, [displayName]);
+// ── Rankings ──
 
-  return { data, loading };
+export function useRankings(params: RankingsQueryParams) {
+  return useQuery({
+    queryKey: rankingKeys.list(params),
+    queryFn: async () => {
+      const res = await api.post('/rankings', {
+        position: params.position,
+        min_minutes: params.min_minutes ?? 0,
+        league: params.league || null,
+        top_n: params.top_n ?? 50,
+      });
+      return res.data as RankingResponse;
+    },
+    staleTime: STALE_TIME,
+  });
+}
+
+// ── Similarity (mutation — triggered on-demand) ──
+
+export function useSimilarity() {
+  return useMutation({
+    mutationFn: async (params: SimilarityQueryParams) => {
+      const res = await api.post('/similarity', {
+        player_name: params.player_name,
+        position: params.position,
+        top_n: params.top_n ?? 20,
+        min_minutes: params.min_minutes ?? 500,
+      });
+      return res.data as SimilarityResponse;
+    },
+  });
 }

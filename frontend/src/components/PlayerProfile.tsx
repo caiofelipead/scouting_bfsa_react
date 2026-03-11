@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
@@ -9,11 +8,12 @@ import {
   BarChart3,
   Target,
   Shield,
+  TrendingUp,
 } from 'lucide-react';
 import RadarChart from './RadarChart';
 import SkeletonProfile from './SkeletonProfile';
 import { usePlayerProfile, useRadarData } from '../hooks/usePlayers';
-import { cn, getScoreClass, getPerformanceLabel, formatNumber } from '../lib/utils';
+import { cn, getScoreClass, getScoreColor, getPerformanceLabel, formatNumber } from '../lib/utils';
 
 interface PlayerProfileProps {
   playerDisplayName: string | null;
@@ -33,9 +33,23 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
 };
 
+function getPdiColor(pdi: number): string {
+  if (pdi >= 75) return '#22c55e';
+  if (pdi >= 60) return '#3b82f6';
+  if (pdi >= 40) return '#eab308';
+  return '#ef4444';
+}
+
+function getPdiLabel(pdi: number): string {
+  if (pdi >= 75) return 'ALTO POTENCIAL';
+  if (pdi >= 60) return 'PROMISSOR';
+  if (pdi >= 40) return 'MODERADO';
+  return 'BAIXO';
+}
+
 export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProfileProps) {
-  const { profile, loading: profileLoading } = usePlayerProfile(playerDisplayName);
-  const { data: radarData, loading: radarLoading } = useRadarData(playerDisplayName);
+  const { data: profile, isLoading: profileLoading } = usePlayerProfile(playerDisplayName);
+  const { data: radarData, isLoading: radarLoading } = useRadarData(playerDisplayName);
 
   if (!playerDisplayName) return null;
 
@@ -51,7 +65,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
     );
   }
 
-  const { summary, percentiles, indices, scout_score, performance_class, skillcorner } = profile;
+  const { summary, percentiles, indices, scout_score, performance_class, skillcorner, projection_score } = profile;
 
   return (
     <AnimatePresence mode="wait">
@@ -167,11 +181,43 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               </div>
             </div>
           )}
+
+          {/* Projection Score (PDI) bar */}
+          {projection_score !== null && projection_score !== undefined && (
+            <div
+              className="px-5 py-3 flex items-center justify-between"
+              style={{ borderTop: '1px solid var(--color-border-subtle)' }}
+            >
+              <div className="flex items-center gap-2">
+                <TrendingUp size={14} style={{ color: getPdiColor(projection_score) }} />
+                <span
+                  className="text-xs font-[var(--font-display)] tracking-[0.15em] uppercase"
+                  style={{ color: 'var(--color-text-muted)' }}
+                >
+                  NOTA DE PROJECAO (PDI)
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className="px-2.5 py-0.5 rounded text-xs font-[var(--font-mono)] font-bold"
+                  style={{ color: getPdiColor(projection_score), background: `${getPdiColor(projection_score)}15` }}
+                >
+                  {projection_score.toFixed(1)}
+                </span>
+                <span
+                  className="text-[10px] font-[var(--font-display)] tracking-[0.1em]"
+                  style={{ color: getPdiColor(projection_score) }}
+                >
+                  {getPdiLabel(projection_score)}
+                </span>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* ── Asymmetric grid: Radar + Indices ────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.65fr] gap-4">
-          {/* Radar */}
+          {/* Radar — uses real percentiles from calibration */}
           <motion.div variants={fadeUp} className="card-glass rounded-lg p-5">
             <div className="flex items-center gap-2 mb-4">
               <BarChart3 size={14} style={{ color: 'var(--color-accent)' }} />
@@ -191,6 +237,22 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               />
             ) : (
               <div className="skeleton-radar max-w-[280px] mx-auto" />
+            )}
+
+            {/* Percentile detail grid */}
+            {percentiles && Object.keys(percentiles).length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1">
+                {Object.entries(percentiles).map(([metric, value]) => (
+                  <div key={metric} className="flex items-center justify-between">
+                    <span className="text-[10px] truncate pr-1" style={{ color: 'var(--color-text-muted)' }}>
+                      {metric}
+                    </span>
+                    <span className="text-[10px] font-[var(--font-mono)] font-semibold" style={{ color: getScoreColor(value) }}>
+                      P{value.toFixed(0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
           </motion.div>
 
@@ -287,11 +349,4 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
       </motion.div>
     </AnimatePresence>
   );
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 75) return '#22c55e';
-  if (score >= 60) return '#eab308';
-  if (score >= 40) return '#f97316';
-  return '#ef4444';
 }

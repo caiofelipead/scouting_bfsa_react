@@ -33,6 +33,7 @@ export interface PlayerProfile {
   scout_score: number | null;
   performance_class: string | null;
   skillcorner: Record<string, number> | null;
+  projection_score: number | null;
 }
 
 export interface RankingEntry {
@@ -88,4 +89,30 @@ export interface BreakdownEntry {
   Similar: number;
   Diferenca: number;
   Invertida: string;
+}
+
+// Query parameter types
+export interface PlayersQueryParams {
+  position?: string;
+  league?: string;
+  search?: string;
+  min_minutes?: number;
+  min_age?: number;
+  max_age?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface RankingsQueryParams {
+  position: string;
+  min_minutes?: number;
+  league?: string;
+  top_n?: number;
+}
+
+export interface SimilarityQueryParams {
+  player_name: string;
+  position: string;
+  top_n?: number;
+  min_minutes?: number;
 }

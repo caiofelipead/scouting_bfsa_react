@@ -1,27 +1,33 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ArrowUpDown } from 'lucide-react';
-import { useRankings } from '../hooks/usePlayers';
-import api from '../lib/api';
+import { useRankings, usePositions, useLeagues } from '../hooks/usePlayers';
 import { getScoreColor, formatNumber } from '../lib/utils';
+import type { RankingsQueryParams } from '../types/api';
 
 export default function RankingsPage() {
-  const { rankings, loading, fetchRankings } = useRankings();
   const [position, setPosition] = useState('Atacante');
   const [minMinutes, setMinMinutes] = useState(500);
   const [league, setLeague] = useState('');
-  const [positions, setPositions] = useState<string[]>([]);
-  const [leagues, setLeagues] = useState<string[]>([]);
-  const hasFetched = useRef(false);
 
-  useEffect(() => {
-    api.get('/config/positions').then((r) => setPositions(r.data.positions)).catch(() => {});
-    api.get('/config/leagues').then((r) => setLeagues(r.data.leagues)).catch(() => {});
-  }, []);
+  const { data: positions = [] } = usePositions();
+  const { data: leagues = [] } = useLeagues();
 
-  useEffect(() => {
-    fetchRankings(position, minMinutes, league || undefined, 50).then(() => { hasFetched.current = true; });
-  }, [position, minMinutes, league, fetchRankings]);
+  const queryParams = useMemo<RankingsQueryParams>(() => ({
+    position,
+    min_minutes: minMinutes,
+    league: league || undefined,
+    top_n: 50,
+  }), [position, minMinutes, league]);
+
+  const { data: rankings, isLoading } = useRankings(queryParams);
+
+  // Extract unique index names from first player for column headers
+  const indexColumns = useMemo(() => {
+    if (!rankings?.players?.length) return [];
+    const first = rankings.players[0];
+    return Object.keys(first.indices || {});
+  }, [rankings]);
 
   return (
     <div className="space-y-5">
@@ -31,7 +37,7 @@ export default function RankingsPage() {
           Rankings
         </h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-          Classificacao ponderada por indices compostos e Scout Score
+          Classificacao ponderada por indices compostos (SSP Lambdas) e Scout Score
         </p>
       </div>
 
@@ -89,16 +95,21 @@ export default function RankingsPage() {
                 <th className="px-3 py-2.5 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Equipa</th>
                 <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Idade</th>
                 <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Min</th>
+                {indexColumns.map((col) => (
+                  <th key={col} className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
+                    {col.replace(/ index$/i, '').slice(0, 12)}
+                  </th>
+                ))}
                 <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-accent)' }}>
                   <span className="flex items-center justify-end gap-1">Score <ArrowUpDown size={10} /></span>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {loading || (!rankings && !hasFetched.current) ? (
+              {isLoading ? (
                 Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: 6 + indexColumns.length }).map((_, j) => (
                       <td key={j} className="px-3 py-2.5"><div className="skeleton h-4 rounded" /></td>
                     ))}
                   </tr>
@@ -120,6 +131,14 @@ export default function RankingsPage() {
                     <td className="px-3 py-2.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>{entry.team || '—'}</td>
                     <td className="px-3 py-2.5 text-right font-[var(--font-mono)] text-xs" style={{ color: 'var(--color-text-muted)' }}>{formatNumber(entry.age)}</td>
                     <td className="px-3 py-2.5 text-right font-[var(--font-mono)] text-xs" style={{ color: 'var(--color-text-muted)' }}>{formatNumber(entry.minutes)}</td>
+                    {indexColumns.map((col) => {
+                      const val = entry.indices?.[col];
+                      return (
+                        <td key={col} className="px-3 py-2.5 text-right font-[var(--font-mono)] text-xs" style={{ color: val != null ? getScoreColor(val) : 'var(--color-text-muted)' }}>
+                          {val != null ? val.toFixed(1) : '—'}
+                        </td>
+                      );
+                    })}
                     <td className="px-3 py-2.5 text-right">
                       <span
                         className="inline-block px-2 py-0.5 rounded text-xs font-[var(--font-mono)] font-bold"
@@ -132,7 +151,7 @@ export default function RankingsPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  <td colSpan={6 + indexColumns.length} className="px-3 py-8 text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
                     Nenhum resultado
                   </td>
                 </tr>

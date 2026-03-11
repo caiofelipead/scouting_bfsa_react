@@ -1,18 +1,17 @@
-import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 
 export default function AnalysesPage() {
-  const [analyses, setAnalyses] = useState<Record<string, string>[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.get('/analyses')
-      .then((r) => setAnalyses(r.data.analyses))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: analyses = [], isLoading: loading } = useQuery({
+    queryKey: ['analyses'],
+    queryFn: async () => {
+      const r = await api.get('/analyses');
+      return r.data.analyses as Record<string, string>[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const columns = analyses.length > 0 ? Object.keys(analyses[0]).slice(0, 10) : [];
 

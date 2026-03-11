@@ -1,36 +1,51 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Users, Percent } from 'lucide-react';
-import { usePlayers, useSimilarity } from '../hooks/usePlayers';
-import api from '../lib/api';
+import { usePlayers, useSimilarity, usePositions } from '../hooks/usePlayers';
 import { formatNumber } from '../lib/utils';
 
 export default function SimilarityPage() {
-  const { result, loading: simLoading, findSimilar } = useSimilarity();
-  const { players, fetchPlayers } = usePlayers();
+  const similarity = useSimilarity();
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState('');
   const [position, setPosition] = useState('Atacante');
   const [topN, setTopN] = useState(20);
   const [minMinutes, setMinMinutes] = useState(500);
-  const [positions, setPositions] = useState<string[]>([]);
+  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    api.get('/config/positions').then((r) => setPositions(r.data.positions)).catch(() => {});
-  }, []);
+  const { data: positions = [] } = usePositions();
 
-  useEffect(() => {
-    if (search.length >= 2) {
-      const t = setTimeout(() => fetchPlayers({ search, limit: 10 }), 200);
-      return () => clearTimeout(t);
-    }
-  }, [search, fetchPlayers]);
+  const searchParams = useMemo(() => ({
+    search: debouncedSearch || undefined,
+    limit: 10,
+  }), [debouncedSearch]);
+
+  const { data: searchData } = usePlayers(
+    debouncedSearch.length >= 2 && !selectedPlayer ? searchParams : { limit: 0 }
+  );
+  const players = searchData?.players ?? [];
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setSelectedPlayer('');
+    if (debounceTimer) clearTimeout(debounceTimer);
+    setDebounceTimer(setTimeout(() => setDebouncedSearch(value), 200));
+  };
 
   const handleSearch = () => {
     if (selectedPlayer) {
-      findSimilar(selectedPlayer, position, topN, minMinutes);
+      similarity.mutate({
+        player_name: selectedPlayer,
+        position,
+        top_n: topN,
+        min_minutes: minMinutes,
+      });
     }
   };
+
+  const result = similarity.data;
+  const simLoading = similarity.isPending;
 
   return (
     <div className="space-y-5">
@@ -55,12 +70,12 @@ export default function SimilarityPage() {
               <input
                 type="text"
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setSelectedPlayer(''); }}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Digite o nome..."
                 className="w-full px-3 py-2 rounded text-sm outline-none"
                 style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}
               />
-              {search.length >= 2 && !selectedPlayer && players.length > 0 && (
+              {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
                 <div
                   className="absolute top-full left-0 right-0 mt-1 rounded overflow-hidden z-20 max-h-48 overflow-y-auto"
                   style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-active)' }}
@@ -68,7 +83,7 @@ export default function SimilarityPage() {
                   {players.map((p, i) => (
                     <button
                       key={i}
-                      onClick={() => { setSelectedPlayer(p.display_name || p.name); setSearch(p.display_name || p.name); }}
+                      onClick={() => { setSelectedPlayer(p.display_name || p.name); setSearch(p.display_name || p.name); setDebouncedSearch(''); }}
                       className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-white/5 cursor-pointer"
                       style={{ borderBottom: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
                     >
