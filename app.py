@@ -984,6 +984,21 @@ WYSCOUT_LEAGUE_MAP = {
 }
 
 
+def padronizar_string(texto):
+    """Normaliza string removendo acentos, convertendo para minúsculas e aplicando strip.
+    Trata valores nulos nativamente retornando None."""
+    if texto is None or (isinstance(texto, float) and pd.isna(texto)):
+        return None
+    try:
+        if pd.isna(texto):
+            return None
+    except (TypeError, ValueError):
+        pass
+    s = unicodedata.normalize('NFD', str(texto))
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    return s.lower().strip()
+
+
 # Dicionário normalizado para lookup rápido (chave = padronizar_string do nome WyScout)
 _WYSCOUT_LEAGUE_MAP_NORM = {
     padronizar_string(k): v for k, v in WYSCOUT_LEAGUE_MAP.items()
@@ -1576,21 +1591,6 @@ def normalize_name(name):
     name = unicodedata.normalize('NFD', str(name))
     name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
     return name.lower().strip()
-
-
-def padronizar_string(texto):
-    """Normaliza string removendo acentos, convertendo para minúsculas e aplicando strip.
-    Trata valores nulos nativamente retornando None."""
-    if texto is None or (isinstance(texto, float) and pd.isna(texto)):
-        return None
-    try:
-        if pd.isna(texto):
-            return None
-    except (TypeError, ValueError):
-        pass
-    s = unicodedata.normalize('NFD', str(texto))
-    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-    return s.lower().strip()
 
 
 def find_skillcorner_player(jogador_name, skillcorner_df):
