@@ -8,6 +8,7 @@ import os
 import time
 import hashlib
 import logging
+import threading
 from contextlib import asynccontextmanager
 from typing import Optional, List, Dict, Any
 
@@ -128,13 +129,19 @@ SHEET_NAMES = {
 
 
 def _load_google_sheet(sheet_id: str, sheet_name: str) -> pd.DataFrame:
-    """Load a single sheet from Google Sheets as CSV export."""
+    """Load a single sheet from Google Sheets as CSV export (with timeout)."""
     import urllib.parse
+    import io
 
     encoded = urllib.parse.quote(sheet_name)
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded}"
     try:
-        df = pd.read_csv(url, dtype=str, na_values=["", "-", "N/A", "nan"])
+        import urllib.request
+
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8")
+        df = pd.read_csv(io.StringIO(raw), dtype=str, na_values=["", "-", "N/A", "nan"])
         logger.info("Loaded sheet '%s': %d rows x %d cols", sheet_name, len(df), len(df.columns))
         return df
     except Exception as e:
@@ -195,21 +202,22 @@ def _prepare_wyscout(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+_data_ready = threading.Event()
+_data_loading = False
+_data_lock = threading.Lock()
+
+
 def _load_all_data():
-    """Load all sheets into memory — parallelized for faster startup."""
-    import concurrent.futures
+    """Load all sheets into memory — sequential with per-sheet timeout."""
+    global _data, _data_loading
 
-    global _data
-
-    def _load_one(key_sheet):
-        key, sheet_name = key_sheet
-        return key, _load_google_sheet(GOOGLE_SHEET_ID, sheet_name)
-
-    # Load all 4 sheets in parallel (4x faster startup)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        results = executor.map(_load_one, SHEET_NAMES.items())
-        for key, df in results:
+    for key, sheet_name in SHEET_NAMES.items():
+        try:
+            df = _load_google_sheet(GOOGLE_SHEET_ID, sheet_name)
             _data[key] = df
+        except Exception as e:
+            logger.error("Failed to load sheet '%s': %s", sheet_name, e)
+            _data[key] = pd.DataFrame()
 
     if "wyscout" in _data and len(_data["wyscout"]) > 0:
         _data["wyscout"] = _prepare_wyscout(_data["wyscout"])
@@ -224,7 +232,30 @@ def _load_all_data():
         from services.similarity import _get_percentile_matrix
         _get_percentile_matrix(_data["wyscout"])
 
-    logger.info("All data loaded successfully")
+    _data_ready.set()
+    _data_loading = False
+    logger.info("All data loaded successfully: %s", {k: len(v) for k, v in _data.items()})
+
+
+def _ensure_data_loaded():
+    """Trigger background loading if not started, wait up to 55s for data."""
+    global _data_loading
+
+    if _data_ready.is_set():
+        return  # data already loaded
+
+    with _data_lock:
+        if not _data_loading:
+            _data_loading = True
+            t = threading.Thread(target=_load_all_data, daemon=True)
+            t.start()
+
+    # Wait for data with a timeout (Render free tier has 60s request limit)
+    if not _data_ready.wait(timeout=55):
+        raise HTTPException(
+            status_code=503,
+            detail="Dados ainda carregando. Tente novamente em alguns segundos.",
+        )
 
 
 # ── Lifespan ──────────────────────────────────────────────────────────
@@ -232,7 +263,12 @@ def _load_all_data():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    _load_all_data()
+    # Start data loading in background — don't block app startup
+    global _data_loading
+    with _data_lock:
+        _data_loading = True
+        t = threading.Thread(target=_load_all_data, daemon=True)
+        t.start()
     yield
 
 
@@ -252,6 +288,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# HEALTH CHECK
+# ══════════════════════════════════════════════════════════════════════
+
+@app.get("/api/health")
+async def health_check():
+    """Health check — returns quickly even during cold start."""
+    ready = _data_ready.is_set()
+    counts = {k: len(v) for k, v in _data.items()} if ready else {}
+    return {
+        "status": "ready" if ready else "loading",
+        "data_loaded": ready,
+        "counts": counts,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -312,6 +364,7 @@ async def get_positions(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/config/leagues")
 async def get_leagues(current_user: dict = Depends(get_current_user)):
+    _ensure_data_loaded()
     leagues = set()
     if "wyscout" in _data and "liga_tier" in _data["wyscout"].columns:
         leagues = set(_data["wyscout"]["liga_tier"].dropna().unique())
@@ -338,6 +391,7 @@ async def get_mappings(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/data/reload")
 async def reload_data(admin: dict = Depends(require_admin)):
+    _data_ready.clear()
     _load_all_data()
     return {
         "message": "Dados recarregados",
@@ -350,6 +404,7 @@ async def reload_data(admin: dict = Depends(require_admin)):
 # ══════════════════════════════════════════════════════════════════════
 
 def _get_wyscout() -> pd.DataFrame:
+    _ensure_data_loaded()
     df = _data.get("wyscout")
     if df is None or len(df) == 0:
         raise HTTPException(status_code=503, detail="Dados WyScout não carregados")
@@ -841,6 +896,7 @@ async def compare_players(
 
 @app.get("/api/offered")
 async def list_offered_players(current_user: dict = Depends(get_current_user)):
+    _ensure_data_loaded()
     df = _data.get("oferecidos")
     if df is None or len(df) == 0:
         return {"players": []}
@@ -863,6 +919,7 @@ async def list_offered_players(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/analyses")
 async def list_analyses(current_user: dict = Depends(get_current_user)):
+    _ensure_data_loaded()
     df = _data.get("analises")
     if df is None or len(df) == 0:
         return {"analyses": []}
@@ -1007,6 +1064,7 @@ async def get_data_table(
     current_user: dict = Depends(get_current_user),
 ):
     """Return raw data table for a source (wyscout, analises, oferecidos, skillcorner)."""
+    _ensure_data_loaded()
     source_map = {
         "wyscout": "wyscout",
         "analises": "analises",
@@ -1302,18 +1360,6 @@ async def get_league_mappings(current_user: dict = Depends(get_current_user)):
     return {
         "wyscout_league_map": WYSCOUT_LEAGUE_MAP,
         "league_logos": LEAGUE_LOGOS,
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════
-# HEALTH
-# ══════════════════════════════════════════════════════════════════════
-
-@app.get("/api/health")
-async def health():
-    return {
-        "status": "ok",
-        "data_loaded": {k: len(v) for k, v in _data.items()},
     }
 
 
