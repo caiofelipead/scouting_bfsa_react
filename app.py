@@ -6,10 +6,23 @@ from urllib.parse import quote, urlparse
 import html as html_module
 import logging
 import os
-import requests
-from bs4 import BeautifulSoup
 import re
 import unicodedata
+
+# --- Módulos refatorados ---
+from config.mappings import (
+    COLORS, COUNTRY_FLAGS, CLUB_LOGOS, LEAGUE_LOGOS,
+    POSICAO_MAP, POSICOES_DISPLAY, INDICES_CONFIG, SKILLCORNER_INDICES,
+    SERIE_B_TEAMS, WYSCOUT_LEAGUE_MAP, CLUB_LEAGUE_MAP,
+    normalize_name, padronizar_string,
+    resolve_league_to_tier, get_posicao_categoria, is_serie_b_team,
+)
+from utils.plotting import (
+    get_color, create_legend_html, create_section_title,
+    create_wyscout_radar, create_bar_chart,
+    create_comparison_radar, create_scatter_plot,
+)
+from utils.scraping import scrape_ogol, scrape_transfermarkt
 from fuzzy_match import build_skillcorner_index, find_skillcorner_player
 from auth import init_db, is_authenticated, render_login_page, logout, get_current_user, render_admin_panel
 from similarity import (

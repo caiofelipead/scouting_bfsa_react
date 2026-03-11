@@ -1,117 +1,144 @@
 """
 Módulo de autenticação para o Scouting Dashboard Botafogo-SP.
 
-Gerencia usuários, login e sessão usando SQLite + werkzeug para hash seguro.
+Backend duplo: PostgreSQL (produção via DATABASE_URL) ou SQLite (dev local).
+Usa psycopg2 para PostgreSQL e sqlite3 como fallback.
+Werkzeug para hash seguro de senhas.
 """
 
-import sqlite3
 import os
 import re
-import json
 import logging
 import streamlit as st
 from werkzeug.security import generate_password_hash, check_password_hash
 
 logger = logging.getLogger(__name__)
 
-# Caminho do banco de dados SQLite
-DB_PATH = os.environ.get("AUTH_DB_PATH", os.path.join(os.path.dirname(__file__), "users.db"))
+# ============================================
+# CONFIGURAÇÃO DO BANCO
+# ============================================
 
-# Arquivo JSON para persistência de usuários entre deploys
-_SEED_FILE = os.path.join(os.path.dirname(__file__), "users_seed.json")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# SQLite fallback path (desenvolvimento local)
+_SQLITE_PATH = os.environ.get(
+    "AUTH_DB_PATH", os.path.join(os.path.dirname(__file__), "users.db")
+)
 
-def _get_connection() -> sqlite3.Connection:
-    """Cria conexão com o banco SQLite de usuários."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA journal_mode=WAL")
-    return conn
+_USE_PG = bool(DATABASE_URL)
 
-
-def _load_seed_users() -> list[dict]:
-    """Carrega usuários do arquivo seed JSON (persistência entre deploys)."""
-    if not os.path.exists(_SEED_FILE):
-        return []
+# Importar driver correto
+if _USE_PG:
     try:
-        with open(_SEED_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, list) else []
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning("Erro ao ler seed de usuários: %s", e)
-        return []
+        import psycopg2
+        import psycopg2.extras
+    except ImportError:
+        logger.warning("psycopg2 não instalado — fallback para SQLite")
+        _USE_PG = False
+
+if not _USE_PG:
+    import sqlite3
 
 
-def _save_seed():
-    """Exporta todos os usuários para o arquivo seed JSON."""
-    try:
-        conn = _get_connection()
-        cursor = conn.execute(
-            "SELECT email, password_hash, name, role FROM users ORDER BY id"
-        )
-        users = [
-            {"email": r[0], "password_hash": r[1], "name": r[2], "role": r[3]}
-            for r in cursor.fetchall()
-        ]
-        conn.close()
-        with open(_SEED_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.warning("Erro ao salvar seed de usuários: %s", e)
+# ============================================
+# CONEXÃO (abstração PostgreSQL / SQLite)
+# ============================================
 
+def _get_connection():
+    """Retorna conexão ao banco configurado (PG ou SQLite)."""
+    if _USE_PG:
+        url = DATABASE_URL
+        # Render.com usa postgres:// mas psycopg2 exige postgresql://
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        conn = psycopg2.connect(url)
+        conn.autocommit = False
+        return conn
+    else:
+        conn = sqlite3.connect(_SQLITE_PATH)
+        conn.execute("PRAGMA journal_mode=WAL")
+        return conn
+
+
+def _execute(conn, sql: str, params: tuple = ()):
+    """Executa SQL adaptando placeholders ao driver."""
+    if _USE_PG:
+        # SQLite usa ?, PostgreSQL usa %s
+        sql = sql.replace("?", "%s")
+    cur = conn.cursor()
+    cur.execute(sql, params)
+    return cur
+
+
+def _fetchone(conn, sql: str, params: tuple = ()):
+    cur = _execute(conn, sql, params)
+    return cur.fetchone()
+
+
+def _fetchall(conn, sql: str, params: tuple = ()):
+    cur = _execute(conn, sql, params)
+    return cur.fetchall()
+
+
+# ============================================
+# INICIALIZAÇÃO DO BANCO
+# ============================================
 
 def init_db():
-    """Inicializa a tabela de usuários se não existir.
-    Restaura usuários do seed JSON ou cria admin padrão se vazio."""
+    """Inicializa a tabela de usuários. Cria admin padrão se vazia."""
     try:
         conn = _get_connection()
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                name TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'analyst',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+
+        if _USE_PG:
+            _execute(conn, """
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'analyst',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        else:
+            _execute(conn, """
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'analyst',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
         conn.commit()
 
-        cursor = conn.execute("SELECT COUNT(*) FROM users")
-        if cursor.fetchone()[0] == 0:
-            # Tentar restaurar do seed JSON (persistência entre deploys)
-            seed_users = _load_seed_users()
-            if seed_users:
-                for u in seed_users:
-                    try:
-                        conn.execute(
-                            "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
-                            (u["email"], u["password_hash"], u["name"], u.get("role", "analyst")),
-                        )
-                    except sqlite3.IntegrityError:
-                        pass
-                conn.commit()
-                logger.info("Usuários restaurados do seed: %d registros", len(seed_users))
-            else:
-                # Criar admin padrão se seed também vazio
-                default_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "botafogo2024")
-                conn.execute(
-                    "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
-                    (
-                        "admin@botafogo-sp.com",
-                        generate_password_hash(default_password),
-                        "Administrador",
-                        "admin",
-                    ),
-                )
-                conn.commit()
-                _save_seed()
-                logger.info("Usuário admin padrão criado: admin@botafogo-sp.com")
+        row = _fetchone(conn, "SELECT COUNT(*) FROM users")
+        if row[0] == 0:
+            default_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "botafogo2024")
+            _execute(
+                conn,
+                "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                (
+                    "admin@botafogo-sp.com",
+                    generate_password_hash(default_password),
+                    "Administrador",
+                    "admin",
+                ),
+            )
+            conn.commit()
+            logger.info("Usuário admin padrão criado: admin@botafogo-sp.com")
 
         conn.close()
-    except sqlite3.Error as e:
+    except Exception as e:
         logger.error("Erro ao inicializar banco de autenticação: %s", e)
         raise
 
+
+# ============================================
+# VALIDAÇÃO
+# ============================================
 
 def _validate_email(email: str) -> bool:
     """Valida formato básico de e-mail."""
@@ -119,12 +146,12 @@ def _validate_email(email: str) -> bool:
     return bool(re.match(pattern, email))
 
 
-def authenticate_user(email: str, password: str) -> dict | None:
-    """Valida credenciais contra o banco de dados.
+# ============================================
+# AUTENTICAÇÃO
+# ============================================
 
-    Returns:
-        dict com dados do usuário se autenticado, None caso contrário.
-    """
+def authenticate_user(email: str, password: str) -> dict | None:
+    """Valida credenciais. Retorna dict do usuário ou None."""
     if not email or not password:
         return None
 
@@ -132,11 +159,11 @@ def authenticate_user(email: str, password: str) -> dict | None:
 
     try:
         conn = _get_connection()
-        cursor = conn.execute(
+        row = _fetchone(
+            conn,
             "SELECT id, email, password_hash, name, role FROM users WHERE email = ?",
             (email,),
         )
-        row = cursor.fetchone()
         conn.close()
 
         if row is None:
@@ -151,13 +178,16 @@ def authenticate_user(email: str, password: str) -> dict | None:
                 "name": name,
                 "role": role,
             }
-
         return None
 
-    except sqlite3.Error as e:
+    except Exception as e:
         logger.error("Erro ao autenticar usuário: %s", e)
         return None
 
+
+# ============================================
+# SESSÃO (Streamlit)
+# ============================================
 
 def is_authenticated() -> bool:
     """Verifica se o usuário está autenticado na sessão atual."""
@@ -177,16 +207,18 @@ def logout():
     st.session_state["user"] = None
 
 
+# ============================================
+# UI — PÁGINA DE LOGIN
+# ============================================
+
 def render_login_page():
     """Renderiza a página de login com o design system do dashboard.
 
     Returns:
         True se o login foi bem-sucedido, False caso contrário.
     """
-    # CSS específico da página de login
     st.markdown("""
     <style>
-        /* Centralizar formulário de login */
         .login-container {
             max-width: 420px;
             margin: 0 auto;
@@ -248,10 +280,8 @@ def render_login_page():
             text-align: center;
             margin-top: 24px;
         }
-        /* Ocultar sidebar na página de login */
         [data-testid="stSidebar"] { display: none; }
         [data-testid="collapsedControl"] { display: none; }
-        /* Estilizar botão de login */
         .stButton > button {
             width: 100%;
             background: #dc2626 !important;
@@ -270,14 +300,11 @@ def render_login_page():
     </style>
     """, unsafe_allow_html=True)
 
-    # Espaçamento superior
     st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # Container centralizado
     col1, col2, col3 = st.columns([1, 1.5, 1])
 
     with col2:
-        # Header com logo e branding
         st.markdown("""
         <div class="login-header">
             <img src="https://cdn-img.zerozero.pt/img/logos/equipas/3154_imgbank_1685113109.png"
@@ -290,14 +317,12 @@ def render_login_page():
         </div>
         """, unsafe_allow_html=True)
 
-        # Exibir mensagem de erro se houver
         if st.session_state.get("login_error"):
             st.markdown(
                 f'<div class="login-error">{st.session_state["login_error"]}</div>',
                 unsafe_allow_html=True,
             )
 
-        # Formulário de login
         with st.form("login_form", clear_on_submit=False):
             email = st.text_input(
                 "E-mail",
@@ -314,10 +339,8 @@ def render_login_page():
             submitted = st.form_submit_button("Entrar")
 
             if submitted:
-                # Limpar erro anterior
                 st.session_state["login_error"] = ""
 
-                # Validar inputs
                 if not email or not password:
                     st.session_state["login_error"] = "Preencha todos os campos."
                     st.rerun()
@@ -341,7 +364,6 @@ def render_login_page():
                         )
                         st.rerun()
 
-        # Info com credenciais padrão
         st.markdown("""
         <div class="login-info">
             <strong>Primeiro acesso?</strong><br>
@@ -360,22 +382,21 @@ def list_users() -> list[dict]:
     """Lista todos os usuários cadastrados."""
     try:
         conn = _get_connection()
-        cursor = conn.execute(
-            "SELECT id, email, name, role, created_at FROM users ORDER BY id"
+        rows = _fetchall(
+            conn, "SELECT id, email, name, role, created_at FROM users ORDER BY id"
         )
-        users = [
-            {"id": r[0], "email": r[1], "name": r[2], "role": r[3], "created_at": r[4]}
-            for r in cursor.fetchall()
-        ]
         conn.close()
-        return users
-    except sqlite3.Error as e:
+        return [
+            {"id": r[0], "email": r[1], "name": r[2], "role": r[3], "created_at": r[4]}
+            for r in rows
+        ]
+    except Exception as e:
         logger.error("Erro ao listar usuários: %s", e)
         return []
 
 
 def create_user(email: str, password: str, name: str, role: str = "analyst") -> str | None:
-    """Cria um novo usuário. Retorna None em sucesso, mensagem de erro caso contrário."""
+    """Cria novo usuário. Retorna None em sucesso, mensagem de erro caso contrário."""
     email = email.strip().lower()
     name = name.strip()
 
@@ -390,47 +411,45 @@ def create_user(email: str, password: str, name: str, role: str = "analyst") -> 
 
     try:
         conn = _get_connection()
-        conn.execute(
+        _execute(
+            conn,
             "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
             (email, generate_password_hash(password), name, role),
         )
         conn.commit()
         conn.close()
-        _save_seed()  # Persistir entre deploys
         return None
-    except sqlite3.IntegrityError:
-        return "Este e-mail já está cadastrado."
-    except sqlite3.Error as e:
+    except Exception as e:
+        err_str = str(e).lower()
+        if "unique" in err_str or "duplicate" in err_str or "integrity" in err_str:
+            return "Este e-mail já está cadastrado."
         logger.error("Erro ao criar usuário: %s", e)
         return f"Erro no banco de dados: {e}"
 
 
 def delete_user(user_id: int) -> str | None:
-    """Remove um usuário pelo ID. Retorna None em sucesso, mensagem de erro caso contrário."""
+    """Remove usuário pelo ID. Retorna None em sucesso, mensagem de erro caso contrário."""
     try:
         conn = _get_connection()
-        # Impedir remoção do último admin
-        cursor = conn.execute(
-            "SELECT role FROM users WHERE id = ?", (user_id,)
-        )
-        row = cursor.fetchone()
+
+        row = _fetchone(conn, "SELECT role FROM users WHERE id = ?", (user_id,))
         if row is None:
             conn.close()
             return "Usuário não encontrado."
+
         if row[0] == "admin":
-            admin_count = conn.execute(
-                "SELECT COUNT(*) FROM users WHERE role = 'admin'"
-            ).fetchone()[0]
-            if admin_count <= 1:
+            count_row = _fetchone(
+                conn, "SELECT COUNT(*) FROM users WHERE role = 'admin'"
+            )
+            if count_row[0] <= 1:
                 conn.close()
                 return "Não é possível remover o único administrador."
 
-        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        _execute(conn, "DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
         conn.close()
-        _save_seed()  # Persistir entre deploys
         return None
-    except sqlite3.Error as e:
+    except Exception as e:
         logger.error("Erro ao remover usuário: %s", e)
         return f"Erro no banco de dados: {e}"
 
@@ -477,7 +496,11 @@ def render_admin_panel():
         new_name = st.text_input("Nome", placeholder="Nome completo", key="adm_name")
         new_email = st.text_input("E-mail", placeholder="email@exemplo.com", key="adm_email")
         new_password = st.text_input("Senha", type="password", placeholder="Mínimo 6 caracteres", key="adm_pass")
-        new_role = st.selectbox("Papel", ["analyst", "admin"], format_func=lambda x: "Analista" if x == "analyst" else "Admin", key="adm_role")
+        new_role = st.selectbox(
+            "Papel", ["analyst", "admin"],
+            format_func=lambda x: "Analista" if x == "analyst" else "Admin",
+            key="adm_role",
+        )
 
         if st.form_submit_button("Cadastrar"):
             err = create_user(new_email, new_password, new_name, new_role)

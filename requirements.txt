@@ -10,4 +10,14 @@ scipy>=1.11.0,<2.0.0
 statsmodels>=0.14.0,<1.0.0
 xgboost>=2.0.0,<3.0.0
 werkzeug>=3.0.0,<4.0.0
-thefuzz>=0.22.0,<1.0.0
+# fuzzy matching (rapidfuzz substitui thefuzz com engine C++)
+rapidfuzz>=3.5.0,<4.0.0
+# PostgreSQL (produção) — SQLite como fallback local
+psycopg2-binary>=2.9.0,<3.0.0
+# scraping assíncrono
+aiohttp>=3.9.0,<4.0.0
+# validação de dados
+pandera>=0.18.0,<1.0.0
+pydantic>=2.5.0,<3.0.0
+# exportação parquet (pipeline offline)
+pyarrow>=14.0.0,<18.0.0
