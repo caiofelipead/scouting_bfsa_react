@@ -10,6 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from fuzzy_match import build_skillcorner_index, find_skillcorner_player
+from auth import init_db, is_authenticated, render_login_page, logout, get_current_user
 from similarity import (
     compute_weighted_cosine_similarity, get_similarity_breakdown,
     calculate_weighted_index, calculate_all_indices,
@@ -1912,6 +1913,18 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
+        # Info do usuário logado e botão de logout
+        user = get_current_user()
+        if user:
+            st.markdown(f"""
+            <div style="text-align:center; padding: 4px 0 8px 0;">
+                <span style="color: #9ca3af; font-size: 12px;">{user['name']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("Sair", key="btn_logout", type="secondary"):
+                logout()
+                st.rerun()
+
         st.divider()
         uploaded = st.file_uploader("📂 Carregar Planilha", type=['xlsx'])
         
@@ -3698,4 +3711,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Inicializar banco de autenticação
+    init_db()
+
+    # Gate de autenticação
+    if not is_authenticated():
+        render_login_page()
+    else:
+        main()
