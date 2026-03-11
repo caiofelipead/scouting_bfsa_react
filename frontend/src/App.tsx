@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { SpeedInsights } from '@vercel/speed-insights/react';
+import { Analytics } from '@vercel/analytics/react';
 import { useAuth } from './hooks/useAuth';
 import LoginPage from './components/LoginPage';
 import Layout, { type TabId } from './components/Layout';
@@ -36,20 +36,22 @@ function App() {
   };
 
   return (
-    <Layout user={user} activeTab={activeTab} onTabChange={setActiveTab} onLogout={logout}>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {renderPage()}
-        </motion.div>
-      </AnimatePresence>
-      <SpeedInsights />
-    </Layout>
+    <>
+      <Layout user={user} activeTab={activeTab} onTabChange={setActiveTab} onLogout={logout}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {renderPage()}
+          </motion.div>
+        </AnimatePresence>
+      </Layout>
+      <Analytics />
+    </>
   );
 }
 
