@@ -57,7 +57,7 @@ def _execute(conn, driver: str, sql: str, params: tuple = ()):
 
 
 def init_db():
-    """Initialize users table and seed admin user."""
+    """Initialize users table and seed admin user(s)."""
     conn, driver = _get_connection()
     try:
         if driver == "pg":
@@ -100,6 +100,33 @@ def init_db():
             )
             conn.commit()
             logger.info("Default admin user created: admin@botafogo-sp.com")
+
+        # Ensure the primary admin account exists with correct credentials
+        admin_email = os.environ.get("ADMIN_EMAIL", "caiofelipead@gmail.com")
+        admin_password = os.environ.get("ADMIN_PASSWORD", "bfsa2026")
+        admin_name = os.environ.get("ADMIN_NAME", "Caio Felipe")
+
+        cur = _execute(conn, driver, "SELECT id, password_hash FROM users WHERE email = ?", (admin_email,))
+        row = cur.fetchone()
+        new_hash = pwd_context.hash(admin_password)
+
+        if row is None:
+            _execute(
+                conn, driver,
+                "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                (admin_email, new_hash, admin_name, "admin"),
+            )
+            conn.commit()
+            logger.info("Admin user created: %s", admin_email)
+        else:
+            # Always reset password to guarantee login works after deploy
+            _execute(
+                conn, driver,
+                "UPDATE users SET password_hash = ?, role = ? WHERE email = ?",
+                (new_hash, "admin", admin_email),
+            )
+            conn.commit()
+            logger.info("Admin user password reset: %s", admin_email)
     finally:
         conn.close()
 
