@@ -14,7 +14,7 @@ import pandas as pd
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.auth import (
+from auth import (
     authenticate_user,
     create_access_token,
     create_user,
@@ -24,7 +24,7 @@ from backend.auth import (
     list_users,
     require_admin,
 )
-from backend.schemas.models import (
+from schemas.models import (
     LoginRequest,
     TokenResponse,
     UserCreate,
@@ -41,7 +41,7 @@ from backend.schemas.models import (
     RadarData,
     PositionConfig,
 )
-from backend.services.similarity import (
+from services.similarity import (
     INVERTED_METRICS,
     POSITION_WEIGHTS,
     calculate_all_indices,
@@ -52,13 +52,13 @@ from backend.services.similarity import (
     get_top_metrics_for_position,
     rank_players_weighted,
 )
-from backend.services.calibration import (
+from services.calibration import (
     SSP_LAMBDAS,
     classify_performance,
     get_calibrated_wp_weights,
 )
-from backend.services.fuzzy_match import build_skillcorner_index, find_skillcorner_player
-from backend.config.mappings import (
+from services.fuzzy_match import build_skillcorner_index, find_skillcorner_player
+from config.mappings import (
     CLUB_LOGOS,
     COUNTRY_FLAGS,
     INDICES_CONFIG,
