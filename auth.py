@@ -7,6 +7,7 @@ Gerencia usuários, login e sessão usando SQLite + werkzeug para hash seguro.
 import sqlite3
 import os
 import re
+import json
 import logging
 import streamlit as st
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -16,6 +17,9 @@ logger = logging.getLogger(__name__)
 # Caminho do banco de dados SQLite
 DB_PATH = os.environ.get("AUTH_DB_PATH", os.path.join(os.path.dirname(__file__), "users.db"))
 
+# Arquivo JSON para persistência de usuários entre deploys
+_SEED_FILE = os.path.join(os.path.dirname(__file__), "users_seed.json")
+
 
 def _get_connection() -> sqlite3.Connection:
     """Cria conexão com o banco SQLite de usuários."""
@@ -24,9 +28,40 @@ def _get_connection() -> sqlite3.Connection:
     return conn
 
 
+def _load_seed_users() -> list[dict]:
+    """Carrega usuários do arquivo seed JSON (persistência entre deploys)."""
+    if not os.path.exists(_SEED_FILE):
+        return []
+    try:
+        with open(_SEED_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Erro ao ler seed de usuários: %s", e)
+        return []
+
+
+def _save_seed():
+    """Exporta todos os usuários para o arquivo seed JSON."""
+    try:
+        conn = _get_connection()
+        cursor = conn.execute(
+            "SELECT email, password_hash, name, role FROM users ORDER BY id"
+        )
+        users = [
+            {"email": r[0], "password_hash": r[1], "name": r[2], "role": r[3]}
+            for r in cursor.fetchall()
+        ]
+        conn.close()
+        with open(_SEED_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning("Erro ao salvar seed de usuários: %s", e)
+
+
 def init_db():
     """Inicializa a tabela de usuários se não existir.
-    Cria um admin padrão caso a tabela esteja vazia."""
+    Restaura usuários do seed JSON ou cria admin padrão se vazio."""
     try:
         conn = _get_connection()
         conn.execute("""
@@ -41,21 +76,36 @@ def init_db():
         """)
         conn.commit()
 
-        # Criar admin padrão se não houver nenhum usuário
         cursor = conn.execute("SELECT COUNT(*) FROM users")
         if cursor.fetchone()[0] == 0:
-            default_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "botafogo2024")
-            conn.execute(
-                "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
-                (
-                    "admin@botafogo-sp.com",
-                    generate_password_hash(default_password),
-                    "Administrador",
-                    "admin",
-                ),
-            )
-            conn.commit()
-            logger.info("Usuário admin padrão criado: admin@botafogo-sp.com")
+            # Tentar restaurar do seed JSON (persistência entre deploys)
+            seed_users = _load_seed_users()
+            if seed_users:
+                for u in seed_users:
+                    try:
+                        conn.execute(
+                            "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                            (u["email"], u["password_hash"], u["name"], u.get("role", "analyst")),
+                        )
+                    except sqlite3.IntegrityError:
+                        pass
+                conn.commit()
+                logger.info("Usuários restaurados do seed: %d registros", len(seed_users))
+            else:
+                # Criar admin padrão se seed também vazio
+                default_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "botafogo2024")
+                conn.execute(
+                    "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                    (
+                        "admin@botafogo-sp.com",
+                        generate_password_hash(default_password),
+                        "Administrador",
+                        "admin",
+                    ),
+                )
+                conn.commit()
+                _save_seed()
+                logger.info("Usuário admin padrão criado: admin@botafogo-sp.com")
 
         conn.close()
     except sqlite3.Error as e:
@@ -345,6 +395,7 @@ def create_user(email: str, password: str, name: str, role: str = "analyst") -> 
         )
         conn.commit()
         conn.close()
+        _save_seed()  # Persistir entre deploys
         return None
     except sqlite3.IntegrityError:
         return "Este e-mail já está cadastrado."
@@ -376,6 +427,7 @@ def delete_user(user_id: int) -> str | None:
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
         conn.close()
+        _save_seed()  # Persistir entre deploys
         return None
     except sqlite3.Error as e:
         logger.error("Erro ao remover usuário: %s", e)

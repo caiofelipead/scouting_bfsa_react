@@ -1,0 +1,8 @@
+[
+  {
+    "email": "admin@botafogo-sp.com",
+    "password_hash": "scrypt:32768:8:1$OJ24NBBBeEZVV45D$f98fa981e2e4f5683386d6640ef5c9d596089dac20124521ded90f7568fa9db7391ea610dcc630e4fb813ee7099cd1f2bbd0021628231812c4a283b5038a448a",
+    "name": "Administrador",
+    "role": "admin"
+  }
+]

@@ -1036,7 +1036,7 @@ for t in [
 # ── Inglaterra — Premier League ──
 for t in [
     'Arsenal', 'Aston Villa', 'Bournemouth', 'Brentford', 'Brighton',
-    'Brighton & Hove Albion', 'Chelsea', 'Crystal Palace', 'Everton',
+    'Brighton & Hove Albion', 'Chelsea', 'Crystal Palace', 'Everton FC',
     'Fulham', 'Ipswich', 'Ipswich Town', 'Leicester', 'Leicester City',
     'Liverpool', 'Manchester City', 'Manchester United', 'Newcastle',
     'Newcastle United', 'Nottingham Forest', 'Southampton', 'Tottenham',
@@ -1198,7 +1198,8 @@ for t in [
 for t in [
     'Colo-Colo', 'Colo Colo', 'Universidad de Chile', 'U. de Chile',
     'Universidad Católica', 'U. Católica', 'Unión Española', 'Cobreloa',
-    'Huachipato', 'Cobresal', 'Palestino', 'Everton de Viña del Mar',
+    'Huachipato', 'Cobresal', 'Palestino', 'Everton', 'Everton de Viña del Mar',
+    'Everton de Viña', 'Everton Chile',
     'O\'Higgins', 'Audax Italiano',
 ]:
     CLUB_LEAGUE_MAP.setdefault(t, 'Liga Chile')
