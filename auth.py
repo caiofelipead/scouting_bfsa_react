@@ -300,3 +300,137 @@ def render_login_page():
         """, unsafe_allow_html=True)
 
     return False
+
+
+# ============================================
+# GERENCIAMENTO DE USUÁRIOS (Admin)
+# ============================================
+
+def list_users() -> list[dict]:
+    """Lista todos os usuários cadastrados."""
+    try:
+        conn = _get_connection()
+        cursor = conn.execute(
+            "SELECT id, email, name, role, created_at FROM users ORDER BY id"
+        )
+        users = [
+            {"id": r[0], "email": r[1], "name": r[2], "role": r[3], "created_at": r[4]}
+            for r in cursor.fetchall()
+        ]
+        conn.close()
+        return users
+    except sqlite3.Error as e:
+        logger.error("Erro ao listar usuários: %s", e)
+        return []
+
+
+def create_user(email: str, password: str, name: str, role: str = "analyst") -> str | None:
+    """Cria um novo usuário. Retorna None em sucesso, mensagem de erro caso contrário."""
+    email = email.strip().lower()
+    name = name.strip()
+
+    if not email or not password or not name:
+        return "Todos os campos são obrigatórios."
+    if not _validate_email(email):
+        return "Formato de e-mail inválido."
+    if len(password) < 6:
+        return "A senha deve ter pelo menos 6 caracteres."
+    if role not in ("admin", "analyst"):
+        return "Papel inválido."
+
+    try:
+        conn = _get_connection()
+        conn.execute(
+            "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+            (email, generate_password_hash(password), name, role),
+        )
+        conn.commit()
+        conn.close()
+        return None
+    except sqlite3.IntegrityError:
+        return "Este e-mail já está cadastrado."
+    except sqlite3.Error as e:
+        logger.error("Erro ao criar usuário: %s", e)
+        return f"Erro no banco de dados: {e}"
+
+
+def delete_user(user_id: int) -> str | None:
+    """Remove um usuário pelo ID. Retorna None em sucesso, mensagem de erro caso contrário."""
+    try:
+        conn = _get_connection()
+        # Impedir remoção do último admin
+        cursor = conn.execute(
+            "SELECT role FROM users WHERE id = ?", (user_id,)
+        )
+        row = cursor.fetchone()
+        if row is None:
+            conn.close()
+            return "Usuário não encontrado."
+        if row[0] == "admin":
+            admin_count = conn.execute(
+                "SELECT COUNT(*) FROM users WHERE role = 'admin'"
+            ).fetchone()[0]
+            if admin_count <= 1:
+                conn.close()
+                return "Não é possível remover o único administrador."
+
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        conn.close()
+        return None
+    except sqlite3.Error as e:
+        logger.error("Erro ao remover usuário: %s", e)
+        return f"Erro no banco de dados: {e}"
+
+
+def render_admin_panel():
+    """Renderiza o painel de gerenciamento de usuários (apenas para admins)."""
+    user = get_current_user()
+    if not user or user.get("role") != "admin":
+        st.warning("Acesso restrito a administradores.")
+        return
+
+    st.markdown("### Usuários Cadastrados")
+
+    users = list_users()
+    if users:
+        for u in users:
+            col1, col2, col3, col4 = st.columns([3, 2, 1.5, 1])
+            with col1:
+                st.markdown(f"**{u['name']}**")
+            with col2:
+                st.caption(u['email'])
+            with col3:
+                role_label = "Admin" if u['role'] == 'admin' else "Analista"
+                color = "#dc2626" if u['role'] == 'admin' else "#9ca3af"
+                st.markdown(
+                    f'<span style="color:{color}; font-size:12px; font-weight:600;">{role_label}</span>',
+                    unsafe_allow_html=True,
+                )
+            with col4:
+                if u['id'] != user['id']:
+                    if st.button("Remover", key=f"del_user_{u['id']}", type="secondary"):
+                        err = delete_user(u['id'])
+                        if err:
+                            st.error(err)
+                        else:
+                            st.rerun()
+    else:
+        st.info("Nenhum usuário cadastrado.")
+
+    st.divider()
+    st.markdown("### Cadastrar Novo Usuário")
+
+    with st.form("add_user_form", clear_on_submit=True):
+        new_name = st.text_input("Nome", placeholder="Nome completo", key="adm_name")
+        new_email = st.text_input("E-mail", placeholder="email@exemplo.com", key="adm_email")
+        new_password = st.text_input("Senha", type="password", placeholder="Mínimo 6 caracteres", key="adm_pass")
+        new_role = st.selectbox("Papel", ["analyst", "admin"], format_func=lambda x: "Analista" if x == "analyst" else "Admin", key="adm_role")
+
+        if st.form_submit_button("Cadastrar"):
+            err = create_user(new_email, new_password, new_name, new_role)
+            if err:
+                st.error(err)
+            else:
+                st.success(f"Usuário {new_email} cadastrado com sucesso!")
+                st.rerun()

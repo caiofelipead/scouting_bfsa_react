@@ -10,7 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from fuzzy_match import build_skillcorner_index, find_skillcorner_player
-from auth import init_db, is_authenticated, render_login_page, logout, get_current_user
+from auth import init_db, is_authenticated, render_login_page, logout, get_current_user, render_admin_panel
 from similarity import (
     compute_weighted_cosine_similarity, get_similarity_breakdown,
     calculate_weighted_index, calculate_all_indices,
@@ -1956,7 +1956,17 @@ def main():
         st.caption(f"📊 {len(analises)} análises | 📈 {len(wyscout)} Wyscout")
         st.caption(f"🏃 {len(skillcorner)} SkillCorner ({sc_with_idx} com índices)")
     
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["📊 Perfil", "📈 Índices", "📋 Relatório", "🔄 Comparativo", "🗂️ Dados", "🏆 Ranking", "🔍 Similaridade", "🎯 Predição", "🧬 Clusters"])
+    # Tabs - incluir aba Admin apenas para administradores
+    current_user = get_current_user()
+    is_admin = current_user and current_user.get("role") == "admin"
+
+    tab_names = ["📊 Perfil", "📈 Índices", "📋 Relatório", "🔄 Comparativo", "🗂️ Dados", "🏆 Ranking", "🔍 Similaridade", "🎯 Predição", "🧬 Clusters"]
+    if is_admin:
+        tab_names.append("👥 Usuários")
+
+    tabs = st.tabs(tab_names)
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = tabs[:9]
+    tab_admin = tabs[9] if is_admin else None
     
     # ===== TAB 1: PERFIL =====
     with tab1:
@@ -3708,6 +3718,11 @@ def main():
                     
                     except Exception as e:
                         st.error(f"Erro na clusterização: {e}")
+
+    # ===== TAB ADMIN: USUÁRIOS =====
+    if is_admin and tab_admin:
+        with tab_admin:
+            render_admin_panel()
 
 
 if __name__ == "__main__":
