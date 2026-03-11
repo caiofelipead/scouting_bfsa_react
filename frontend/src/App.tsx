@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuth } from './hooks/useAuth';
 import LoginPage from './components/LoginPage';
 import Layout, { type TabId } from './components/Layout';
@@ -47,6 +48,7 @@ function App() {
           {renderPage()}
         </motion.div>
       </AnimatePresence>
+      <SpeedInsights />
     </Layout>
   );
 }
