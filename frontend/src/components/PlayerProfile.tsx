@@ -65,7 +65,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
     );
   }
 
-  const { summary, percentiles, indices, scout_score, performance_class, skillcorner, projection_score, ssp_lambdas, prediction } = profile;
+  const { summary, percentiles, indices, scout_score, performance_class, skillcorner, skillcorner_physical, projection_score, ssp_lambdas, prediction } = profile;
 
   return (
     <AnimatePresence mode="wait">
@@ -334,6 +334,48 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                     style={{ color: 'var(--color-text-muted)' }}
                   >
                     {name.replace(/ index$/i, '')}
+                  </div>
+                  <div
+                    className="text-lg font-[var(--font-mono)] font-bold"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    {typeof value === 'number' ? value.toFixed(2) : value}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+        {/* ── SkillCorner Physical Data ────────────────────────────── */}
+        {skillcorner_physical && Object.keys(skillcorner_physical).length > 0 && (
+          <motion.div variants={fadeUp} className="card-glass rounded-lg p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <ChevronRight size={14} style={{ color: 'var(--color-accent)' }} />
+              <span
+                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                DADOS FISICOS (SKILLCORNER)
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {Object.entries(skillcorner_physical).map(([name, value], i) => (
+                <motion.div
+                  key={name}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 + i * 0.05 }}
+                  className="p-3 rounded"
+                  style={{
+                    background: 'var(--color-surface-2)',
+                    border: '1px solid var(--color-border-subtle)',
+                  }}
+                >
+                  <div
+                    className="text-[10px] mb-1 leading-tight"
+                    style={{ color: 'var(--color-text-muted)' }}
+                  >
+                    {name}
                   </div>
                   <div
                     className="text-lg font-[var(--font-mono)] font-bold"
