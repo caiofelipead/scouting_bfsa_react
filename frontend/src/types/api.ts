@@ -46,6 +46,7 @@ export interface PlayerProfile {
   scout_score: number | null;
   performance_class: string | null;
   skillcorner: Record<string, number> | null;
+  skillcorner_physical: Record<string, number> | null;
   projection_score: number | null;
   ssp_lambdas: Record<string, number> | null;
   prediction: PredictionResult | null;

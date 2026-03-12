@@ -592,6 +592,7 @@ async def get_player_profile(
 
     # SkillCorner match
     sc_data = None
+    sc_physical = None
     sc_df = _data.get("skillcorner")
     if sc_df is not None and len(sc_df) > 0:
         sc_match = find_skillcorner_player(
@@ -606,6 +607,19 @@ async def get_player_profile(
                 val = _safe_float(sc_match.get(idx_name))
                 if val is not None:
                     sc_data[idx_name] = round(val, 2)
+            # Physical performance columns
+            _SC_PHYSICAL_COLS = {
+                "sprint_count_per_90": "Sprints/90",
+                "hi_count_per_90": "High Intensity Runs/90",
+                "distance_per_90": "Distance/90",
+                "avg_psv99": "Avg PSV-99",
+                "avg_top_5_psv99": "Avg Top 5 PSV-99",
+            }
+            sc_physical = {}
+            for col, label in _SC_PHYSICAL_COLS.items():
+                val = _safe_float(sc_match.get(col))
+                if val is not None:
+                    sc_physical[label] = round(val, 2)
 
     # Collect numeric metrics
     metrics = {}
@@ -658,6 +672,7 @@ async def get_player_profile(
         "scout_score": round(score, 1) if score else None,
         "performance_class": perf_class,
         "skillcorner": sc_data,
+        "skillcorner_physical": sc_physical,
         "projection_score": projection_score,
         "ssp_lambdas": SSP_LAMBDAS,
         "prediction": prediction,

@@ -72,6 +72,7 @@ class PlayerProfile(BaseModel):
     scout_score: Optional[float] = None
     performance_class: Optional[str] = None
     skillcorner: Optional[Dict[str, Any]] = None
+    skillcorner_physical: Optional[Dict[str, Any]] = None
 
 
 # ── Rankings ──────────────────────────────────────────────────────────
