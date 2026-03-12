@@ -447,7 +447,7 @@ for t in [
 for t in [
     'Arsenal', 'Aston Villa', 'Bournemouth', 'Brentford', 'Brighton',
     'Chelsea', 'Crystal Palace', 'Everton FC', 'Fulham', 'Ipswich',
-    'Leicester', 'Liverpool', 'Manchester City', 'Manchester United',
+    'Leicester', 'Liverpool FC', 'Manchester City', 'Manchester United',
     'Newcastle', 'Newcastle United', 'Nottingham Forest', 'Southampton',
     'Tottenham', 'West Ham', 'Wolverhampton', 'Wolves',
 ]:
@@ -1112,6 +1112,178 @@ for t in ['Al Fahaheel']:
     CLUB_LEAGUE_MAP.setdefault(t, 'Kuwaiti Premier League')
 for t in ['Antigua GFC']:
     CLUB_LEAGUE_MAP.setdefault(t, 'Liga Nacional Guatemala')
+
+# ============================================================
+# FIX: Missing / variant club names from scouting data
+# These clubs were falling through to the default "Serie B Brasil"
+# ============================================================
+
+# ── Uruguay (variants — direct assignment to override any prior entries) ──
+CLUB_LEAGUE_MAP['Nacional'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Club Nacional'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Nacional Montevideo'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Liverpool'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Liverpool Montevideo'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Juventud'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['CA Juventud'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Juventud de Las Piedras'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Wanderers'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Montevideo Wanderers'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Torque'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Montevideo City Torque'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Progreso'] = 'Liga Uruguai'
+CLUB_LEAGUE_MAP['Miramar Misiones'] = 'Liga Uruguai'
+
+# ── Argentina (variants) ──
+CLUB_LEAGUE_MAP['Independiente Rivadavia'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Talleres Córdoba'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Talleres de Córdoba'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Newell\'s Old Boys'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Newell\'s'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Unión de Santa Fe'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Unión'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Central Córdoba'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Central Córdoba SdE'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Gimnasia LP'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Gimnasia y Esgrima'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Platense'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Instituto'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Deportivo Riestra'] = 'Liga Argentina'
+CLUB_LEAGUE_MAP['Sarmiento'] = 'Liga Argentina'
+
+# ── Colombia (variants) ──
+CLUB_LEAGUE_MAP['Tolima'] = 'Liga Colombia'
+CLUB_LEAGUE_MAP['Deportes Tolima'] = 'Liga Colombia'
+CLUB_LEAGUE_MAP['Millonarios FC'] = 'Liga Colombia'
+CLUB_LEAGUE_MAP['Santa Fe'] = 'Liga Colombia'
+CLUB_LEAGUE_MAP['Independiente Santa Fe'] = 'Liga Colombia'
+CLUB_LEAGUE_MAP['Envigado'] = 'Liga Colombia'
+CLUB_LEAGUE_MAP['Jaguares de Córdoba'] = 'Liga Colombia'
+CLUB_LEAGUE_MAP['Patriotas'] = 'Liga Colombia'
+CLUB_LEAGUE_MAP['La Equidad'] = 'Liga Colombia'
+CLUB_LEAGUE_MAP['Águilas Doradas'] = 'Liga Colombia'
+
+# ── Japan (variants) ──
+CLUB_LEAGUE_MAP['Shimizu S-Pulse'] = 'J1 League'
+CLUB_LEAGUE_MAP['Shimizu S Pulse'] = 'J1 League'
+CLUB_LEAGUE_MAP['Sanfrecce Hiroshima'] = 'J1 League'
+CLUB_LEAGUE_MAP['Kashiwa Reysol'] = 'J1 League'
+CLUB_LEAGUE_MAP['Jubilo Iwata'] = 'J1 League'
+CLUB_LEAGUE_MAP['Machida Zelvia'] = 'J1 League'
+CLUB_LEAGUE_MAP['Tokushima Vortis'] = 'J2 League'
+CLUB_LEAGUE_MAP['Tokyo Verdy'] = 'J2 League'
+CLUB_LEAGUE_MAP['V-Varen Nagasaki'] = 'J2 League'
+CLUB_LEAGUE_MAP['Ventforet Kofu'] = 'J2 League'
+
+# ── Switzerland (variants) ──
+CLUB_LEAGUE_MAP['Sion'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['FC Sion'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['Young Boys'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['BSC Young Boys'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['Servette'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['Lausanne'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['Lugano'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['St. Gallen'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['Grasshoppers'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['Luzern'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['Winterthur'] = 'Swiss Super League'
+CLUB_LEAGUE_MAP['Yverdon'] = 'Swiss Super League'
+
+# ── Turkey (variants) ──
+CLUB_LEAGUE_MAP['Göztepe'] = 'Super Lig'
+CLUB_LEAGUE_MAP['Goztepe'] = 'Super Lig'
+CLUB_LEAGUE_MAP['Hatayspor'] = 'Super Lig'
+CLUB_LEAGUE_MAP['Sivasspor'] = 'Super Lig'
+CLUB_LEAGUE_MAP['Gaziantep FK'] = 'Super Lig'
+CLUB_LEAGUE_MAP['Rizespor'] = 'Super Lig'
+CLUB_LEAGUE_MAP['Pendikspor'] = 'Super Lig'
+CLUB_LEAGUE_MAP['Bodrum FK'] = 'Super Lig'
+CLUB_LEAGUE_MAP['Eyüpspor'] = 'Super Lig'
+
+# ── Ukraine (variants) ──
+CLUB_LEAGUE_MAP['Metalist 1925 Kharkiv'] = 'Ukrainian Premier League'
+CLUB_LEAGUE_MAP['Metalist 1925'] = 'Ukrainian Premier League'
+CLUB_LEAGUE_MAP['Shakhtar Donetsk'] = 'Ukrainian Premier League'
+CLUB_LEAGUE_MAP['Shakhtar'] = 'Ukrainian Premier League'
+CLUB_LEAGUE_MAP['Dynamo Kyiv'] = 'Ukrainian Premier League'
+CLUB_LEAGUE_MAP['Dnipro-1'] = 'Ukrainian Premier League'
+CLUB_LEAGUE_MAP['Vorskla'] = 'Ukrainian Premier League'
+CLUB_LEAGUE_MAP['Kolos Kovalivka'] = 'Ukrainian Premier League'
+CLUB_LEAGUE_MAP['Kryvbas'] = 'Ukrainian Premier League'
+CLUB_LEAGUE_MAP['Mynai'] = 'Ukrainian Premier League'
+
+# ── Malta ──
+CLUB_LEAGUE_MAP['Hamrun Spartans'] = 'Maltese Premier League'
+CLUB_LEAGUE_MAP['Ħamrun Spartans'] = 'Maltese Premier League'
+CLUB_LEAGUE_MAP['Valletta'] = 'Maltese Premier League'
+CLUB_LEAGUE_MAP['Hibernians'] = 'Maltese Premier League'
+CLUB_LEAGUE_MAP['Floriana'] = 'Maltese Premier League'
+CLUB_LEAGUE_MAP['Birkirkara'] = 'Maltese Premier League'
+CLUB_LEAGUE_MAP['Sliema Wanderers'] = 'Maltese Premier League'
+
+# ── Croatia ──
+CLUB_LEAGUE_MAP['Dinamo Zagreb'] = 'Croatian HNL'
+CLUB_LEAGUE_MAP['Hajduk Split'] = 'Croatian HNL'
+CLUB_LEAGUE_MAP['Rijeka'] = 'Croatian HNL'
+CLUB_LEAGUE_MAP['Osijek'] = 'Croatian HNL'
+CLUB_LEAGUE_MAP['Lokomotiva Zagreb'] = 'Croatian HNL'
+
+# ── Czech Republic ──
+CLUB_LEAGUE_MAP['Slavia Prague'] = 'Czech First League'
+CLUB_LEAGUE_MAP['Sparta Prague'] = 'Czech First League'
+CLUB_LEAGUE_MAP['Viktoria Plzeň'] = 'Czech First League'
+CLUB_LEAGUE_MAP['Baník Ostrava'] = 'Czech First League'
+
+# ── Denmark (additional) ──
+CLUB_LEAGUE_MAP['Copenhagen'] = 'Danish Superliga'
+CLUB_LEAGUE_MAP['FC Copenhagen'] = 'Danish Superliga'
+CLUB_LEAGUE_MAP['Brøndby'] = 'Danish Superliga'
+CLUB_LEAGUE_MAP['Nordsjælland'] = 'Danish Superliga'
+CLUB_LEAGUE_MAP['Silkeborg'] = 'Danish Superliga'
+
+# ── Norway ──
+CLUB_LEAGUE_MAP['Bodø/Glimt'] = 'Norwegian Eliteserien'
+CLUB_LEAGUE_MAP['Molde'] = 'Norwegian Eliteserien'
+CLUB_LEAGUE_MAP['Rosenborg'] = 'Norwegian Eliteserien'
+CLUB_LEAGUE_MAP['Viking'] = 'Norwegian Eliteserien'
+CLUB_LEAGUE_MAP['Brann'] = 'Norwegian Eliteserien'
+
+# ── Sweden (additional) ──
+CLUB_LEAGUE_MAP['Malmö FF'] = 'Swedish Allsvenskan'
+CLUB_LEAGUE_MAP['AIK'] = 'Swedish Allsvenskan'
+CLUB_LEAGUE_MAP['Djurgården'] = 'Swedish Allsvenskan'
+CLUB_LEAGUE_MAP['Hammarby'] = 'Swedish Allsvenskan'
+CLUB_LEAGUE_MAP['IFK Göteborg'] = 'Swedish Allsvenskan'
+
+# ── Hungary (additional) ──
+CLUB_LEAGUE_MAP['Ferencvárosi TC'] = 'Hungarian NB I'
+CLUB_LEAGUE_MAP['Puskás Akadémia'] = 'Hungarian NB I'
+CLUB_LEAGUE_MAP['Fehérvár'] = 'Hungarian NB I'
+
+# ── Poland (additional) ──
+CLUB_LEAGUE_MAP['Legia Warsaw'] = 'Polish Ekstraklasa'
+CLUB_LEAGUE_MAP['Lech Poznań'] = 'Polish Ekstraklasa'
+CLUB_LEAGUE_MAP['Raków Częstochowa'] = 'Polish Ekstraklasa'
+CLUB_LEAGUE_MAP['Pogoń Szczecin'] = 'Polish Ekstraklasa'
+
+# ── Greece (additional) ──
+CLUB_LEAGUE_MAP['Olympiacos'] = 'Greek Super League'
+CLUB_LEAGUE_MAP['Olympiakos'] = 'Greek Super League'
+CLUB_LEAGUE_MAP['PAOK'] = 'Greek Super League'
+CLUB_LEAGUE_MAP['Panathinaikos'] = 'Greek Super League'
+CLUB_LEAGUE_MAP['AEK Athens'] = 'Greek Super League'
+
+# ── Romania (additional) ──
+CLUB_LEAGUE_MAP['CFR Cluj'] = 'Romanian Liga I'
+CLUB_LEAGUE_MAP['FCSB'] = 'Romanian Liga I'
+CLUB_LEAGUE_MAP['Universitatea Craiova'] = 'Romanian Liga I'
+CLUB_LEAGUE_MAP['Rapid Bucharest'] = 'Romanian Liga I'
+
+# ── Russia ──
+CLUB_LEAGUE_MAP['Zenit'] = 'Russian Premier League'
+CLUB_LEAGUE_MAP['Spartak Moscow'] = 'Russian Premier League'
+CLUB_LEAGUE_MAP['Lokomotiv Moscow'] = 'Russian Premier League'
+CLUB_LEAGUE_MAP['Krasnodar'] = 'Russian Premier League'
 
 # Dicionário normalizado para lookup O(1)
 _CLUB_LEAGUE_MAP_NORM = {

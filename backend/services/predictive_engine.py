@@ -867,6 +867,9 @@ class ContractSuccessPredictor:
         'Slovak Super Liga': 6.0,
         'Moldovan National Division': 5.5,
         'Montenegrin First League': 4.0,
+        'Maltese Premier League': 4.5,
+        'Croatian HNL': 7.5,
+        'Czech First League': 7.5,
         'Azerbaijan Premier League': 5.5,
         'Armenian Premier League': 5.5,
         # === AMÉRICAS ===
