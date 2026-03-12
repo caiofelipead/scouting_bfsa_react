@@ -329,10 +329,41 @@ async def health_check():
     """Health check — returns quickly even during cold start."""
     ready = _data_ready.is_set()
     counts = {k: len(v) for k, v in _data.items()} if ready else {}
+    sc_diag = None
+    if ready:
+        sc_df = _data.get("skillcorner")
+        ws_df = _data.get("wyscout")
+        if sc_df is not None and len(sc_df) > 0:
+            sc_diag = {
+                "columns": list(sc_df.columns),
+                "sample_players": [
+                    {col: (str(row[col]) if pd.notna(row.get(col)) else None) for col in ["player_name", "short_name", "team_name"] if col in sc_df.columns}
+                    for _, row in sc_df.head(5).iterrows()
+                ],
+            }
+            if ws_df is not None and len(ws_df) > 0:
+                ws_sample = [
+                    str(r.get("Jogador", "")) for _, r in ws_df.head(5).iterrows()
+                ]
+                sc_diag["wyscout_sample_names"] = ws_sample
+                # Try matching first wyscout player
+                try:
+                    test_name = str(ws_df.iloc[0].get("Jogador", ""))
+                    test_team = str(ws_df.iloc[0].get("Equipa", "")) if pd.notna(ws_df.iloc[0].get("Equipa")) else None
+                    test_match = find_skillcorner_player(test_name, sc_df, team_name=test_team)
+                    sc_diag["test_match"] = {
+                        "searched": test_name,
+                        "team": test_team,
+                        "found": test_match is not None,
+                        "matched_name": str(test_match.get("player_name", "")) if test_match is not None else None,
+                    }
+                except Exception as e:
+                    sc_diag["test_match_error"] = str(e)
     return {
         "status": "ready" if ready else "loading",
         "data_loaded": ready,
         "counts": counts,
+        "skillcorner_diagnostic": sc_diag,
     }
 
 
