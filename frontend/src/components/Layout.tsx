@@ -15,6 +15,7 @@ import {
   Target,
   Dna,
   FileBarChart,
+  Activity,
 } from 'lucide-react';
 import type { User } from '../types/api';
 
@@ -23,6 +24,7 @@ export type TabId =
   | 'indices'
   | 'report'
   | 'comparison'
+  | 'skillcorner'
   | 'data'
   | 'rankings'
   | 'similarity'
@@ -44,6 +46,7 @@ const NAV_ITEMS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'indices', label: 'Indices', icon: <FileBarChart size={16} /> },
   { id: 'report', label: 'Relatorio', icon: <FileText size={16} /> },
   { id: 'comparison', label: 'Comparativo', icon: <ArrowLeftRight size={16} /> },
+  { id: 'skillcorner', label: 'SkillCorner', icon: <Activity size={16} /> },
   { id: 'data', label: 'Dados', icon: <Database size={16} /> },
   { id: 'rankings', label: 'Ranking', icon: <Trophy size={16} /> },
   { id: 'similarity', label: 'Similaridade', icon: <Search size={16} /> },

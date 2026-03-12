@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, AlertCircle } from 'lucide-react';
+import { ArrowLeftRight, AlertCircle, Activity } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
-import { usePlayers, usePositions } from '../hooks/usePlayers';
+import { usePlayers, usePositions, useSkillCornerComparison } from '../hooks/usePlayers';
 import { getScoreColor } from '../lib/utils';
 import RadarChart from '../components/RadarChart';
 import type { ComparisonResponse } from '../types/api';
@@ -61,6 +61,11 @@ export default function ComparisonPage() {
     enabled: !!player1 && !!player2 && player1 !== player2,
     staleTime: 10 * 60 * 1000,
   });
+
+  // SkillCorner comparison (complementary, non-destructive)
+  const { data: scComparison } = useSkillCornerComparison(
+    player1, player2, position
+  );
 
   return (
     <div className="space-y-5">
@@ -160,6 +165,75 @@ export default function ComparisonPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* SkillCorner comparison section (non-destructive extension) */}
+      {scComparison && (scComparison.player1.found || scComparison.player2.found) && (
+        <div className="card-glass rounded-lg overflow-hidden">
+          <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+            <Activity size={13} style={{ color: 'var(--color-accent)' }} />
+            <span className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
+              SKILLCORNER — METRICAS FISICAS
+            </span>
+            <div className="ml-auto flex gap-2">
+              {scComparison.player1.found ? (
+                <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+                  {scComparison.player1.sc_name}
+                </span>
+              ) : (
+                <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
+                  J1: sem dados
+                </span>
+              )}
+              {scComparison.player2.found ? (
+                <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+                  {scComparison.player2.sc_name}
+                </span>
+              ) : (
+                <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
+                  J2: sem dados
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+                  <th className="px-3 py-2.5 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Metrica</th>
+                  <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-accent)' }}>{comparison?.player1.name || player1}</th>
+                  <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: '#3b82f6' }}>{comparison?.player2.name || player2}</th>
+                  <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Diff</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scComparison.comparison.map((row, i) => (
+                  <motion.tr
+                    key={row.metric}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.03 }}
+                    style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+                    className="hover:bg-white/[0.02]"
+                  >
+                    <td className="px-3 py-2 text-xs font-medium">
+                      {row.metric.replace(/_/g, ' ').replace(/per 90/i, '/90').replace(/ index$/i, '')}
+                    </td>
+                    <td className="px-3 py-2 text-right font-[var(--font-mono)] text-xs" style={{ color: row.player1_value != null ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                      {row.player1_value != null ? row.player1_value.toFixed(2) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right font-[var(--font-mono)] text-xs" style={{ color: row.player2_value != null ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                      {row.player2_value != null ? row.player2_value.toFixed(2) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right font-[var(--font-mono)] text-xs" style={{ color: row.diff != null ? (row.diff > 0 ? 'var(--color-accent)' : row.diff < 0 ? '#3b82f6' : 'var(--color-text-muted)') : 'var(--color-text-muted)' }}>
+                      {row.diff != null ? `${row.diff > 0 ? '+' : ''}${row.diff.toFixed(2)}` : '—'}
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {!player1 && !player2 && (

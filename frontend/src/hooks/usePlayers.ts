@@ -8,6 +8,9 @@ import type {
   PlayersQueryParams,
   RankingsQueryParams,
   SimilarityQueryParams,
+  SkillCornerPlayerProfile,
+  SkillCornerComparisonResponse,
+  SkillCornerCoverage,
 } from '../types/api';
 
 // ── Query key factories (consistent keys prevent cache resets on tab switch) ──
@@ -185,5 +188,61 @@ export function useSimilarity() {
       });
       return res.data as SimilarityResponse;
     },
+  });
+}
+
+// ── SkillCorner dedicated hooks ──
+
+export const skillCornerKeys = {
+  player: (name: string, scOverride?: string | null) => ['skillcorner', 'player', name, scOverride ?? ''] as const,
+  comparison: (p1: string, p2: string, pos: string) => ['skillcorner', 'comparison', p1, p2, pos] as const,
+  coverage: ['skillcorner', 'coverage'] as const,
+};
+
+export function useSkillCornerPlayer(displayName: string | null, scOverride?: string | null) {
+  return useQuery({
+    queryKey: skillCornerKeys.player(displayName ?? '', scOverride),
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (scOverride) params.sc_override = scOverride;
+      const res = await api.get(`/skillcorner/player/${encodeURIComponent(displayName!)}`, { params });
+      return res.data as SkillCornerPlayerProfile;
+    },
+    enabled: !!displayName,
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+}
+
+export function useSkillCornerComparison(player1: string, player2: string, position: string, sc1Override?: string | null, sc2Override?: string | null) {
+  return useQuery({
+    queryKey: [...skillCornerKeys.comparison(player1, player2, position), sc1Override ?? '', sc2Override ?? ''],
+    queryFn: async () => {
+      const res = await api.post('/skillcorner/comparison', {
+        player1,
+        player2,
+        position,
+        sc1_override: sc1Override || undefined,
+        sc2_override: sc2Override || undefined,
+      });
+      return res.data as SkillCornerComparisonResponse;
+    },
+    enabled: !!player1 && !!player2 && player1 !== player2,
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+}
+
+export function useSkillCornerCoverage() {
+  return useQuery({
+    queryKey: skillCornerKeys.coverage,
+    queryFn: async () => {
+      const res = await api.get('/skillcorner/coverage');
+      return res.data as SkillCornerCoverage;
+    },
+    staleTime: CONFIG_STALE,
+    gcTime: CONFIG_GC,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }
