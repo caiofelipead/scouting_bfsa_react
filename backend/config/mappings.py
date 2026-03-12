@@ -384,6 +384,22 @@ WYSCOUT_LEAGUE_MAP = {
     'Argentina | 2': 'Liga Argentina B',
     'Japão | 2': 'J2 League',
     'Israel | 1': 'Israeli Premier League',
+    # New leagues from power ranking data
+    'Hungary | 1': 'Hungarian NB I', 'Hungria | 1': 'Hungarian NB I',
+    'Albania | 1': 'Albanian Superiore', 'Albânia | 1': 'Albanian Superiore',
+    'Armenia | 1': 'Armenian Premier League', 'Armênia | 1': 'Armenian Premier League',
+    'Austria | 2': 'Austrian 2. Liga', 'Áustria | 2': 'Austrian 2. Liga',
+    'Romania | 2': 'Romanian Liga II', 'Romênia | 2': 'Romanian Liga II',
+    'Colombia | 2': 'Liga Colombia B', 'Colômbia | 2': 'Liga Colombia B',
+    'Chile | 2': 'Liga Chile B',
+    'Uruguay | 2': 'Liga Uruguai B', 'Uruguai | 2': 'Liga Uruguai B',
+    'Paraguay | 2': 'Liga Paraguai B', 'Paraguai | 2': 'Liga Paraguai B',
+    'UAE | 2': 'UAE First Division', 'Emirados | 2': 'UAE First Division',
+    'Kuwait | 1': 'Kuwaiti Premier League',
+    'Bangladesh | 1': 'Bangladesh Premier League',
+    'Guatemala | 1': 'Liga Nacional Guatemala',
+    'Italy | 3': 'Serie C Italia',
+    'Catarinense A1': 'Catarinense A1',
 }
 
 _WYSCOUT_LEAGUE_MAP_NORM = {
@@ -832,6 +848,270 @@ for t in ['East Bengal FC']:
 # ── Uzbekistan ──
 for t in ['Pakhtakor Tashkent']:
     CLUB_LEAGUE_MAP.setdefault(t, 'Uzbek Super League')
+
+# ============================================================
+# CLUBS FROM POWER RANKING DATABASE (calibrated data)
+# ============================================================
+
+# ── Premier League (England) ──
+for t in ['Aston Villa', 'Chelsea']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Premier League')
+
+# ── La Liga / Spain ──
+for t in ['Barcelona']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'La Liga')
+for t in ['Albacete', 'Cádiz', 'Cartagena']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'La Liga 2')
+for t in ['Antequera', 'Cultural Leonesa']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'La Liga 3')
+
+# ── Serie A/B Italia ──
+for t in ['Cagliari']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Serie A Italia')
+for t in ['Catanzaro']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Serie B Italia')
+
+# ── 2. Bundesliga ──
+for t in ['Elversberg']:
+    CLUB_LEAGUE_MAP.setdefault(t, '2. Bundesliga')
+
+# ── Liga Portugal ──
+for t in ['Casa Pia AC', 'Estrela Amadora', 'Famalicão', 'Farense']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Portugal')
+for t in [
+    'Académico de Viseu F.C.', 'Alverca', 'Chaves',
+    'Felgueiras 1932',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Portugal 2')
+for t in ['Académica', 'Amarante', 'Amora', 'Anadia', 'Atlético CP']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Portugal 3')
+for t in ['AD Marco 09']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Campeonato de Portugal')
+
+# ── Eredivisie ──
+for t in ['AZ', 'Fortuna Sittard']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Eredivisie')
+
+# ── Belgium ──
+for t in ['Cercle Brugge']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Belgian Pro League')
+for t in ['Francs Borains']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Belgian Second Division')
+
+# ── Super Lig / 1. Lig Turkey ──
+for t in ['Eyüpspor', 'Fenerbahçe']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Super Lig')
+for t in ['BB Erzurumspor', 'Bandırmaspor']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Super Lig 2')
+
+# ── Scotland ──
+for t in ['Celtic']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Scottish Premiership')
+
+# ── Greece ──
+for t in ['AEK Athens', 'Aris', 'Athens Kallithea', 'Atromitos']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Greek Super League')
+
+# ── Russia ──
+for t in ['Akhmat Grozny', 'Akron Togliatti', 'CSKA Moskva', 'Dinamo Moskva']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Russian Premier League')
+
+# ── Ukraine ──
+for t in ['Chornomorets']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Ukrainian Premier League')
+
+# ── Austria ──
+for t in ['Austria Klagenfurt']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Austrian Bundesliga')
+for t in ['Austria Lustenau']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Austrian 2. Liga')
+
+# ── Switzerland ──
+for t in ['Basel']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Swiss Super League')
+for t in ['Bellinzona']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Swiss Challenge League')
+
+# ── Sweden ──
+for t in ['Elfsborg']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Swedish Allsvenskan')
+
+# ── Serbia ──
+for t in ['Crvena Zvezda']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Serbian Super Liga')
+
+# ── Hungary ──
+for t in ['Ferencváros']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Hungarian NB I')
+
+# ── Romania ──
+for t in ['Farul Constanţa']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Romanian Liga I')
+for t in ['Argeș']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Romanian Liga II')
+
+# ── Bulgaria ──
+for t in ['Arda', 'Beroe', 'Botev Plovdiv', 'CSKA 1948 Sofia', 'CSKA Sofia', 'Cherno More']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Bulgarian First League')
+
+# ── Cyprus ──
+for t in ['AEK Larnaca', 'AEL', 'Anorthosis', 'Apollon']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Cypriot First Division')
+
+# ── Slovenia ──
+for t in ['Domžale']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Slovenian PrvaLiga')
+
+# ── Montenegro ──
+for t in ['Bokelj']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Montenegrin First League')
+
+# ── Albania ──
+for t in ['Egnatia Rrogozhinë']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Albanian Superiore')
+
+# ── Armenia ──
+for t in ['Ararat-Armenia']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Armenian Premier League')
+
+# ── Argentina ──
+for t in [
+    'Aldosivi', 'Argentinos Juniors', 'Atlético Tucumán', 'Barracas Central',
+    'Belgrano', 'Boca Juniors', 'Central Córdoba SdE', 'Defensa y Justicia',
+    'Deportivo Riestra', 'Estudiantes',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Argentina')
+for t in [
+    'All Boys', 'Almirante Brown', 'Atlético Rafaela', 'Chacarita Juniors',
+    'Colón', 'Deportivo Morón', 'Estudiantes Caseros', 'Estudiantes Río Cuarto',
+    'Ferro Carril Oeste',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Argentina B')
+
+# ── Brasil (additional) ──
+for t in ['Athletico Paranaense', 'Atlético GO', 'Atlético Mineiro', 'Bahia',
+           'Botafogo', 'Corinthians', 'Criciúma', 'Cruzeiro', 'Cuiabá',
+           'Flamengo', 'Fluminense', 'Fortaleza']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Serie A Brasil')
+for t in ['Amazonas', 'América Mineiro', 'Avaí', 'Botafogo SP', 'Brusque',
+           'Ceará', 'Chapecoense', 'Coritiba', 'CRB']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Serie B Brasil')
+for t in ['ABC', 'Botafogo PB', 'Confiança', 'CSA', 'Ferroviária', 'Figueirense',
+           'Floresta EC']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Serie C Brasil')
+for t in ['América RN', 'Anápolis', 'Cianorte']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Serie D Brasil')
+for t in ['Camboriú']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Catarinense A1')
+
+# ── MLS ──
+for t in ['Colorado Rapids']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'MLS')
+
+# ── Mexico ──
+for t in ['Atlas', 'Atlético de San Luis']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga MX')
+
+# ── Colombia ──
+for t in [
+    'América de Cali', 'Atlético Bucaramanga', 'Atlético Nacional',
+    'Boyacá Chicó', 'Deportivo Cali', 'Deportivo Pasto', 'Deportivo Pereira',
+    'Envigado',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Colombia')
+for t in ['Atlético Huila', 'Cortuluá', 'Deportes Quindío']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Colombia B')
+
+# ── Chile ──
+for t in ['Audax Italiano', 'Cobresal', 'Colo Colo', 'Coquimbo Unido', 'Deportes Iquique']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Chile')
+for t in ['Deportes Temuco']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Chile B')
+
+# ── Uruguay ──
+for t in ['Boston River', 'Cerro', 'Cerro Largo', 'Danubio', 'Defensor Sporting',
+           'Deportivo Maldonado', 'Fénix']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Uruguai')
+for t in ['Albion']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Uruguai B')
+
+# ── Paraguay ──
+for t in ['Cerro Porteño']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Paraguai')
+for t in ['Atlético Tembetary', 'Deportivo Recoleta']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Paraguai B')
+
+# ── Ecuador ──
+for t in ['Aucas', 'Emelec']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Equador')
+
+# ── Bolivia ──
+for t in ['Aurora', 'Blooming', 'Bolívar']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Bolivia')
+
+# ── Venezuela ──
+for t in ['Academia Puerto Cabello', 'Deportivo Táchira', 'Estudiantes de Mérida']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Venezuela')
+
+# ── Peru ──
+for t in ['ADT', 'Alianza', 'Alianza Lima', 'Carlos Mannucci']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Peru')
+
+# ── Japan ──
+for t in ['Albirex Niigata', 'Avispa Fukuoka', 'Cerezo Osaka', 'Consadole Sapporo']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'J1 League')
+for t in ['Fagiano Okayama']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'J2 League')
+
+# ── Korea ──
+for t in ['Daegu', 'Daejeon Citizen']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'K-League 1')
+for t in ['Anyang', 'Bucheon 1995']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'K-League 2')
+
+# ── Saudi Arabia ──
+for t in ['Al Ahli']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Saudi Pro League')
+for t in ['Al Hazem', 'Al Najma']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Saudi First Division')
+
+# ── Qatar ──
+for t in ['Al Khor', 'Al Rayyan', 'Al Sadd']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Qatar Stars League')
+
+# ── UAE ──
+for t in [
+    'Ajman', 'Al Ain', 'Al Bataeh', 'Al Ittihad Kalba', 'Al Jazira',
+    'Al Nasr', 'Al Orooba', 'Al Sharjah', 'Al Wahda', 'Al Wasl',
+    'Bani Yas', 'Dibba Al Hisn',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'UAE Pro League')
+for t in ['Al Dhafra', 'Dibba Al Fujairah']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'UAE First Division')
+
+# ── China ──
+for t in ['Beijing Guoan']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Chinese Super League')
+
+# ── India ──
+for t in ['Bengaluru', 'East Bengal']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Indian Super League')
+
+# ── Thailand ──
+for t in ['Bangkok United', 'Buriram United']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Thai League')
+
+# ── Tunisia ──
+for t in ['ES Tunis']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Tunisian Ligue 1')
+
+# ── Other ──
+for t in ['Abahani Dhaka']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Bangladesh Premier League')
+for t in ['Al Fahaheel']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Kuwaiti Premier League')
+for t in ['Antigua GFC']:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Liga Nacional Guatemala')
 
 # Dicionário normalizado para lookup O(1)
 _CLUB_LEAGUE_MAP_NORM = {
