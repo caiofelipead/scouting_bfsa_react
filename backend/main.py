@@ -81,6 +81,9 @@ from config.mappings import (
 logger = logging.getLogger(__name__)
 
 
+_unmapped_clubs: set = set()  # Track clubs not found in CLUB_LEAGUE_MAP
+
+
 def resolve_actual_league(team_name: str, fallback_liga_tier: str = None) -> str:
     """Resolve a player's actual current league based on their club name.
 
@@ -99,6 +102,10 @@ def resolve_actual_league(team_name: str, fallback_liga_tier: str = None) -> str
         team_norm = padronizar_string(team_str)
         if team_norm in _CLUB_LEAGUE_MAP_NORM:
             return _CLUB_LEAGUE_MAP_NORM[team_norm]
+        # Track unmapped club
+        if team_str not in _unmapped_clubs:
+            _unmapped_clubs.add(team_str)
+            logger.warning("Unmapped club '%s' — using fallback league", team_str)
     # Fallback to the liga_tier column (scouting pool league)
     if fallback_liga_tier and pd.notna(fallback_liga_tier):
         return str(fallback_liga_tier)
@@ -422,6 +429,26 @@ async def reload_data(admin: dict = Depends(require_admin)):
     return {
         "message": "Dados recarregados",
         "counts": {k: len(v) for k, v in _data.items()},
+    }
+
+
+@app.get("/api/data/unmapped-clubs")
+async def get_unmapped_clubs(admin: dict = Depends(require_admin)):
+    """Return clubs found in data that aren't in CLUB_LEAGUE_MAP."""
+    _ensure_data_loaded()
+    # Also scan full wyscout dataset for comprehensive list
+    df = _data.get("wyscout")
+    all_unmapped = set(_unmapped_clubs)
+    if df is not None and "Equipa" in df.columns:
+        for team in df["Equipa"].dropna().unique():
+            team_str = str(team).strip()
+            team_norm = padronizar_string(team_str)
+            if team_str not in CLUB_LEAGUE_MAP and team_norm not in _CLUB_LEAGUE_MAP_NORM:
+                all_unmapped.add(team_str)
+    return {
+        "unmapped_clubs": sorted(all_unmapped),
+        "count": len(all_unmapped),
+        "total_mapped": len(CLUB_LEAGUE_MAP),
     }
 
 

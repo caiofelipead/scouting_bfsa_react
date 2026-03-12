@@ -262,10 +262,25 @@ LEAGUE_LOGOS = {
 # TIMES DA SÉRIE B 2025
 # ============================================
 SERIE_B_TEAMS = [
-    'Amazonas', 'América Mineiro', 'Athletic Club', 'Athletico Paranaense',
-    'Atlético GO', 'Avaí', 'Botafogo SP', 'Chapecoense', 'Coritiba', 'CRB',
-    'Criciúma', 'Cuiabá', 'Ferroviária', 'Goiás', 'Grêmio Novorizontino',
-    'Operário PR', 'Paysandu', 'Remo', 'Vila Nova', 'Volta Redonda',
+    'Amazonas', 'Amazonas FC', 'América Mineiro', 'América MG', 'América-MG',
+    'Athletic Club', 'Athletico Paranaense', 'Athletico-PR',
+    'Atlético GO', 'Atlético Goianiense', 'Atlético-GO',
+    'Avaí', 'Avaí FC', 'Botafogo SP', 'Botafogo-SP',
+    'Chapecoense', 'Chapecoense AF', 'Coritiba', 'Coritiba FC', 'CRB',
+    'Criciúma', 'Criciúma EC', 'Cuiabá', 'Cuiabá EC',
+    'Ferroviária', 'Ferroviária SP', 'Goiás', 'Goiás EC',
+    'Grêmio Novorizontino', 'Novorizontino',
+    'Operário PR', 'Operário-PR', 'Operário Ferroviário',
+    'Paysandu', 'Paysandu SC', 'Remo', 'Clube do Remo',
+    'Vila Nova', 'Vila Nova FC', 'Volta Redonda', 'Volta Redonda FC',
+    # Common alternate names / WyScout variants
+    'Guarani', 'Guarani FC', 'Ponte Preta', 'AA Ponte Preta',
+    'Ituano', 'Ituano FC', 'Tombense', 'Tombense FC',
+    'Londrina', 'Londrina EC', 'Sampaio Corrêa', 'Sampaio Corrêa FC',
+    'ABC', 'ABC FC', 'Sport Recife', 'Náutico', 'Club Náutico Capibaribe',
+    'CSA', 'Centro Sportivo Alagoano', 'Brusque', 'Brusque FC',
+    'Figueirense', 'Figueirense FC', 'Joinville', 'Joinville EC',
+    'Confiança', 'AD Confiança',
 ]
 
 
@@ -351,13 +366,31 @@ for team in SERIE_B_TEAMS:
     CLUB_LEAGUE_MAP[team] = 'Serie B Brasil'
 
 for t in [
-    'Atlético MG', 'Atlético Mineiro', 'Athletico Paranaense', 'Athletico PR',
-    'Bahia', 'Botafogo', 'Corinthians', 'Cruzeiro', 'Cuiabá',
-    'Flamengo', 'Fluminense', 'Fortaleza', 'Grêmio', 'Internacional',
-    'Juventude', 'Palmeiras', 'RB Bragantino', 'Red Bull Bragantino',
-    'Santos', 'São Paulo', 'Vasco', 'Vasco da Gama', 'Vitória',
-    'Sport', 'Sport Recife', 'Ceará', 'Mirassol', 'Novorizontino',
-    'Grêmio Novorizontino', 'Atlético GO', 'Atlético Goianiense', 'Criciúma',
+    'Atlético MG', 'Atlético Mineiro', 'Atlético-MG', 'Clube Atlético Mineiro',
+    'Athletico Paranaense', 'Athletico PR', 'Athletico-PR', 'CAP',
+    'Bahia', 'EC Bahia', 'Esporte Clube Bahia',
+    'Botafogo', 'Botafogo FR', 'Botafogo RJ', 'Botafogo de Futebol e Regatas',
+    'Corinthians', 'SC Corinthians', 'SC Corinthians Paulista',
+    'Cruzeiro', 'Cruzeiro EC', 'Cruzeiro Esporte Clube',
+    'Cuiabá', 'Cuiabá EC',
+    'Flamengo', 'CR Flamengo', 'Clube de Regatas do Flamengo',
+    'Fluminense', 'Fluminense FC',
+    'Fortaleza', 'Fortaleza EC',
+    'Grêmio', 'Grêmio FBPA', 'Grêmio Porto Alegre',
+    'Internacional', 'SC Internacional', 'Inter RS',
+    'Juventude', 'EC Juventude',
+    'Palmeiras', 'SE Palmeiras',
+    'RB Bragantino', 'Red Bull Bragantino', 'Bragantino',
+    'Santos', 'Santos FC',
+    'São Paulo', 'São Paulo FC', 'SPFC',
+    'Vasco', 'Vasco da Gama', 'CR Vasco da Gama',
+    'Vitória', 'EC Vitória', 'Vitória BA',
+    'Sport', 'Sport Recife', 'Sport Club do Recife',
+    'Ceará', 'Ceará SC',
+    'Mirassol', 'Mirassol FC',
+    'Novorizontino', 'Grêmio Novorizontino',
+    'Atlético GO', 'Atlético Goianiense', 'Atlético-GO',
+    'Criciúma', 'Criciúma EC',
 ]:
     CLUB_LEAGUE_MAP[t] = 'Serie A Brasil'
 
@@ -518,6 +551,20 @@ for t in ['Bolívar', 'The Strongest', 'Jorge Wilstermann', 'Always Ready']:
 
 for t in ['Caracas FC', 'Deportivo Táchira', 'Zamora FC', 'Monagas SC']:
     CLUB_LEAGUE_MAP.setdefault(t, 'Liga Venezuela')
+
+# Serie C / Serie D / Regional Brazilian clubs that may appear in scouting data
+for t in [
+    'Aparecidense', 'Athletic Club MG', 'Botafogo PB', 'Botafogo-PB',
+    'Floresta', 'Floresta EC', 'Ferroviário', 'Ferroviário CE',
+    'Figueirense', 'Figueirense FC', 'Icasa', 'Jacuipense',
+    'Manaus', 'Manaus FC', 'Náutico', 'Club Náutico Capibaribe',
+    'Remo', 'Clube do Remo', 'São Bernardo', 'São Bernardo FC',
+    'São José', 'São José RS', 'São José EC', 'Ypiranga', 'Ypiranga RS',
+    'Volta Redonda', 'Volta Redonda FC', 'Altos', 'Altos PI',
+    'Imperatriz', 'Imperatriz MA', 'Treze', 'Treze PB',
+    'Paysandu', 'Paysandu SC',
+]:
+    CLUB_LEAGUE_MAP.setdefault(t, 'Serie C Brasil')
 
 # Dicionário normalizado para lookup O(1)
 _CLUB_LEAGUE_MAP_NORM = {
