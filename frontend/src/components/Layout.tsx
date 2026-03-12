@@ -70,19 +70,15 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
       >
         {/* Brand */}
         <div className="px-4 py-5 flex items-center gap-2.5">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{
-              background: 'var(--color-accent-glow)',
-              border: '1px solid rgba(220, 38, 38, 0.3)',
-            }}
-          >
-            <Shield size={16} style={{ color: 'var(--color-accent)' }} />
-          </div>
+          <img
+            src="/3154_imgbank_1685113109.png"
+            alt="Logo Botafogo-SP"
+            className="w-8 h-8 object-contain"
+          />
           <div>
             <div className="font-[var(--font-display)] text-sm font-bold tracking-tight">SCOUTING</div>
             <div className="text-[9px] tracking-[0.15em]" style={{ color: 'var(--color-text-muted)' }}>
-              BOTAFOGO-SP
+              BOTAFOGO-SA
             </div>
           </div>
         </div>
