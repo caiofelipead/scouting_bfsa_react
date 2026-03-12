@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
@@ -9,10 +10,12 @@ import {
   Target,
   Shield,
   TrendingUp,
+  Search,
+  X,
 } from 'lucide-react';
 import RadarChart from './RadarChart';
 import SkeletonProfile from './SkeletonProfile';
-import { usePlayerProfile, useRadarData } from '../hooks/usePlayers';
+import { usePlayerProfile, useRadarData, useSkillCornerSearch } from '../hooks/usePlayers';
 import { cn, getScoreClass, getScoreColor, getPerformanceLabel, formatNumber } from '../lib/utils';
 
 interface PlayerProfileProps {
@@ -48,8 +51,19 @@ function getPdiLabel(pdi: number): string {
 }
 
 export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProfileProps) {
-  const { data: profile, isLoading: profileLoading } = usePlayerProfile(playerDisplayName);
+  const [scOverride, setScOverride] = useState<string | null>(null);
+  const [scSearchOpen, setScSearchOpen] = useState(false);
+  const [scSearchQuery, setScSearchQuery] = useState('');
+  const { data: profile, isLoading: profileLoading } = usePlayerProfile(playerDisplayName, scOverride);
   const { data: radarData, isLoading: radarLoading } = useRadarData(playerDisplayName);
+  const { data: scResults } = useSkillCornerSearch(scSearchOpen ? scSearchQuery : '');
+
+  // Reset override when player changes
+  useEffect(() => {
+    setScOverride(null);
+    setScSearchOpen(false);
+    setScSearchQuery('');
+  }, [playerDisplayName]);
 
   if (!playerDisplayName) return null;
 
@@ -123,7 +137,11 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
             </h2>
             {summary.team && (
               <p className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                <Shield size={13} />
+                {summary.club_logo ? (
+                  <img src={summary.club_logo} alt={summary.team} className="w-5 h-5 object-contain" />
+                ) : (
+                  <Shield size={13} />
+                )}
                 {summary.team}
               </p>
             )}
@@ -304,18 +322,96 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
           </motion.div>
         </div>
 
-        {/* ── SkillCorner data ─────────────────────────────────────── */}
-        {skillcorner && Object.keys(skillcorner).length > 0 && (
-          <motion.div variants={fadeUp} className="card-glass rounded-lg p-5">
-            <div className="flex items-center gap-2 mb-4">
+        {/* ── SkillCorner section ─────────────────────────────────── */}
+        <motion.div variants={fadeUp} className="card-glass rounded-lg p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
               <ChevronRight size={14} style={{ color: 'var(--color-accent)' }} />
               <span
                 className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase"
                 style={{ color: 'var(--color-text-muted)' }}
               >
-                SKILLCORNER INDICES
+                SKILLCORNER {scOverride ? `(${scOverride})` : ''}
               </span>
             </div>
+            <button
+              onClick={() => setScSearchOpen(!scSearchOpen)}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors cursor-pointer"
+              style={{
+                background: scSearchOpen ? 'var(--color-accent-glow)' : 'var(--color-surface-2)',
+                color: scSearchOpen ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                border: `1px solid ${scSearchOpen ? 'rgba(220,38,38,0.3)' : 'var(--color-border-subtle)'}`,
+              }}
+            >
+              <Search size={10} />
+              Buscar atleta
+            </button>
+          </div>
+
+          {/* SkillCorner player search */}
+          {scSearchOpen && (
+            <div className="mb-4 relative">
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="text"
+                  placeholder="Nome do jogador no SkillCorner..."
+                  value={scSearchQuery}
+                  onChange={(e) => setScSearchQuery(e.target.value)}
+                  className="flex-1 px-3 py-1.5 rounded text-xs outline-none"
+                  style={{
+                    background: 'var(--color-surface-1)',
+                    border: '1px solid var(--color-border-subtle)',
+                    color: 'var(--color-text-primary)',
+                    fontFamily: 'var(--font-body)',
+                  }}
+                  autoFocus
+                />
+                {scOverride && (
+                  <button
+                    onClick={() => { setScOverride(null); setScSearchQuery(''); setScSearchOpen(false); }}
+                    className="px-2 py-1.5 rounded text-[10px] cursor-pointer"
+                    style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                    title="Remover selecao manual"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+              {scResults && scResults.length > 0 && (
+                <div
+                  className="rounded overflow-hidden max-h-48 overflow-y-auto"
+                  style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)' }}
+                >
+                  {scResults.map((r) => (
+                    <button
+                      key={`${r.player_name}-${r.team_name}`}
+                      onClick={() => {
+                        setScOverride(r.player_name);
+                        setScSearchOpen(false);
+                        setScSearchQuery('');
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors cursor-pointer flex items-center justify-between"
+                      style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+                    >
+                      <span style={{ color: 'var(--color-text-primary)' }}>{r.player_name}</span>
+                      <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                        {r.team_name} {r.position_group ? `· ${r.position_group}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {scSearchQuery.length >= 2 && scResults && scResults.length === 0 && (
+                <div className="text-[10px] py-2" style={{ color: 'var(--color-text-muted)' }}>
+                  Nenhum jogador encontrado
+                </div>
+              )}
+            </div>
+          )}
+
+        {skillcorner && Object.keys(skillcorner).length > 0 && (
+          <div className="mb-4">
+            <div className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>INDICES</div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {Object.entries(skillcorner).map(([name, value], i) => (
                 <motion.div
@@ -344,20 +440,13 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                 </motion.div>
               ))}
             </div>
-          </motion.div>
+          </div>
         )}
-        {/* ── SkillCorner Physical Data ────────────────────────────── */}
+
+        {/* Physical data */}
         {skillcorner_physical && Object.keys(skillcorner_physical).length > 0 && (
-          <motion.div variants={fadeUp} className="card-glass rounded-lg p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <ChevronRight size={14} style={{ color: 'var(--color-accent)' }} />
-              <span
-                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                DADOS FISICOS (SKILLCORNER)
-              </span>
-            </div>
+          <div>
+            <div className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>DADOS FISICOS</div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               {Object.entries(skillcorner_physical).map(([name, value], i) => (
                 <motion.div
@@ -386,8 +475,17 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                 </motion.div>
               ))}
             </div>
-          </motion.div>
+          </div>
         )}
+
+        {/* No data message */}
+        {(!skillcorner || Object.keys(skillcorner).length === 0) && (!skillcorner_physical || Object.keys(skillcorner_physical).length === 0) && (
+          <div className="text-[10px] py-2" style={{ color: 'var(--color-text-muted)' }}>
+            Nenhum dado SkillCorner encontrado. Use "Buscar atleta" para selecionar manualmente.
+          </div>
+        )}
+
+        </motion.div>
         {/* ── P(Sucesso) Prediction Card ──────────────────────────── */}
         {prediction && (
           <motion.div variants={fadeUp} className="card-glass rounded-lg p-5">

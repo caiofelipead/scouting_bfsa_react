@@ -329,10 +329,41 @@ async def health_check():
     """Health check — returns quickly even during cold start."""
     ready = _data_ready.is_set()
     counts = {k: len(v) for k, v in _data.items()} if ready else {}
+    sc_diag = None
+    if ready:
+        sc_df = _data.get("skillcorner")
+        ws_df = _data.get("wyscout")
+        if sc_df is not None and len(sc_df) > 0:
+            sc_diag = {
+                "columns": list(sc_df.columns),
+                "sample_players": [
+                    {col: (str(row[col]) if pd.notna(row.get(col)) else None) for col in ["player_name", "short_name", "team_name"] if col in sc_df.columns}
+                    for _, row in sc_df.head(5).iterrows()
+                ],
+            }
+            if ws_df is not None and len(ws_df) > 0:
+                ws_sample = [
+                    str(r.get("Jogador", "")) for _, r in ws_df.head(5).iterrows()
+                ]
+                sc_diag["wyscout_sample_names"] = ws_sample
+                # Try matching first wyscout player
+                try:
+                    test_name = str(ws_df.iloc[0].get("Jogador", ""))
+                    test_team = str(ws_df.iloc[0].get("Equipa", "")) if pd.notna(ws_df.iloc[0].get("Equipa")) else None
+                    test_match = find_skillcorner_player(test_name, sc_df, team_name=test_team)
+                    sc_diag["test_match"] = {
+                        "searched": test_name,
+                        "team": test_team,
+                        "found": test_match is not None,
+                        "matched_name": str(test_match.get("player_name", "")) if test_match is not None else None,
+                    }
+                except Exception as e:
+                    sc_diag["test_match_error"] = str(e)
     return {
         "status": "ready" if ready else "loading",
         "data_loaded": ready,
         "counts": counts,
+        "skillcorner_diagnostic": sc_diag,
     }
 
 
@@ -437,6 +468,38 @@ async def reload_data(admin: dict = Depends(require_admin)):
         "sync_results": sync_results,
         "counts": {k: len(v) for k, v in _data.items()},
     }
+
+
+@app.get("/api/skillcorner/search")
+async def search_skillcorner_players(
+    q: str = "",
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user),
+):
+    """Search SkillCorner players by name for manual selection."""
+    _ensure_data_loaded()
+    sc_df = _data.get("skillcorner")
+    if sc_df is None or len(sc_df) == 0:
+        return {"results": []}
+
+    results = []
+    if q.strip():
+        q_lower = q.strip().lower()
+        for _, row in sc_df.iterrows():
+            pname = str(row.get("player_name", "")) if pd.notna(row.get("player_name")) else ""
+            sname = str(row.get("short_name", "")) if pd.notna(row.get("short_name")) else ""
+            tname = str(row.get("team_name", "")) if pd.notna(row.get("team_name")) else ""
+            if q_lower in pname.lower() or q_lower in sname.lower():
+                results.append({
+                    "player_name": pname,
+                    "short_name": sname,
+                    "team_name": tname,
+                    "position_group": str(row.get("position_group", "")) if pd.notna(row.get("position_group")) else None,
+                })
+                if len(results) >= limit:
+                    break
+
+    return {"results": results}
 
 
 @app.post("/api/data/sync")
@@ -562,6 +625,7 @@ async def list_players(
 @app.get("/api/players/{player_display_name}/profile")
 async def get_player_profile(
     player_display_name: str,
+    sc_override: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
     df = _get_wyscout()
@@ -599,11 +663,15 @@ async def get_player_profile(
     team_name_sc = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
     sc_rows = len(sc_df) if sc_df is not None else 0
     if sc_df is not None and sc_rows > 0:
-        sc_match = find_skillcorner_player(
-            jogador_name,
-            sc_df,
-            team_name=team_name_sc,
-        )
+        # Manual override: user selected a SkillCorner player by name
+        if sc_override and "player_name" in sc_df.columns:
+            override_mask = sc_df["player_name"] == sc_override
+            if override_mask.sum() > 0:
+                sc_match = sc_df[override_mask].iloc[0]
+            else:
+                sc_match = find_skillcorner_player(jogador_name, sc_df, team_name=team_name_sc)
+        else:
+            sc_match = find_skillcorner_player(jogador_name, sc_df, team_name=team_name_sc)
         if sc_match is not None:
             sc_matched_name = str(sc_match.get("player_name", ""))
             sc_indices = SKILLCORNER_INDICES.get(position, [])
@@ -684,6 +752,7 @@ async def get_player_profile(
             "name": str(row.get("Jogador", "")),
             "display_name": str(row.get("JogadorDisplay", "")),
             "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
+            "club_logo": CLUB_LOGOS.get(str(row.get("Equipa", ""))) if pd.notna(row.get("Equipa")) else None,
             "position": position,
             "age": age,
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,

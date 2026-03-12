@@ -97,14 +97,38 @@ export function usePlayers(params: PlayersQueryParams) {
 
 // ── Player profile ──
 
-export function usePlayerProfile(displayName: string | null) {
+export function usePlayerProfile(displayName: string | null, scOverride?: string | null) {
   return useQuery({
-    queryKey: playerKeys.profile(displayName ?? ''),
+    queryKey: [...playerKeys.profile(displayName ?? ''), scOverride ?? ''],
     queryFn: async () => {
-      const res = await api.get(`/players/${encodeURIComponent(displayName!)}/profile`);
+      const params: Record<string, string> = {};
+      if (scOverride) params.sc_override = scOverride;
+      const res = await api.get(`/players/${encodeURIComponent(displayName!)}/profile`, { params });
       return res.data as PlayerProfile;
     },
     enabled: !!displayName,
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+}
+
+// ── SkillCorner search ──
+
+interface SkillCornerSearchResult {
+  player_name: string;
+  short_name: string;
+  team_name: string;
+  position_group: string | null;
+}
+
+export function useSkillCornerSearch(query: string) {
+  return useQuery({
+    queryKey: ['skillcorner-search', query],
+    queryFn: async () => {
+      const res = await api.get('/skillcorner/search', { params: { q: query, limit: 15 } });
+      return res.data.results as SkillCornerSearchResult[];
+    },
+    enabled: query.length >= 2,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });

@@ -16,6 +16,7 @@ export interface PlayerSummary {
   name: string;
   display_name: string | null;
   team: string | null;
+  club_logo: string | null;
   position: string | null;
   age: number | null;
   nationality: string | null;
