@@ -1570,6 +1570,220 @@ async def get_league_mappings(current_user: dict = Depends(get_current_user)):
     }
 
 
+# ══════════════════════════════════════════════════════════════════════
+# SKILLCORNER — DEDICATED ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════
+
+# Leagues covered by SkillCorner in this dataset (South America + Portugal)
+SKILLCORNER_COVERED_LEAGUES = {
+    # Brazil
+    "Serie A Brasil", "Serie B Brasil", "Serie C Brasil",
+    "Paulista A1", "Paulista A2", "Carioca A1", "Gaucho A1",
+    "Mineiro A1", "Paranaense A1", "Copa do Brasil",
+    # Argentina
+    "Liga Argentina",
+    # Other South America
+    "Liga Colombia", "Liga Chile", "Copa Libertadores", "Copa Sudamericana",
+    # Portugal
+    "Liga Portugal", "Portugal | 1",
+}
+
+
+def _is_skillcorner_covered(league: str | None, team: str | None = None) -> bool:
+    """Check if a player's league is within SkillCorner coverage."""
+    if league and any(covered.lower() in league.lower() for covered in SKILLCORNER_COVERED_LEAGUES):
+        return True
+    # Fallback: check team's resolved league
+    if team:
+        resolved = resolve_actual_league(team)
+        if resolved and any(covered.lower() in resolved.lower() for covered in SKILLCORNER_COVERED_LEAGUES):
+            return True
+    return False
+
+
+@app.get("/api/skillcorner/player/{player_name}")
+async def get_skillcorner_player_profile(
+    player_name: str,
+    sc_override: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Full SkillCorner profile for a player — indices + physical + coverage status."""
+    _ensure_data_loaded()
+    sc_df = _data.get("skillcorner")
+    if sc_df is None or len(sc_df) == 0:
+        return {"found": False, "reason": "no_skillcorner_data", "covered": False}
+
+    # Resolve WyScout player for context
+    df = _get_wyscout()
+    mask = df["JogadorDisplay"] == player_name
+    if mask.sum() == 0:
+        mask = df["JogadorDisplay"].str.lower() == player_name.lower()
+
+    league = None
+    team = None
+    position = "Meia"
+    jogador_name = player_name
+
+    if mask.sum() > 0:
+        row = df[mask].iloc[0]
+        jogador_name = str(row.get("Jogador", ""))
+        team = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
+        position_raw = str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else "Meia"
+        position = get_posicao_categoria(position_raw)
+        liga_tier_raw = str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None
+        league = resolve_actual_league(team, fallback_liga_tier=liga_tier_raw)
+
+    covered = _is_skillcorner_covered(league, team)
+
+    # Find SkillCorner match
+    sc_match = None
+    if sc_override and "player_name" in sc_df.columns:
+        override_mask = sc_df["player_name"] == sc_override
+        if override_mask.sum() > 0:
+            sc_match = sc_df[override_mask].iloc[0]
+    if sc_match is None:
+        sc_match = find_skillcorner_player(jogador_name, sc_df, team_name=team)
+
+    if sc_match is None:
+        return {
+            "found": False,
+            "covered": covered,
+            "league": league,
+            "reason": "no_match",
+            "searched_name": jogador_name,
+            "searched_team": team,
+        }
+
+    # Extract all SkillCorner indices for position
+    sc_indices_keys = SKILLCORNER_INDICES.get(position, [])
+    sc_indices = {}
+    for idx_name in sc_indices_keys:
+        val = _safe_float(sc_match.get(idx_name))
+        if val is not None:
+            sc_indices[idx_name] = round(val, 2)
+
+    # Extract ALL numeric columns for full data view
+    all_metrics = {}
+    for col in sc_df.columns:
+        if col in {"player_name", "short_name", "team_name", "position_group"}:
+            continue
+        val = _safe_float(sc_match.get(col))
+        if val is not None:
+            all_metrics[col] = round(val, 2)
+
+    # Physical subset
+    _SC_PHYSICAL_COLS = {
+        "sprint_count_per_90": "Sprints/90",
+        "hi_count_per_90": "High Intensity Runs/90",
+        "distance_per_90": "Distance/90",
+        "avg_psv99": "Avg PSV-99",
+        "avg_top_5_psv99": "Avg Top 5 PSV-99",
+    }
+    physical = {}
+    for col, label in _SC_PHYSICAL_COLS.items():
+        val = _safe_float(sc_match.get(col))
+        if val is not None:
+            physical[label] = round(val, 2)
+
+    return {
+        "found": True,
+        "covered": covered,
+        "league": league,
+        "position": position,
+        "matched_name": str(sc_match.get("player_name", "")),
+        "matched_team": str(sc_match.get("team_name", "")) if pd.notna(sc_match.get("team_name")) else None,
+        "matched_position": str(sc_match.get("position_group", "")) if pd.notna(sc_match.get("position_group")) else None,
+        "indices": sc_indices,
+        "physical": physical,
+        "all_metrics": all_metrics,
+    }
+
+
+@app.post("/api/skillcorner/comparison")
+async def compare_skillcorner_players(
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """Compare SkillCorner data for two players."""
+    _ensure_data_loaded()
+    sc_df = _data.get("skillcorner")
+    if sc_df is None or len(sc_df) == 0:
+        raise HTTPException(status_code=404, detail="SkillCorner data not available")
+
+    df = _get_wyscout()
+    p1_name = req.get("player1", "")
+    p2_name = req.get("player2", "")
+    sc1_override = req.get("sc1_override")
+    sc2_override = req.get("sc2_override")
+    pos = get_posicao_categoria(req.get("position", "Meia"))
+
+    def _resolve_sc(display_name, sc_override_name):
+        if sc_override_name and "player_name" in sc_df.columns:
+            m = sc_df["player_name"] == sc_override_name
+            if m.sum() > 0:
+                return sc_df[m].iloc[0]
+        mask = df["JogadorDisplay"] == display_name
+        if mask.sum() == 0:
+            mask = df["JogadorDisplay"].str.lower() == display_name.lower()
+        if mask.sum() == 0:
+            return None
+        row = df[mask].iloc[0]
+        jn = str(row.get("Jogador", ""))
+        tn = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
+        return find_skillcorner_player(jn, sc_df, team_name=tn)
+
+    sc1 = _resolve_sc(p1_name, sc1_override)
+    sc2 = _resolve_sc(p2_name, sc2_override)
+
+    if sc1 is None and sc2 is None:
+        raise HTTPException(status_code=404, detail="No SkillCorner data for either player")
+
+    # Collect metrics for comparison
+    sc_indices_keys = SKILLCORNER_INDICES.get(pos, [])
+    _SC_PHYSICAL_COLS = [
+        "sprint_count_per_90", "hi_count_per_90", "distance_per_90",
+        "avg_psv99", "avg_top_5_psv99",
+    ]
+    compare_cols = sc_indices_keys + _SC_PHYSICAL_COLS
+
+    comparison = []
+    for col in compare_cols:
+        v1 = round(_safe_float(sc1.get(col)) or 0, 2) if sc1 is not None else None
+        v2 = round(_safe_float(sc2.get(col)) or 0, 2) if sc2 is not None else None
+        comparison.append({
+            "metric": col,
+            "player1_value": v1,
+            "player2_value": v2,
+            "diff": round((v1 or 0) - (v2 or 0), 2) if v1 is not None and v2 is not None else None,
+        })
+
+    return {
+        "position": pos,
+        "player1": {
+            "name": p1_name,
+            "sc_name": str(sc1.get("player_name", "")) if sc1 is not None else None,
+            "sc_team": str(sc1.get("team_name", "")) if sc1 is not None else None,
+            "found": sc1 is not None,
+        },
+        "player2": {
+            "name": p2_name,
+            "sc_name": str(sc2.get("player_name", "")) if sc2 is not None else None,
+            "sc_team": str(sc2.get("team_name", "")) if sc2 is not None else None,
+            "found": sc2 is not None,
+        },
+        "comparison": comparison,
+    }
+
+
+@app.get("/api/skillcorner/coverage")
+async def get_skillcorner_coverage(current_user: dict = Depends(get_current_user)):
+    """Return the list of leagues covered by SkillCorner."""
+    return {
+        "covered_leagues": sorted(SKILLCORNER_COVERED_LEAGUES),
+        "description": "Dados SkillCorner disponíveis apenas para ligas sul-americanas e Liga Portugal.",
+    }
+
+
 # ── Run ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

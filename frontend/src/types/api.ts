@@ -201,3 +201,40 @@ export interface SimilarityQueryParams {
   top_n?: number;
   min_minutes?: number;
 }
+
+// ── SkillCorner types ──
+
+export interface SkillCornerPlayerProfile {
+  found: boolean;
+  covered: boolean;
+  league: string | null;
+  position?: string;
+  matched_name?: string;
+  matched_team?: string;
+  matched_position?: string;
+  indices?: Record<string, number>;
+  physical?: Record<string, number>;
+  all_metrics?: Record<string, number>;
+  reason?: string;
+  searched_name?: string;
+  searched_team?: string;
+}
+
+export interface SkillCornerComparisonEntry {
+  metric: string;
+  player1_value: number | null;
+  player2_value: number | null;
+  diff: number | null;
+}
+
+export interface SkillCornerComparisonResponse {
+  position: string;
+  player1: { name: string; sc_name: string | null; sc_team: string | null; found: boolean };
+  player2: { name: string; sc_name: string | null; sc_team: string | null; found: boolean };
+  comparison: SkillCornerComparisonEntry[];
+}
+
+export interface SkillCornerCoverage {
+  covered_leagues: string[];
+  description: string;
+}

@@ -16,6 +16,7 @@ import PredictionPage from './pages/PredictionPage';
 import ClustersPage from './pages/ClustersPage';
 import OfferedPage from './pages/OfferedPage';
 import AnalysesPage from './pages/AnalysesPage';
+import SkillCornerPage from './pages/SkillCornerPage';
 
 function App() {
   const { user, isAuthenticated, loading, error, login, logout } = useAuth();
@@ -35,6 +36,8 @@ function App() {
         return <ReportPage />;
       case 'comparison':
         return <ComparisonPage />;
+      case 'skillcorner':
+        return <SkillCornerPage />;
       case 'data':
         return <DataBrowserPage />;
       case 'rankings':
