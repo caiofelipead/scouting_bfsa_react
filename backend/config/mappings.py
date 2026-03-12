@@ -271,7 +271,7 @@ SERIE_B_TEAMS = [
     'Ferroviária', 'Ferroviária SP', 'Goiás', 'Goiás EC',
     'Grêmio Novorizontino', 'Novorizontino',
     'Operário PR', 'Operário-PR', 'Operário Ferroviário',
-    'Paysandu', 'Paysandu SC', 'Remo', 'Clube do Remo',
+    'Paysandu', 'Paysandu SC',
     'Vila Nova', 'Vila Nova FC', 'Volta Redonda', 'Volta Redonda FC',
     # Common alternate names / WyScout variants
 ]
@@ -978,7 +978,7 @@ for t in [
 # ── Brasil (additional) ──
 for t in ['Athletico Paranaense', 'Atlético Mineiro', 'Bahia',
            'Botafogo', 'Corinthians', 'Cruzeiro',
-           'Flamengo', 'Fluminense', 'Chapecoense', 'Coritiba']:
+           'Flamengo', 'Fluminense', 'Chapecoense', 'Coritiba', 'Remo']:
     CLUB_LEAGUE_MAP.setdefault(t, 'Serie A Brasil')
 for t in 'América Mineiro', 'Atlético GO', 'Avaí', 'Botafogo SP', 'Criciúma', 'Cuiabá',
            'Ceará', 'CRB', 'Sport', 'Sport Recife', 'Sport Club do Recife',
