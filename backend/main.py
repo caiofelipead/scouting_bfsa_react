@@ -593,14 +593,19 @@ async def get_player_profile(
     # SkillCorner match
     sc_data = None
     sc_physical = None
+    sc_debug = None
     sc_df = _data.get("skillcorner")
-    if sc_df is not None and len(sc_df) > 0:
+    jogador_name = str(row.get("Jogador", ""))
+    team_name_sc = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
+    sc_rows = len(sc_df) if sc_df is not None else 0
+    if sc_df is not None and sc_rows > 0:
         sc_match = find_skillcorner_player(
-            str(row.get("Jogador", "")),
+            jogador_name,
             sc_df,
-            team_name=str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
+            team_name=team_name_sc,
         )
         if sc_match is not None:
+            sc_matched_name = str(sc_match.get("player_name", ""))
             sc_indices = SKILLCORNER_INDICES.get(position, [])
             sc_data = {}
             for idx_name in sc_indices:
@@ -620,6 +625,26 @@ async def get_player_profile(
                 val = _safe_float(sc_match.get(col))
                 if val is not None:
                     sc_physical[label] = round(val, 2)
+            sc_debug = {
+                "sc_total_rows": sc_rows,
+                "match_found": True,
+                "matched_name": sc_matched_name,
+                "indices_found": len(sc_data),
+                "physical_found": len(sc_physical),
+            }
+        else:
+            sc_debug = {
+                "sc_total_rows": sc_rows,
+                "match_found": False,
+                "searched_name": jogador_name,
+                "searched_team": team_name_sc,
+            }
+    else:
+        sc_debug = {
+            "sc_total_rows": sc_rows,
+            "match_found": False,
+            "reason": "skillcorner_dataframe_empty",
+        }
 
     # Collect numeric metrics
     metrics = {}
@@ -673,6 +698,7 @@ async def get_player_profile(
         "performance_class": perf_class,
         "skillcorner": sc_data,
         "skillcorner_physical": sc_physical,
+        "skillcorner_debug": sc_debug,
         "projection_score": projection_score,
         "ssp_lambdas": SSP_LAMBDAS,
         "prediction": prediction,
