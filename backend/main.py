@@ -435,6 +435,20 @@ async def get_leagues(current_user: dict = Depends(get_current_user)):
     }
 
 
+@app.get("/api/config/analises-debug")
+async def analises_debug(current_user: dict = Depends(get_current_user)):
+    """Debug endpoint: show análises columns and first few player names."""
+    _ensure_data_loaded()
+    df = _data.get("analises")
+    if df is None:
+        return {"status": "no_data", "columns": [], "names": [], "rows": 0}
+    cols = list(df.columns)
+    names = []
+    if "Nome" in df.columns:
+        names = [str(v) for v in df["Nome"].dropna().head(20).tolist()]
+    return {"status": "ok", "columns": cols, "names": names, "rows": len(df)}
+
+
 @app.get("/api/config/mappings")
 async def get_mappings(current_user: dict = Depends(get_current_user)):
     return {
@@ -758,34 +772,48 @@ async def get_player_profile(
 
     # ── Análises match ──
     analises_data = None
+    ana_match = None  # define at top scope so photo fallback can use it
     analises_df = _data.get("analises")
     if analises_df is not None and len(analises_df) > 0 and "Nome" in analises_df.columns:
-        # Try exact match first, then fuzzy
-        ana_match = None
-        ana_mask = analises_df["Nome"].str.strip().str.lower() == jogador_name.strip().lower()
-        if ana_mask.sum() > 0:
-            ana_match = analises_df[ana_mask].iloc[0]
-        else:
-            # Fuzzy match using rapidfuzz
-            from rapidfuzz import fuzz as _fuzz
+        from rapidfuzz import fuzz as _fuzz
+
+        # Names to try matching against (display name, raw name, the URL param)
+        _names_to_try = list(dict.fromkeys(filter(None, [
+            player_display_name,
+            jogador_name,
+            str(row.get("JogadorDisplay", "")),
+        ])))
+
+        # 1) Try exact match on any candidate name
+        for _candidate in _names_to_try:
+            ana_mask = analises_df["Nome"].str.strip().str.lower() == _candidate.strip().lower()
+            if ana_mask.sum() > 0:
+                ana_match = analises_df[ana_mask].iloc[0]
+                break
+
+        # 2) Fuzzy match if no exact match found
+        if ana_match is None:
             best_score = 0.0
             best_idx = None
-            name_norm = jogador_name.strip().lower()
-            for aidx, arow in analises_df.iterrows():
-                aname = str(arow.get("Nome", "")).strip().lower()
-                if not aname:
+            for _candidate in _names_to_try:
+                name_norm = _candidate.strip().lower()
+                if not name_norm:
                     continue
-                sim = max(
-                    _fuzz.ratio(name_norm, aname) / 100.0,
-                    _fuzz.token_sort_ratio(name_norm, aname) / 100.0,
-                )
-                # Containment bonus
-                if name_norm in aname or aname in name_norm:
-                    sim = max(sim, 0.80)
-                if sim > best_score:
-                    best_score = sim
-                    best_idx = aidx
-            if best_idx is not None and best_score >= 0.70:
+                for aidx, arow in analises_df.iterrows():
+                    aname = str(arow.get("Nome", "")).strip().lower()
+                    if not aname:
+                        continue
+                    sim = max(
+                        _fuzz.ratio(name_norm, aname) / 100.0,
+                        _fuzz.token_sort_ratio(name_norm, aname) / 100.0,
+                    )
+                    # Containment bonus
+                    if name_norm in aname or aname in name_norm:
+                        sim = max(sim, 0.85)
+                    if sim > best_score:
+                        best_score = sim
+                        best_idx = aidx
+            if best_idx is not None and best_score >= 0.65:
                 ana_match = analises_df.loc[best_idx]
 
         if ana_match is not None:
@@ -817,11 +845,11 @@ async def get_player_profile(
                 modelo = str(val).strip()
 
             faixa_salarial = None
-            val = ana_match.get("Faixa salarial")
-            if val is None:
-                val = ana_match.get("faixa salarial")
-            if val is not None and pd.notna(val) and str(val).strip():
-                faixa_salarial = str(val).strip()
+            for _faixa_col in ("Faixa salarial", "faixa salarial", "Faixa Salarial"):
+                val = ana_match.get(_faixa_col)
+                if val is not None and pd.notna(val) and str(val).strip():
+                    faixa_salarial = str(val).strip()
+                    break
 
             transfer_luvas = None
             val = ana_match.get("Transfer/Luvas")
@@ -837,6 +865,7 @@ async def get_player_profile(
                 "faixa_salarial": faixa_salarial,
                 "transfer_luvas": transfer_luvas,
             }
+            logger.debug("Análises match for '%s': found '%s'", player_display_name, ana_match.get("Nome"))
 
     # Try to get photo_url from WyScout data first, then from análises
     photo_url = None
@@ -846,11 +875,10 @@ async def get_player_profile(
             photo_url = str(val).strip()
             break
     # Fallback: get photo from análises sheet
-    if not photo_url and analises_df is not None and len(analises_df) > 0:
-        if ana_match is not None:
-            foto_val = ana_match.get("Foto")
-            if foto_val is not None and pd.notna(foto_val) and str(foto_val).strip():
-                photo_url = str(foto_val).strip()
+    if not photo_url and ana_match is not None:
+        foto_val = ana_match.get("Foto")
+        if foto_val is not None and pd.notna(foto_val) and str(foto_val).strip():
+            photo_url = str(foto_val).strip()
 
     return {
         "summary": {
