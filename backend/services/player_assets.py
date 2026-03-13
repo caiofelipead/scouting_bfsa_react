@@ -68,8 +68,12 @@ def load_player_assets_csv(csv_path: str = None):
                 if not jogador:
                     continue
 
+                # Only use photo_url from reliable matches (ALTA or MEDIA)
+                # BAIXA_REVISAR and NAO_ENCONTRADO photos are likely wrong
+                reliable_photo = quality in ("ALTA", "MEDIA")
+
                 entry = {
-                    "photo_url": foto_url or None,
+                    "photo_url": (foto_url or None) if reliable_photo else None,
                     "club_logo": escudo_url or None,
                     "league_name": liga or None,
                     "league_country": pais_liga or None,
