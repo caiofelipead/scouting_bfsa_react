@@ -1493,6 +1493,13 @@ async def analyses_players(
                         liga = str(val).strip()
                         break
 
+                perfil = None
+                for pfc in ("Perfil", "perfil"):
+                    val = row.get(pfc)
+                    if val is not None and pd.notna(val) and str(val).strip():
+                        perfil = str(val).strip()
+                        break
+
                 # WyScout match using pre-computed lookup
                 wyscout_match = None
                 if ws_names_list:
@@ -1529,6 +1536,7 @@ async def analyses_players(
                     "equipe": equipe,
                     "liga": liga,
                     "modelo": modelo,
+                    "perfil": perfil,
                     "scores": scores,
                     "links": links,
                     "analysis_text": analysis_text,

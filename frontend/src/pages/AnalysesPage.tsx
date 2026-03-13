@@ -33,6 +33,7 @@ interface AnalysesPlayer {
   equipe: string | null;
   liga: string | null;
   modelo: string | null;
+  perfil: string | null;
   scores: Record<string, number>;
   links: Record<string, string>;
   analysis_text: string | null;
@@ -75,6 +76,15 @@ function getModeloStyle(modelo: string) {
   if (modelo === 'Descartado') return { bg: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'rgba(239,68,68,0.2)' };
   if (modelo === 'Livre') return { bg: 'rgba(34,197,94,0.1)', color: '#22c55e', border: 'rgba(34,197,94,0.2)' };
   return { bg: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: 'rgba(59,130,246,0.2)' };
+}
+
+function getPerfilStyle(perfil: string) {
+  const p = perfil.toLowerCase();
+  if (p.includes('titular')) return { bg: 'rgba(34,197,94,0.1)', color: '#22c55e', border: 'rgba(34,197,94,0.2)' };
+  if (p.includes('rota')) return { bg: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: 'rgba(59,130,246,0.2)' };
+  if (p.includes('aposta')) return { bg: 'rgba(168,85,247,0.1)', color: '#a855f7', border: 'rgba(168,85,247,0.2)' };
+  if (p.includes('reserva')) return { bg: 'rgba(234,179,8,0.1)', color: '#eab308', border: 'rgba(234,179,8,0.2)' };
+  return { bg: 'rgba(107,114,128,0.1)', color: '#9ca3af', border: 'rgba(107,114,128,0.2)' };
 }
 
 // ── Hook ──
@@ -175,20 +185,122 @@ function ScIdentityResolver({
   );
 }
 
+// ── WyScout Identity Resolver ──
+
+function WsIdentityResolver({
+  wsOverride,
+  onOverride,
+}: {
+  wsOverride: string | null;
+  onOverride: (name: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const { data: results } = useQuery({
+    queryKey: ['ws-search', query],
+    queryFn: async () => {
+      const res = await api.get('/players', { params: { search: query, limit: 10 } });
+      return res.data as { total: number; players: { name: string; display_name: string | null; team: string | null; position: string | null }[] };
+    },
+    enabled: open && query.length >= 2,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs transition-colors cursor-pointer"
+          style={{
+            background: open ? 'var(--color-accent-glow)' : 'var(--color-surface-2)',
+            color: open ? 'var(--color-accent)' : 'var(--color-text-muted)',
+            border: `1px solid ${open ? 'rgba(220,38,38,0.3)' : 'var(--color-border-subtle)'}`,
+          }}
+        >
+          <Search size={11} />
+          Buscar no WyScout
+        </button>
+        {wsOverride && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] px-2 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)' }}>
+              {wsOverride}
+            </span>
+            <button
+              onClick={() => { onOverride(null); setQuery(''); setOpen(false); }}
+              className="p-0.5 rounded cursor-pointer hover:bg-white/5"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2">
+            <input
+              type="text"
+              placeholder="Buscar jogador na base WyScout..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full px-3 py-2 rounded text-xs outline-none"
+              style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
+              autoFocus
+            />
+            {results?.players && results.players.length > 0 && (
+              <div className="mt-1 rounded overflow-hidden max-h-48 overflow-y-auto" style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)' }}>
+                {results.players.map((r) => (
+                  <button
+                    key={r.display_name || r.name}
+                    onClick={() => { onOverride(r.display_name || r.name); setOpen(false); setQuery(''); }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors cursor-pointer flex items-center justify-between"
+                    style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+                  >
+                    <span style={{ color: 'var(--color-text-primary)' }}>{r.display_name || r.name}</span>
+                    <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                      {r.team} {r.position ? `· ${r.position}` : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ── Detail panel tabs ──
 
 type DetailTab = 'analise' | 'wyscout' | 'skillcorner';
 
 // ── WyScout Profile Mini ──
 
-function WyScoutProfileSection({ displayName }: { displayName: string }) {
-  const { data: profile, isLoading } = usePlayerProfile(displayName);
+function WyScoutProfileSection({ displayName, wsOverride, onOverrideChange }: { displayName: string | null; wsOverride: string | null; onOverrideChange: (v: string | null) => void }) {
+  const effectiveName = wsOverride || displayName;
+  const { data: profile, isLoading } = usePlayerProfile(effectiveName);
+
+  if (!effectiveName) return (
+    <div className="space-y-4 p-1">
+      <div className="py-6 text-center" style={{ color: 'var(--color-text-muted)' }}>
+        <BarChart3 size={24} className="mx-auto mb-2 opacity-30" />
+        <p className="text-xs">Nenhum match WyScout automatico encontrado</p>
+        <p className="text-[10px] mt-1">Use a busca abaixo para vincular manualmente</p>
+      </div>
+      <WsIdentityResolver wsOverride={wsOverride} onOverride={onOverrideChange} />
+    </div>
+  );
 
   if (isLoading) return <div className="p-6"><div className="skeleton h-48 rounded" /></div>;
   if (!profile) return (
-    <div className="p-8 text-center" style={{ color: 'var(--color-text-muted)' }}>
-      <BarChart3 size={28} className="mx-auto mb-2 opacity-30" />
-      <p className="text-sm">Perfil WyScout nao encontrado</p>
+    <div className="space-y-4 p-1">
+      <div className="p-8 text-center" style={{ color: 'var(--color-text-muted)' }}>
+        <BarChart3 size={28} className="mx-auto mb-2 opacity-30" />
+        <p className="text-sm">Perfil WyScout nao encontrado</p>
+      </div>
+      <WsIdentityResolver wsOverride={wsOverride} onOverride={onOverrideChange} />
     </div>
   );
 
@@ -270,6 +382,9 @@ function WyScoutProfileSection({ displayName }: { displayName: string }) {
           </div>
         </div>
       )}
+
+      {/* Manual override */}
+      <WsIdentityResolver wsOverride={wsOverride} onOverride={onOverrideChange} />
     </div>
   );
 }
@@ -382,6 +497,7 @@ export default function AnalysesPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<AnalysesPlayer | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>('analise');
   const [scOverride, setScOverride] = useState<string | null>(null);
+  const [wsOverride, setWsOverride] = useState<string | null>(null);
   const [filterPosition, setFilterPosition] = useState('');
   const [filterModelo, setFilterModelo] = useState('');
   const [filterLiga, setFilterLiga] = useState('');
@@ -399,16 +515,16 @@ export default function AnalysesPage() {
   // Extract unique filter options from data
   const filterOptions = useMemo(() => {
     const positions = new Set<string>();
-    const modelos = new Set<string>();
+    const perfis = new Set<string>();
     const ligas = new Set<string>();
     for (const p of allPlayers) {
       if (p.posicao) positions.add(p.posicao);
-      if (p.modelo) modelos.add(p.modelo);
+      if (p.perfil) perfis.add(p.perfil);
       if (p.liga) ligas.add(p.liga);
     }
     return {
       positions: [...positions].sort(),
-      modelos: [...modelos].sort(),
+      perfis: [...perfis].sort(),
       ligas: [...ligas].sort(),
     };
   }, [allPlayers]);
@@ -417,7 +533,7 @@ export default function AnalysesPage() {
   const players = useMemo(() => {
     return allPlayers.filter((p) => {
       if (filterPosition && p.posicao !== filterPosition) return false;
-      if (filterModelo && p.modelo !== filterModelo) return false;
+      if (filterModelo && p.perfil !== filterModelo) return false;
       if (filterLiga && p.liga !== filterLiga) return false;
       return true;
     });
@@ -425,9 +541,10 @@ export default function AnalysesPage() {
 
   const activeFilterCount = [filterPosition, filterModelo, filterLiga].filter(Boolean).length;
 
-  // Reset SC override when player changes
+  // Reset overrides when player changes
   useEffect(() => {
     setScOverride(null);
+    setWsOverride(null);
     setActiveTab('analise');
   }, [selectedPlayer?.nome]);
 
@@ -516,9 +633,9 @@ export default function AnalysesPage() {
                     </select>
                   </div>
 
-                  {/* Modelo/Status filter */}
+                  {/* Perfil/Elenco filter */}
                   <div>
-                    <label className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: 'var(--color-text-muted)' }}>Status</label>
+                    <label className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: 'var(--color-text-muted)' }}>Perfil no Elenco</label>
                     <select
                       value={filterModelo}
                       onChange={(e) => setFilterModelo(e.target.value)}
@@ -529,8 +646,8 @@ export default function AnalysesPage() {
                         color: filterModelo ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                       }}
                     >
-                      <option value="">Todos status</option>
-                      {filterOptions.modelos.map((m) => (
+                      <option value="">Todos perfis</option>
+                      {filterOptions.perfis.map((m) => (
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
@@ -597,7 +714,7 @@ export default function AnalysesPage() {
           ) : (
             players.map((p, i) => {
               const isSelected = selectedPlayer?.nome === p.nome;
-              const mStyle = p.modelo ? getModeloStyle(p.modelo) : null;
+              const pStyle = p.perfil ? getPerfilStyle(p.perfil) : null;
               const avgScore = Object.values(p.scores).length > 0
                 ? Object.values(p.scores).reduce((a, b) => a + b, 0) / Object.values(p.scores).length
                 : null;
@@ -629,9 +746,9 @@ export default function AnalysesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{p.nome}</span>
-                      {mStyle && (
-                        <span className="text-[8px] px-1.5 py-0.5 rounded-full uppercase font-semibold shrink-0" style={{ background: mStyle.bg, color: mStyle.color, border: `1px solid ${mStyle.border}` }}>
-                          {p.modelo}
+                      {pStyle && (
+                        <span className="text-[8px] px-1.5 py-0.5 rounded-full uppercase font-semibold shrink-0" style={{ background: pStyle.bg, color: pStyle.color, border: `1px solid ${pStyle.border}` }}>
+                          {p.perfil}
                         </span>
                       )}
                     </div>
@@ -679,11 +796,11 @@ export default function AnalysesPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>{selectedPlayer.nome}</h2>
-                  {selectedPlayer.modelo && (() => {
-                    const ms = getModeloStyle(selectedPlayer.modelo);
+                  {selectedPlayer.perfil && (() => {
+                    const ps = getPerfilStyle(selectedPlayer.perfil);
                     return (
-                      <span className="text-[9px] px-2 py-0.5 rounded-full uppercase font-semibold" style={{ background: ms.bg, color: ms.color, border: `1px solid ${ms.border}` }}>
-                        {selectedPlayer.modelo}
+                      <span className="text-[9px] px-2 py-0.5 rounded-full uppercase font-semibold" style={{ background: ps.bg, color: ps.color, border: `1px solid ${ps.border}` }}>
+                        {selectedPlayer.perfil}
                       </span>
                     );
                   })()}
@@ -708,19 +825,17 @@ export default function AnalysesPage() {
             <div className="flex px-5 pt-3 gap-1" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
               {([
                 { id: 'analise' as DetailTab, label: 'Analise do Scout', icon: <FileText size={13} /> },
-                { id: 'wyscout' as DetailTab, label: 'WyScout', icon: <BarChart3 size={13} />, disabled: !selectedPlayer.wyscout_match },
-                { id: 'skillcorner' as DetailTab, label: 'SkillCorner', icon: <Activity size={13} />, disabled: !selectedPlayer.wyscout_match },
-              ] as { id: DetailTab; label: string; icon: React.ReactNode; disabled?: boolean }[]).map((tab) => (
+                { id: 'wyscout' as DetailTab, label: 'WyScout', icon: <BarChart3 size={13} /> },
+                { id: 'skillcorner' as DetailTab, label: 'SkillCorner', icon: <Activity size={13} /> },
+              ] as { id: DetailTab; label: string; icon: React.ReactNode }[]).map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => !tab.disabled && setActiveTab(tab.id)}
+                  onClick={() => setActiveTab(tab.id)}
                   className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors cursor-pointer rounded-t"
                   style={{
-                    color: activeTab === tab.id ? 'var(--color-accent)' : tab.disabled ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
+                    color: activeTab === tab.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                     borderBottom: activeTab === tab.id ? '2px solid var(--color-accent)' : '2px solid transparent',
-                    opacity: tab.disabled ? 0.4 : 1,
                   }}
-                  title={tab.disabled ? 'Nenhum match WyScout encontrado' : undefined}
                 >
                   {tab.icon}
                   {tab.label}
@@ -819,21 +934,18 @@ export default function AnalysesPage() {
                       </div>
                     )}
 
-                    {/* WyScout match info */}
-                    {selectedPlayer.wyscout_match && (
-                      <div className="flex items-center gap-2 text-[10px] px-3 py-2 rounded-lg" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
-                        <BarChart3 size={12} style={{ color: '#22c55e' }} />
-                        <span style={{ color: 'var(--color-text-muted)' }}>Match WyScout:</span>
-                        <span style={{ color: '#22c55e' }}>{selectedPlayer.wyscout_match}</span>
-                        <span style={{ color: 'var(--color-text-muted)' }}>— use as abas acima para ver o perfil</span>
-                      </div>
-                    )}
-                    {!selectedPlayer.wyscout_match && (
-                      <div className="flex items-center gap-2 text-[10px] px-3 py-2 rounded-lg" style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.15)' }}>
-                        <AlertCircle size={12} style={{ color: '#eab308' }} />
-                        <span style={{ color: 'var(--color-text-muted)' }}>Nenhum match WyScout encontrado para este jogador</span>
-                      </div>
-                    )}
+                    {/* WyScout/SkillCorner availability hint */}
+                    <div className="flex items-center gap-2 text-[10px] px-3 py-2 rounded-lg" style={{ background: selectedPlayer.wyscout_match ? 'rgba(34,197,94,0.06)' : 'rgba(59,130,246,0.06)', border: `1px solid ${selectedPlayer.wyscout_match ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)'}` }}>
+                      <BarChart3 size={12} style={{ color: selectedPlayer.wyscout_match ? '#22c55e' : '#3b82f6' }} />
+                      {selectedPlayer.wyscout_match ? (
+                        <>
+                          <span style={{ color: 'var(--color-text-muted)' }}>Match WyScout:</span>
+                          <span style={{ color: '#22c55e' }}>{selectedPlayer.wyscout_match}</span>
+                        </>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)' }}>Use as abas WyScout e SkillCorner para buscar dados do jogador</span>
+                      )}
+                    </div>
 
                     {/* Empty state for no analysis data */}
                     {Object.keys(selectedPlayer.scores).length === 0 && !selectedPlayer.analysis_text && (
@@ -845,16 +957,20 @@ export default function AnalysesPage() {
                   </motion.div>
                 )}
 
-                {activeTab === 'wyscout' && selectedPlayer.wyscout_match && (
+                {activeTab === 'wyscout' && (
                   <motion.div key="wyscout" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                    <WyScoutProfileSection displayName={selectedPlayer.wyscout_match} />
+                    <WyScoutProfileSection
+                      displayName={selectedPlayer.wyscout_match}
+                      wsOverride={wsOverride}
+                      onOverrideChange={setWsOverride}
+                    />
                   </motion.div>
                 )}
 
-                {activeTab === 'skillcorner' && selectedPlayer.wyscout_match && (
+                {activeTab === 'skillcorner' && (
                   <motion.div key="skillcorner" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                     <SkillCornerProfileSection
-                      displayName={selectedPlayer.wyscout_match}
+                      displayName={wsOverride || selectedPlayer.wyscout_match || selectedPlayer.nome}
                       scOverride={scOverride}
                       onOverrideChange={setScOverride}
                     />
