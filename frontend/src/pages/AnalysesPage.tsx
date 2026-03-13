@@ -85,6 +85,8 @@ function useAnalysesPlayers(search: string) {
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
   });
 }
 
@@ -441,9 +443,14 @@ export default function AnalysesPage() {
               </div>
             ))
           ) : error ? (
-            <div className="p-4 flex items-center gap-2 text-xs" style={{ color: '#ef4444' }}>
-              <AlertCircle size={14} />
-              Erro ao carregar dados
+            <div className="p-4 space-y-2">
+              <div className="flex items-center gap-2 text-xs" style={{ color: '#ef4444' }}>
+                <AlertCircle size={14} />
+                Erro ao carregar dados
+              </div>
+              <p className="text-[10px] pl-5" style={{ color: 'var(--color-text-muted)' }}>
+                {(error as any)?.response?.data?.detail || (error as Error)?.message || 'Erro desconhecido'}
+              </p>
             </div>
           ) : players.length === 0 ? (
             <div className="p-8 text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
