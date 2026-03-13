@@ -599,7 +599,7 @@ for t in ['Vila Nova', 'Botafogo-SP', 'America Mineiro', 'America-MG', 'CRB', 'B
 for t in [
     'Botafogo PB', 'Botafogo-PB', 'Athletic Club MG',
     'Floresta', 'Floresta EC', 'Ferroviário', 'Ferroviário CE',
-    'Figueirense', 'Figueirense FC', ,
+    'Figueirense', 'Figueirense FC',
     'Manaus', 'Manaus FC', 'São Bernardo', 'São Bernardo FC', 'Ypiranga', 'Ypiranga RS',
     'Volta Redonda', 'Volta Redonda FC', 
     'Paysandu', 'Paysandu SC',
@@ -979,9 +979,9 @@ for t in ['Athletico Paranaense', 'Atlético Mineiro', 'Bahia',
            'Botafogo', 'Corinthians', 'Cruzeiro',
            'Flamengo', 'Fluminense', 'Chapecoense', 'Coritiba', 'Remo']:
     CLUB_LEAGUE_MAP.setdefault(t, 'Serie A Brasil')
-for t in 'América Mineiro', 'Atlético GO', 'Avaí', 'Botafogo SP', 'Criciúma', 'Cuiabá',
+for t in ['América Mineiro', 'Atlético GO', 'Avaí', 'Botafogo SP', 'Criciúma', 'Cuiabá',
            'Ceará', 'CRB', 'Sport', 'Sport Recife', 'Sport Club do Recife',
-                  'Ceará', 'Ceará SC', 'Fortaleza']:
+           'Ceará SC', 'Fortaleza']:
     CLUB_LEAGUE_MAP.setdefault(t, 'Serie B Brasil')
 for t in ['ABC', 'Botafogo PB', 'Confiança', 'CSA', 'Ferroviária', 'Figueirense',
            'Floresta EC', 'Amazonas', 'Brusque']:
