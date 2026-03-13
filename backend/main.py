@@ -336,6 +336,25 @@ async def health_check():
     """Health check — returns quickly even during cold start."""
     ready = _data_ready.is_set()
     counts = {k: len(v) for k, v in _data.items()} if ready else {}
+
+    # Database diagnostics
+    db_diag = {}
+    from services.database import DATABASE_URL
+    db_diag["database_url_set"] = bool(DATABASE_URL)
+    db_diag["database_url_preview"] = (DATABASE_URL[:30] + "...") if DATABASE_URL else "(empty)"
+    try:
+        from services.database import get_connection
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM scouting_rows")
+            db_diag["scouting_rows_count"] = cur.fetchone()[0]
+            cur.execute("SELECT sheet_key, COUNT(*) FROM scouting_rows GROUP BY sheet_key")
+            db_diag["rows_per_sheet"] = {r[0]: r[1] for r in cur.fetchall()}
+        conn.close()
+        db_diag["connection"] = "ok"
+    except Exception as e:
+        db_diag["connection"] = f"error: {e}"
+
     sc_diag = None
     if ready:
         sc_df = _data.get("skillcorner")
@@ -370,6 +389,7 @@ async def health_check():
         "status": "ready" if ready else "loading",
         "data_loaded": ready,
         "counts": counts,
+        "database": db_diag,
         "skillcorner_diagnostic": sc_diag,
     }
 
