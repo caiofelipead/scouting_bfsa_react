@@ -50,6 +50,14 @@ function getPdiLabel(pdi: number): string {
   return 'BAIXO';
 }
 
+function getRecommendationBadge(score: number | null): { label: string; cls: string } | null {
+  if (score == null) return null;
+  if (score >= 75) return { label: 'Top Target', cls: 'badge-top-target' };
+  if (score >= 55) return { label: 'Monitorar', cls: 'badge-monitor' };
+  if (score < 35) return { label: 'Descartar', cls: 'badge-discard' };
+  return null;
+}
+
 export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProfileProps) {
   const [scOverride, setScOverride] = useState<string | null>(null);
   const [scSearchOpen, setScSearchOpen] = useState(false);
@@ -73,13 +81,14 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
 
   if (!profile) {
     return (
-      <div className="card-glass rounded-lg p-8 text-center" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="card-glass p-8 text-center" style={{ color: 'var(--color-text-muted)' }}>
         Jogador nao encontrado
       </div>
     );
   }
 
   const { summary, percentiles, indices, scout_score, performance_class, skillcorner, skillcorner_physical, projection_score, ssp_lambdas, prediction } = profile;
+  const badge = getRecommendationBadge(scout_score);
 
   return (
     <AnimatePresence mode="wait">
@@ -92,24 +101,24 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
         className="space-y-4"
       >
         {/* ── Header card ─────────────────────────────────────────── */}
-        <motion.div variants={fadeUp} className="card-glass-accent rounded-lg overflow-hidden">
-          <div className="p-5">
-            {/* Top bar: position tag + close */}
+        <motion.div variants={fadeUp} className="card-glass-accent overflow-hidden">
+          <div className="p-6">
+            {/* Top bar: position tag + badge + close */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span
-                  className="px-2 py-0.5 rounded text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase"
+                  className="px-2.5 py-1 rounded-full text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold"
                   style={{
                     background: 'var(--color-accent-glow)',
                     color: 'var(--color-accent)',
-                    border: '1px solid rgba(220, 38, 38, 0.3)',
+                    border: '1px solid rgba(227, 6, 19, 0.3)',
                   }}
                 >
                   {summary.position || '—'}
                 </span>
                 {summary.league && (
                   <span
-                    className="px-2 py-0.5 rounded text-[10px] tracking-wide"
+                    className="px-2 py-1 rounded-full text-[10px] tracking-wide"
                     style={{
                       background: 'rgba(255,255,255,0.04)',
                       color: 'var(--color-text-muted)',
@@ -119,11 +128,16 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                     {summary.league}
                   </span>
                 )}
+                {badge && (
+                  <span className={cn('px-2 py-1 rounded-full text-[9px] font-[var(--font-display)] tracking-wider uppercase font-semibold', badge.cls)}>
+                    {badge.label}
+                  </span>
+                )}
               </div>
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="text-sm px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                  className="text-sm px-2 py-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
                   style={{ color: 'var(--color-text-muted)' }}
                 >
                   Fechar
@@ -131,61 +145,78 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               )}
             </div>
 
-            {/* Player name & team */}
-            <h2 className="font-[var(--font-display)] text-2xl font-bold tracking-tight leading-tight mb-1">
-              {summary.name}
-            </h2>
-            {summary.team && (
-              <p className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                {summary.club_logo ? (
-                  <img src={summary.club_logo} alt={summary.team} className="w-5 h-5 object-contain" />
-                ) : (
-                  <Shield size={13} />
+            {/* Player name, photo & team */}
+            <div className="flex items-start gap-4">
+              {/* Photo (only if photo_url exists — restricted to offered/observed players) */}
+              {summary.photo_url ? (
+                <img
+                  src={summary.photo_url}
+                  alt={summary.name}
+                  className="player-photo-hex-lg"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="player-photo-placeholder-lg">
+                  <User size={24} strokeWidth={1.5} />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h2 className="font-[var(--font-display)] text-2xl font-bold tracking-tight leading-tight mb-1">
+                  {summary.name}
+                </h2>
+                {summary.team && (
+                  <p className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                    {summary.club_logo ? (
+                      <img src={summary.club_logo} alt={summary.team} className="w-5 h-5 object-contain" />
+                    ) : (
+                      <Shield size={13} strokeWidth={1.5} />
+                    )}
+                    {summary.team}
+                  </p>
                 )}
-                {summary.team}
-              </p>
-            )}
 
-            {/* Meta row */}
-            <div className="flex flex-wrap items-center gap-4 mt-4">
-              {summary.age && (
-                <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  <User size={12} />
-                  {summary.age} anos
-                </span>
-              )}
-              {summary.nationality && (
-                <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  <MapPin size={12} />
-                  {summary.nationality}
-                </span>
-              )}
-              {summary.minutes_played && (
-                <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  <Clock size={12} />
-                  {formatNumber(summary.minutes_played)} min
-                </span>
-              )}
+                {/* Meta row */}
+                <div className="flex flex-wrap items-center gap-4 mt-3">
+                  {summary.age && (
+                    <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      <User size={12} strokeWidth={1.5} />
+                      {summary.age} anos
+                    </span>
+                  )}
+                  {summary.nationality && (
+                    <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      <MapPin size={12} strokeWidth={1.5} />
+                      {summary.nationality}
+                    </span>
+                  )}
+                  {summary.minutes_played && (
+                    <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      <Clock size={12} strokeWidth={1.5} />
+                      {formatNumber(summary.minutes_played)} min
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Scout Score bar */}
           {scout_score !== null && (
             <div
-              className="px-5 py-3 flex items-center justify-between"
+              className="px-6 py-3 flex items-center justify-between"
               style={{ borderTop: '1px solid var(--color-border-subtle)' }}
             >
               <div className="flex items-center gap-2">
-                <Target size={14} style={{ color: 'var(--color-accent)' }} />
+                <Target size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
                 <span
-                  className="text-xs font-[var(--font-display)] tracking-[0.15em] uppercase"
+                  className="text-xs font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold"
                   style={{ color: 'var(--color-text-muted)' }}
                 >
                   SSP (SCOUT SCORE PREDITIVO)
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <span className={cn('px-2.5 py-0.5 rounded text-xs font-[var(--font-mono)] font-bold', getScoreClass(scout_score))}>
+                <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-[var(--font-mono)] font-bold', getScoreClass(scout_score))}>
                   {scout_score.toFixed(1)}
                 </span>
                 {performance_class && (
@@ -203,13 +234,13 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
           {/* Projection Score (PDI) bar */}
           {projection_score !== null && projection_score !== undefined && (
             <div
-              className="px-5 py-3 flex items-center justify-between"
+              className="px-6 py-3 flex items-center justify-between"
               style={{ borderTop: '1px solid var(--color-border-subtle)' }}
             >
               <div className="flex items-center gap-2">
-                <TrendingUp size={14} style={{ color: getPdiColor(projection_score) }} />
+                <TrendingUp size={14} strokeWidth={1.5} style={{ color: getPdiColor(projection_score) }} />
                 <span
-                  className="text-xs font-[var(--font-display)] tracking-[0.15em] uppercase"
+                  className="text-xs font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold"
                   style={{ color: 'var(--color-text-muted)' }}
                 >
                   NOTA DE PROJECAO (PDI)
@@ -217,7 +248,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               </div>
               <div className="flex items-center gap-3">
                 <span
-                  className="px-2.5 py-0.5 rounded text-xs font-[var(--font-mono)] font-bold"
+                  className="px-2.5 py-0.5 rounded-full text-xs font-[var(--font-mono)] font-bold"
                   style={{ color: getPdiColor(projection_score), background: `${getPdiColor(projection_score)}15` }}
                 >
                   {projection_score.toFixed(1)}
@@ -235,12 +266,12 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
 
         {/* ── Asymmetric grid: Radar + Indices ────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.65fr] gap-4">
-          {/* Radar — uses real percentiles from calibration */}
-          <motion.div variants={fadeUp} className="card-glass rounded-lg p-5">
+          {/* Radar */}
+          <motion.div variants={fadeUp} className="card-glass p-6">
             <div className="flex items-center gap-2 mb-4">
-              <BarChart3 size={14} style={{ color: 'var(--color-accent)' }} />
+              <BarChart3 size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
               <span
-                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase"
+                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}
               >
                 PERCENTIS POR POSICAO
@@ -275,17 +306,17 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
           </motion.div>
 
           {/* Composite Indices */}
-          <motion.div variants={fadeUp} className="card-glass rounded-lg p-5 flex flex-col">
+          <motion.div variants={fadeUp} className="card-glass p-6 flex flex-col">
             <div className="flex items-center gap-2 mb-4">
-              <Trophy size={14} style={{ color: 'var(--color-accent)' }} />
+              <Trophy size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
               <span
-                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase"
+                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}
               >
                 INDICES COMPOSTOS
               </span>
             </div>
-            <div className="flex-1 space-y-2.5">
+            <div className="flex-1 space-y-3">
               {Object.entries(indices).map(([name, value], i) => (
                 <motion.div
                   key={name}
@@ -310,7 +341,9 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                   >
                     <motion.div
                       className="h-full rounded-full"
-                      style={{ background: getScoreColor(value) }}
+                      style={{
+                        background: `linear-gradient(90deg, var(--color-accent) 0%, ${getScoreColor(value)} 100%)`,
+                      }}
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.min(value, 100)}%` }}
                       transition={{ duration: 0.6, delay: 0.3 + i * 0.06, ease: [0.22, 1, 0.36, 1] }}
@@ -323,12 +356,12 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
         </div>
 
         {/* ── SkillCorner section ─────────────────────────────────── */}
-        <motion.div variants={fadeUp} className="card-glass rounded-lg p-5">
+        <motion.div variants={fadeUp} className="card-glass p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <ChevronRight size={14} style={{ color: 'var(--color-accent)' }} />
+              <ChevronRight size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
               <span
-                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase"
+                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}
               >
                 SKILLCORNER {scOverride ? `(${scOverride})` : ''}
@@ -336,14 +369,14 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
             </div>
             <button
               onClick={() => setScSearchOpen(!scSearchOpen)}
-              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer"
               style={{
                 background: scSearchOpen ? 'var(--color-accent-glow)' : 'var(--color-surface-2)',
                 color: scSearchOpen ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                border: `1px solid ${scSearchOpen ? 'rgba(220,38,38,0.3)' : 'var(--color-border-subtle)'}`,
+                border: `1px solid ${scSearchOpen ? 'rgba(227,6,19,0.3)' : 'var(--color-border-subtle)'}`,
               }}
             >
-              <Search size={10} />
+              <Search size={10} strokeWidth={1.5} />
               Buscar atleta
             </button>
           </div>
@@ -357,10 +390,10 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                   placeholder="Nome do jogador no SkillCorner..."
                   value={scSearchQuery}
                   onChange={(e) => setScSearchQuery(e.target.value)}
-                  className="flex-1 px-3 py-1.5 rounded text-xs outline-none"
+                  className="flex-1 px-3 py-2 rounded-lg text-xs outline-none"
                   style={{
                     background: 'var(--color-surface-1)',
-                    border: '1px solid var(--color-border-subtle)',
+                    borderBottom: '1px solid var(--color-surface-3)',
                     color: 'var(--color-text-primary)',
                     fontFamily: 'var(--font-body)',
                   }}
@@ -369,7 +402,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                 {scOverride && (
                   <button
                     onClick={() => { setScOverride(null); setScSearchQuery(''); setScSearchOpen(false); }}
-                    className="px-2 py-1.5 rounded text-[10px] cursor-pointer"
+                    className="px-2 py-1.5 rounded-lg text-[10px] cursor-pointer"
                     style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
                     title="Remover selecao manual"
                   >
@@ -379,7 +412,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               </div>
               {scResults && scResults.length > 0 && (
                 <div
-                  className="rounded overflow-hidden max-h-48 overflow-y-auto"
+                  className="rounded-lg overflow-hidden max-h-48 overflow-y-auto"
                   style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)' }}
                 >
                   {scResults.map((r) => (
@@ -411,7 +444,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
 
         {skillcorner && Object.keys(skillcorner).length > 0 && (
           <div className="mb-4">
-            <div className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>INDICES</div>
+            <div className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>INDICES</div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {Object.entries(skillcorner).map(([name, value], i) => (
                 <motion.div
@@ -419,7 +452,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 + i * 0.05 }}
-                  className="p-3 rounded"
+                  className="p-4 rounded-xl"
                   style={{
                     background: 'var(--color-surface-2)',
                     border: '1px solid var(--color-border-subtle)',
@@ -446,7 +479,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
         {/* Physical data */}
         {skillcorner_physical && Object.keys(skillcorner_physical).length > 0 && (
           <div>
-            <div className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>DADOS FISICOS</div>
+            <div className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>DADOS FISICOS</div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               {Object.entries(skillcorner_physical).map(([name, value], i) => (
                 <motion.div
@@ -454,7 +487,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 + i * 0.05 }}
-                  className="p-3 rounded"
+                  className="p-4 rounded-xl"
                   style={{
                     background: 'var(--color-surface-2)',
                     border: '1px solid var(--color-border-subtle)',
@@ -488,11 +521,11 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
         </motion.div>
         {/* ── P(Sucesso) Prediction Card ──────────────────────────── */}
         {prediction && (
-          <motion.div variants={fadeUp} className="card-glass rounded-lg p-5">
+          <motion.div variants={fadeUp} className="card-glass p-6">
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp size={14} style={{ color: prediction.success_probability >= 0.65 ? '#22c55e' : prediction.success_probability >= 0.40 ? '#eab308' : '#ef4444' }} />
+              <TrendingUp size={14} strokeWidth={1.5} style={{ color: prediction.success_probability >= 0.65 ? '#22c55e' : prediction.success_probability >= 0.40 ? '#eab308' : '#ef4444' }} />
               <span
-                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase"
+                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}
               >
                 PREDICAO DE SUCESSO (CONTRATACAO)
@@ -501,7 +534,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {/* P(Sucesso) main */}
-              <div className="p-3 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+              <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
                 <div className="text-[10px] mb-1" style={{ color: 'var(--color-text-muted)' }}>P(Sucesso)</div>
                 <div className="text-2xl font-[var(--font-mono)] font-bold" style={{ color: prediction.success_probability >= 0.65 ? '#22c55e' : prediction.success_probability >= 0.40 ? '#eab308' : '#ef4444' }}>
                   {(prediction.success_probability * 100).toFixed(0)}%
@@ -512,7 +545,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               </div>
 
               {/* League Gap */}
-              <div className="p-3 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+              <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
                 <div className="text-[10px] mb-1" style={{ color: 'var(--color-text-muted)' }}>Gap de Liga</div>
                 <div className="text-lg font-[var(--font-mono)] font-bold" style={{ color: prediction.league_gap > 2 ? '#ef4444' : prediction.league_gap > 0 ? '#eab308' : '#22c55e' }}>
                   {prediction.league_gap > 0 ? '+' : ''}{prediction.league_gap.toFixed(1)}
@@ -523,7 +556,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               </div>
 
               {/* Age Factor */}
-              <div className="p-3 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+              <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
                 <div className="text-[10px] mb-1" style={{ color: 'var(--color-text-muted)' }}>Fator Idade</div>
                 <div className="text-lg font-[var(--font-mono)] font-bold" style={{ color: getScoreColor(prediction.age_factor * 100) }}>
                   {(prediction.age_factor * 100).toFixed(0)}%
@@ -532,7 +565,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               </div>
 
               {/* Minutes Factor */}
-              <div className="p-3 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+              <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
                 <div className="text-[10px] mb-1" style={{ color: 'var(--color-text-muted)' }}>Regularidade</div>
                 <div className="text-lg font-[var(--font-mono)] font-bold" style={{ color: getScoreColor(prediction.minutes_factor * 100) }}>
                   {(prediction.minutes_factor * 100).toFixed(0)}%
@@ -544,12 +577,12 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
             {/* SSP Lambda weights */}
             {ssp_lambdas && (
               <div className="pt-3" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
-                <div className="text-[9px] font-[var(--font-display)] tracking-[0.15em] uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                <div className="text-[9px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold mb-2" style={{ color: 'var(--color-text-muted)' }}>
                   SSP LAMBDAS (COMPOSICAO DO SCORE)
                 </div>
                 <div className="flex gap-2">
                   {Object.entries(ssp_lambdas).map(([key, weight]) => (
-                    <div key={key} className="flex-1 text-center p-1.5 rounded" style={{ background: 'var(--color-surface-2)' }}>
+                    <div key={key} className="flex-1 text-center p-2 rounded-lg" style={{ background: 'var(--color-surface-2)' }}>
                       <div className="text-[9px] uppercase" style={{ color: 'var(--color-text-muted)' }}>{key}</div>
                       <div className="text-xs font-[var(--font-mono)] font-bold" style={{ color: 'var(--color-text-primary)' }}>
                         {(weight * 100).toFixed(0)}%

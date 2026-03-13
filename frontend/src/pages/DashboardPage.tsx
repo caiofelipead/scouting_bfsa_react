@@ -1,10 +1,18 @@
 import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Search, Filter, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Filter, ChevronRight, SlidersHorizontal, User } from 'lucide-react';
 import PlayerProfile from '../components/PlayerProfile';
 import { usePlayers, usePositions, useLeagues } from '../hooks/usePlayers';
 import { cn, getScoreColor, formatNumber } from '../lib/utils';
 import type { PlayersQueryParams } from '../types/api';
+
+function getRecommendationBadge(score: number | null): { label: string; cls: string } | null {
+  if (score == null) return null;
+  if (score >= 75) return { label: 'Top Target', cls: 'badge-top-target' };
+  if (score >= 55) return { label: 'Monitorar', cls: 'badge-monitor' };
+  if (score < 35) return { label: 'Descartar', cls: 'badge-discard' };
+  return null;
+}
 
 export default function DashboardPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
@@ -38,7 +46,7 @@ export default function DashboardPage() {
   }), [debouncedSearch, position, league, minAge, maxAge]);
 
   const { data, isLoading, isFetching } = usePlayers(queryParams);
-  // Sort players by SSP (scout_score) descending — SSP is the primary ranking metric
+  // Sort players by SSP (scout_score) descending
   const players = useMemo(() => {
     const list = data?.players ?? [];
     return [...list].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
@@ -49,18 +57,19 @@ export default function DashboardPage() {
     <div className="space-y-5">
       {/* Page header */}
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight">Jogadores</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <h1 className="font-[var(--font-display)] text-xl font-bold tracking-tight">Jogadores</h1>
+        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
           {total} jogadores no banco de dados WyScout
         </p>
       </div>
 
-      {/* Filters */}
+      {/* Filters — compact horizontal bar */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search
               size={14}
+              strokeWidth={1.5}
               className="absolute left-3 top-1/2 -translate-y-1/2"
               style={{ color: 'var(--color-text-muted)' }}
             />
@@ -69,10 +78,10 @@ export default function DashboardPage() {
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Buscar jogador..."
-              className="w-full pl-9 pr-3 py-2 rounded text-sm outline-none transition-colors"
+              className="w-full pl-9 pr-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
               style={{
                 background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-border-subtle)',
+                borderBottom: '1px solid var(--color-surface-3)',
                 color: 'var(--color-text-primary)',
                 fontFamily: 'var(--font-body)',
               }}
@@ -82,10 +91,10 @@ export default function DashboardPage() {
           <select
             value={position}
             onChange={(e) => setPosition(e.target.value)}
-            className="px-3 py-2 rounded text-sm cursor-pointer outline-none"
+            className="px-3 py-2.5 rounded-lg text-sm cursor-pointer outline-none"
             style={{
               background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-border-subtle)',
+              borderBottom: '1px solid var(--color-surface-3)',
               color: 'var(--color-text-secondary)',
               fontFamily: 'var(--font-body)',
             }}
@@ -99,10 +108,10 @@ export default function DashboardPage() {
           <select
             value={league}
             onChange={(e) => setLeague(e.target.value)}
-            className="px-3 py-2 rounded text-sm cursor-pointer outline-none"
+            className="px-3 py-2.5 rounded-lg text-sm cursor-pointer outline-none"
             style={{
               background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-border-subtle)',
+              borderBottom: '1px solid var(--color-surface-3)',
               color: 'var(--color-text-secondary)',
               fontFamily: 'var(--font-body)',
             }}
@@ -115,74 +124,88 @@ export default function DashboardPage() {
 
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded text-sm transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer"
             style={{
               background: showAdvanced ? 'var(--color-accent-glow)' : 'var(--color-surface-1)',
-              border: `1px solid ${showAdvanced ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
+              borderBottom: `1px solid ${showAdvanced ? 'var(--color-accent)' : 'var(--color-surface-3)'}`,
               color: showAdvanced ? 'var(--color-accent)' : 'var(--color-text-secondary)',
               fontFamily: 'var(--font-body)',
             }}
           >
-            <SlidersHorizontal size={13} />
+            <SlidersHorizontal size={13} strokeWidth={1.5} />
             Filtros
           </button>
+
+          {/* Micro-animation: loading indicator when filters are being applied */}
+          <AnimatePresence>
+            {isFetching && !isLoading && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="filter-loading-spinner"
+              />
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Advanced filters row */}
-        {showAdvanced && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="flex flex-wrap items-end gap-3 overflow-hidden"
-          >
-            <div>
-              <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                IDADE MIN
-              </label>
-              <input
-                type="number"
-                value={minAge}
-                onChange={(e) => setMinAge(e.target.value)}
-                placeholder="16"
-                className="w-20 px-3 py-2 rounded text-sm outline-none"
-                style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                IDADE MAX
-              </label>
-              <input
-                type="number"
-                value={maxAge}
-                onChange={(e) => setMaxAge(e.target.value)}
-                placeholder="40"
-                className="w-20 px-3 py-2 rounded text-sm outline-none"
-                style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}
-              />
-            </div>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex flex-wrap items-end gap-3 overflow-hidden"
+            >
+              <div>
+                <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                  IDADE MIN
+                </label>
+                <input
+                  type="number"
+                  value={minAge}
+                  onChange={(e) => setMinAge(e.target.value)}
+                  placeholder="16"
+                  className="w-20 px-3 py-2.5 rounded-lg text-sm outline-none"
+                  style={{ background: 'var(--color-surface-1)', borderBottom: '1px solid var(--color-surface-3)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                  IDADE MAX
+                </label>
+                <input
+                  type="number"
+                  value={maxAge}
+                  onChange={(e) => setMaxAge(e.target.value)}
+                  placeholder="40"
+                  className="w-20 px-3 py-2.5 rounded-lg text-sm outline-none"
+                  style={{ background: 'var(--color-surface-1)', borderBottom: '1px solid var(--color-surface-3)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Content: list + profile */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.1fr] gap-5">
         {/* Player list */}
-        <div className="card-glass rounded-lg overflow-hidden">
+        <div className="card-glass overflow-hidden">
           <div
-            className="px-4 py-2.5 flex items-center justify-between"
+            className="px-5 py-3 flex items-center justify-between"
             style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
           >
             <span
-              className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase"
+              className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold"
               style={{ color: 'var(--color-text-muted)' }}
             >
               RESULTADOS
             </span>
             <div className="flex items-center gap-2">
               {isFetching && !isLoading && (
-                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" style={{ color: 'var(--color-accent)' }} />
+                <div className="filter-loading-spinner" />
               )}
               <span className="text-[10px] font-[var(--font-mono)]" style={{ color: 'var(--color-text-muted)' }}>
                 {total}
@@ -193,8 +216,13 @@ export default function DashboardPage() {
           <div className="max-h-[65vh] overflow-y-auto">
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="skeleton-table-row px-4">
-                  <div /><div /><div /><div /><div />
+                <div key={i} className="flex items-center gap-3 px-5 py-3" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+                  <div className="skeleton w-10 h-10 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <div className="skeleton h-4 w-40 rounded" />
+                    <div className="skeleton h-3 w-24 rounded" />
+                  </div>
+                  <div className="skeleton h-5 w-12 rounded" />
                 </div>
               ))
             ) : players.length === 0 ? (
@@ -204,6 +232,7 @@ export default function DashboardPage() {
             ) : (
               players.map((player, i) => {
                 const isSelected = selectedPlayer === (player.display_name || player.name);
+                const badge = getRecommendationBadge(player.score);
                 return (
                   <motion.button
                     key={player.id + '-' + i}
@@ -211,24 +240,38 @@ export default function DashboardPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.02 }}
                     onClick={() => setSelectedPlayer(player.display_name || player.name)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all duration-150 cursor-pointer"
                     style={{
-                      background: isSelected ? 'var(--color-accent-glow)' : 'transparent',
+                      background: isSelected ? 'var(--color-accent-glow)' : i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
                       borderBottom: '1px solid var(--color-border-subtle)',
-                      borderLeft: isSelected ? '2px solid var(--color-accent)' : '2px solid transparent',
+                      borderLeft: isSelected ? '3px solid var(--color-accent)' : '3px solid transparent',
                     }}
                   >
+                    {/* Player photo (only if photo_url exists — restricted to offered/observed players) */}
+                    {player.photo_url ? (
+                      <img
+                        src={player.photo_url}
+                        alt={player.name}
+                        className="player-photo-hex"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="player-photo-placeholder">
+                        <User size={16} strokeWidth={1.5} />
+                      </div>
+                    )}
+
                     {/* Rank */}
                     <span
-                      className="text-[10px] font-[var(--font-mono)] w-6 text-right"
-                      style={{ color: 'var(--color-text-muted)' }}
+                      className="text-[10px] font-[var(--font-mono)] w-5 text-right"
+                      style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
                     >
                       {i + 1}
                     </span>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+                      <div className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
                         {player.name}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -239,7 +282,7 @@ export default function DashboardPage() {
                         )}
                         {player.position && (
                           <span
-                            className="text-[9px] px-1 py-0.5 rounded"
+                            className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
                             style={{
                               background: 'rgba(255,255,255,0.04)',
                               color: 'var(--color-text-muted)',
@@ -249,21 +292,30 @@ export default function DashboardPage() {
                             {player.position}
                           </span>
                         )}
+                        {player.age && (
+                          <span className="text-[10px] font-[var(--font-mono)]" style={{ color: 'var(--color-text-muted)' }}>
+                            {player.age}a
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {/* SSP badge (Scout Score Preditivo) */}
-                    {player.score != null && (
-                      <div className="flex flex-col items-end">
+                    {/* SSP badge + recommendation */}
+                    <div className="flex flex-col items-end gap-1">
+                      {player.score != null && (
                         <span
-                          className="text-[10px] font-[var(--font-mono)] font-bold px-1.5 py-0.5 rounded"
+                          className="text-[10px] font-[var(--font-mono)] font-bold px-2 py-0.5 rounded-full"
                           style={{ color: getScoreColor(player.score), background: `${getScoreColor(player.score)}15` }}
                         >
                           {player.score.toFixed(1)}
                         </span>
-                        <span className="text-[8px] font-[var(--font-display)] tracking-widest" style={{ color: 'var(--color-text-muted)' }}>SSP</span>
-                      </div>
-                    )}
+                      )}
+                      {badge && (
+                        <span className={cn('text-[8px] px-1.5 py-0.5 rounded-full font-[var(--font-display)] tracking-wider uppercase', badge.cls)}>
+                          {badge.label}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Minutes */}
                     {player.minutes_played && (
@@ -275,18 +327,9 @@ export default function DashboardPage() {
                       </span>
                     )}
 
-                    {/* Age */}
-                    {player.age && (
-                      <span
-                        className="text-[10px] font-[var(--font-mono)] w-6 text-right"
-                        style={{ color: 'var(--color-text-muted)' }}
-                      >
-                        {player.age}
-                      </span>
-                    )}
-
                     <ChevronRight
                       size={12}
+                      strokeWidth={1.5}
                       style={{ color: isSelected ? 'var(--color-accent)' : 'var(--color-text-muted)', opacity: 0.5 }}
                     />
                   </motion.button>
@@ -305,7 +348,7 @@ export default function DashboardPage() {
             />
           ) : (
             <div
-              className="card-glass rounded-lg p-12 text-center"
+              className="card-glass p-12 text-center"
               style={{ color: 'var(--color-text-muted)' }}
             >
               <Filter size={32} className="mx-auto mb-3 opacity-30" />

@@ -40,13 +40,13 @@ export default function OfferedPage() {
         </div>
       )}
 
-      <div className="card-glass rounded-lg overflow-hidden">
+      <div className="card-glass overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-zebra">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+              <tr style={{ borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-surface-1)' }}>
                 {columns.map((col) => (
-                  <th key={col} className="px-3 py-2.5 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
+                  <th key={col} className="px-3 py-3 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase whitespace-nowrap sticky top-0" style={{ color: 'var(--color-text-muted)', background: 'var(--color-surface-1)' }}>
                     {col}
                   </th>
                 ))}

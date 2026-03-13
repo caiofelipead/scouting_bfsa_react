@@ -25,7 +25,7 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
       <div
         className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, rgba(220, 38, 38, 0.06) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(227, 6, 19, 0.06) 0%, transparent 70%)',
         }}
       />
 
@@ -81,7 +81,7 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
                   color: 'var(--color-text-primary)',
                   fontFamily: 'var(--font-body)',
                 }}
-                onFocus={(e) => (e.target.style.borderColor = 'rgba(220, 38, 38, 0.4)')}
+                onFocus={(e) => (e.target.style.borderColor = 'rgba(227, 6, 19, 0.4)')}
                 onBlur={(e) => (e.target.style.borderColor = 'var(--color-border-subtle)')}
               />
             </div>
@@ -113,7 +113,7 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
                   color: 'var(--color-text-primary)',
                   fontFamily: 'var(--font-body)',
                 }}
-                onFocus={(e) => (e.target.style.borderColor = 'rgba(220, 38, 38, 0.4)')}
+                onFocus={(e) => (e.target.style.borderColor = 'rgba(227, 6, 19, 0.4)')}
                 onBlur={(e) => (e.target.style.borderColor = 'var(--color-border-subtle)')}
               />
             </div>
