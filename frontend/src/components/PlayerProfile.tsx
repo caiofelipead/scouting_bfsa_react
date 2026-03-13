@@ -12,6 +12,10 @@ import {
   TrendingUp,
   Search,
   X,
+  FileText,
+  ExternalLink,
+  Video,
+  DollarSign,
 } from 'lucide-react';
 import RadarChart from './RadarChart';
 import SkeletonProfile from './SkeletonProfile';
@@ -50,6 +54,29 @@ function getPdiLabel(pdi: number): string {
   return 'BAIXO';
 }
 
+function getAnalysisScoreColor(score: number): string {
+  if (score >= 4) return '#22c55e';
+  if (score >= 3) return '#3b82f6';
+  if (score >= 2) return '#eab308';
+  return '#ef4444';
+}
+
+const SCORE_LABELS: Record<string, string> = {
+  'Técnica': 'Técnica',
+  'Físico': 'Físico',
+  'Tática': 'Tática',
+  'Mental': 'Mental',
+  'Nota_Desempenho': 'Nota Desempenho',
+  'Potencial': 'Potencial',
+};
+
+const LINK_ICONS: Record<string, { label: string; icon: string }> = {
+  'ogol': { label: 'ogol', icon: 'link' },
+  'TM': { label: 'Transfermarkt', icon: 'link' },
+  'Vídeo': { label: 'Vídeo', icon: 'video' },
+  'Relatório': { label: 'Relatório', icon: 'file' },
+};
+
 function getRecommendationBadge(score: number | null): { label: string; cls: string } | null {
   if (score == null) return null;
   if (score >= 75) return { label: 'Top Target', cls: 'badge-top-target' };
@@ -87,7 +114,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
     );
   }
 
-  const { summary, percentiles, indices, scout_score, performance_class, skillcorner, skillcorner_physical, projection_score, ssp_lambdas, prediction } = profile;
+  const { summary, percentiles, indices, scout_score, performance_class, skillcorner, skillcorner_physical, projection_score, ssp_lambdas, prediction, analises } = profile;
   const badge = getRecommendationBadge(scout_score);
 
   return (
@@ -263,6 +290,136 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
             </div>
           )}
         </motion.div>
+
+        {/* ── Análises card ─────────────────────────────────────── */}
+        {analises && (
+          <motion.div variants={fadeUp} className="card-glass overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
+                <span
+                  className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
+                  style={{ color: 'var(--color-text-muted)' }}
+                >
+                  ANALISE DO SCOUT
+                </span>
+                {analises.modelo && (
+                  <span
+                    className="ml-auto px-2 py-0.5 rounded-full text-[9px] font-[var(--font-display)] tracking-wider uppercase font-semibold"
+                    style={{
+                      background: analises.modelo === 'Descartado' ? 'rgba(239,68,68,0.1)' : analises.modelo === 'Livre' ? 'rgba(34,197,94,0.1)' : 'rgba(59,130,246,0.1)',
+                      color: analises.modelo === 'Descartado' ? '#ef4444' : analises.modelo === 'Livre' ? '#22c55e' : '#3b82f6',
+                      border: `1px solid ${analises.modelo === 'Descartado' ? 'rgba(239,68,68,0.2)' : analises.modelo === 'Livre' ? 'rgba(34,197,94,0.2)' : 'rgba(59,130,246,0.2)'}`,
+                    }}
+                  >
+                    {analises.modelo}
+                  </span>
+                )}
+              </div>
+
+              {/* Score grades grid */}
+              {Object.keys(analises.scores).length > 0 && (
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+                  {Object.entries(analises.scores).map(([key, value], i) => (
+                    <motion.div
+                      key={key}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 + i * 0.05 }}
+                      className="text-center p-3 rounded-xl"
+                      style={{
+                        background: 'var(--color-surface-2)',
+                        border: '1px solid var(--color-border-subtle)',
+                      }}
+                    >
+                      <div className="text-[9px] mb-1 leading-tight uppercase" style={{ color: 'var(--color-text-muted)' }}>
+                        {SCORE_LABELS[key] || key}
+                      </div>
+                      <div
+                        className="text-xl font-[var(--font-mono)] font-bold"
+                        style={{ color: getAnalysisScoreColor(value) }}
+                      >
+                        {value.toFixed(1)}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
+              {/* Analysis text */}
+              {analises.analysis_text && (
+                <div
+                  className="text-xs leading-relaxed p-3 rounded-lg mb-4"
+                  style={{
+                    background: 'var(--color-surface-2)',
+                    color: 'var(--color-text-secondary)',
+                    border: '1px solid var(--color-border-subtle)',
+                  }}
+                >
+                  <div className="text-[9px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                    PARECER
+                  </div>
+                  {analises.analysis_text}
+                </div>
+              )}
+
+              {/* Financial info row */}
+              {(analises.faixa_salarial || analises.transfer_luvas) && (
+                <div className="flex flex-wrap gap-3 mb-4">
+                  {analises.faixa_salarial && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px]" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+                      <DollarSign size={11} strokeWidth={1.5} style={{ color: 'var(--color-text-muted)' }} />
+                      <span style={{ color: 'var(--color-text-muted)' }}>Salario:</span>
+                      <span style={{ color: 'var(--color-text-primary)' }}>{analises.faixa_salarial}</span>
+                    </div>
+                  )}
+                  {analises.transfer_luvas && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px]" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+                      <DollarSign size={11} strokeWidth={1.5} style={{ color: 'var(--color-text-muted)' }} />
+                      <span style={{ color: 'var(--color-text-muted)' }}>Transfer/Luvas:</span>
+                      <span style={{ color: 'var(--color-text-primary)' }}>{analises.transfer_luvas}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* External links */}
+              {Object.keys(analises.links).length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(analises.links).map(([key, url]) => {
+                    const info = LINK_ICONS[key];
+                    const label = info?.label || key;
+                    const isVideo = key === 'Vídeo';
+                    const isReport = key === 'Relatório';
+                    return (
+                      <a
+                        key={key}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-colors hover:bg-white/10"
+                        style={{
+                          background: 'var(--color-surface-2)',
+                          color: 'var(--color-text-secondary)',
+                          border: '1px solid var(--color-border-subtle)',
+                        }}
+                      >
+                        {isVideo ? (
+                          <Video size={11} strokeWidth={1.5} />
+                        ) : isReport ? (
+                          <FileText size={11} strokeWidth={1.5} />
+                        ) : (
+                          <ExternalLink size={11} strokeWidth={1.5} />
+                        )}
+                        {label}
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         {/* ── Asymmetric grid: Radar + Indices ────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.65fr] gap-4">

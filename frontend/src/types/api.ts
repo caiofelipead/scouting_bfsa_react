@@ -39,6 +39,16 @@ export interface PredictionResult {
   league_gap: number;
 }
 
+export interface AnalysisData {
+  nome: string;
+  scores: Record<string, number>;
+  links: Record<string, string>;
+  analysis_text: string | null;
+  modelo: string | null;
+  faixa_salarial: string | null;
+  transfer_luvas: string | null;
+}
+
 export interface PlayerProfile {
   summary: PlayerSummary;
   metrics: Record<string, number>;
@@ -51,6 +61,7 @@ export interface PlayerProfile {
   projection_score: number | null;
   ssp_lambdas: Record<string, number> | null;
   prediction: PredictionResult | null;
+  analises: AnalysisData | null;
 }
 
 export interface RankingEntry {
