@@ -23,6 +23,42 @@ import { usePlayerProfile, useRadarData, useSkillCornerSearch } from '../hooks/u
 import { cn, getScoreClass, getScoreColor, getPerformanceLabel, formatNumber } from '../lib/utils';
 import { proxyImageUrl } from '../lib/api';
 
+function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: string; size?: 'sm' | 'lg' }) {
+  const [failed, setFailed] = useState(false);
+  const [prevUrl, setPrevUrl] = useState(url);
+  if (url !== prevUrl) { setPrevUrl(url); setFailed(false); }
+  if (!url || failed) {
+    return (
+      <div className={size === 'lg' ? 'player-photo-placeholder-lg' : 'player-photo-placeholder'}>
+        <User size={size === 'lg' ? 24 : 16} strokeWidth={1.5} />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={proxyImageUrl(url)!}
+      alt={alt}
+      className={size === 'lg' ? 'player-photo-hex-lg' : 'player-photo-hex'}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function ClubLogo({ url, alt, className = 'w-5 h-5 object-contain', fallback }: { url: string | null; alt: string; className?: string; fallback?: React.ReactNode }) {
+  const [failed, setFailed] = useState(false);
+  const [prevUrl, setPrevUrl] = useState(url);
+  if (url !== prevUrl) { setPrevUrl(url); setFailed(false); }
+  if (!url || failed) return <>{fallback ?? null}</>;
+  return (
+    <img
+      src={proxyImageUrl(url)!}
+      alt={alt}
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 interface PlayerProfileProps {
   playerDisplayName: string | null;
   onClose?: () => void;
@@ -175,30 +211,14 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
 
             {/* Player name, photo & team */}
             <div className="flex items-start gap-4">
-              {/* Photo (only if photo_url exists — restricted to offered/observed players) */}
-              {summary.photo_url ? (
-                <img
-                  src={proxyImageUrl(summary.photo_url)!}
-                  alt={summary.name}
-                  className="player-photo-hex-lg"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              ) : (
-                <div className="player-photo-placeholder-lg">
-                  <User size={24} strokeWidth={1.5} />
-                </div>
-              )}
+              <PlayerPhoto url={summary.photo_url} alt={summary.name} size="lg" />
               <div className="flex-1 min-w-0">
                 <h2 className="font-[var(--font-display)] text-2xl font-bold tracking-tight leading-tight mb-1">
                   {summary.name}
                 </h2>
                 {summary.team && (
                   <p className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                    {summary.club_logo ? (
-                      <img src={proxyImageUrl(summary.club_logo)!} alt={summary.team} className="w-5 h-5 object-contain" />
-                    ) : (
-                      <Shield size={13} strokeWidth={1.5} />
-                    )}
+                    <ClubLogo url={summary.club_logo} alt={summary.team} fallback={<Shield size={13} strokeWidth={1.5} />} />
                     {summary.team}
                   </p>
                 )}

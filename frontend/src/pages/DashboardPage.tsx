@@ -7,6 +7,44 @@ import { cn, getScoreColor, formatNumber } from '../lib/utils';
 import { proxyImageUrl } from '../lib/api';
 import type { PlayersQueryParams } from '../types/api';
 
+function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: string; size?: 'sm' | 'lg' }) {
+  const [failed, setFailed] = useState(false);
+  const [src, setSrc] = useState(url);
+
+  // Reset on url change
+  if (url !== src && !failed) setSrc(url);
+  if (url !== src && failed) { setSrc(url); setFailed(false); }
+
+  if (!src || failed) {
+    return (
+      <div className={size === 'lg' ? 'player-photo-placeholder-lg' : 'player-photo-placeholder'}>
+        <User size={size === 'lg' ? 24 : 16} strokeWidth={1.5} />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={proxyImageUrl(src)!}
+      alt={alt}
+      className={size === 'lg' ? 'player-photo-hex-lg' : 'player-photo-hex'}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function ClubLogo({ url, alt, className = 'w-3.5 h-3.5 object-contain' }: { url: string | null; alt: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) return null;
+  return (
+    <img
+      src={proxyImageUrl(url)!}
+      alt={alt}
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function getRecommendationBadge(score: number | null): { label: string; cls: string } | null {
   if (score == null) return null;
   if (score >= 75) return { label: 'Top Target', cls: 'badge-top-target' };
@@ -248,19 +286,12 @@ export default function DashboardPage() {
                       borderLeft: isSelected ? '3px solid var(--color-accent)' : '3px solid transparent',
                     }}
                   >
-                    {/* Player photo (only if photo_url exists — restricted to offered/observed players) */}
-                    {player.photo_url ? (
-                      <img
-                        src={proxyImageUrl(player.photo_url)!}
-                        alt={player.name}
-                        className="player-photo-hex"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                    ) : (
-                      <div className="player-photo-placeholder">
-                        <User size={16} strokeWidth={1.5} />
-                      </div>
-                    )}
+                    {/* Player photo */}
+                    <PlayerPhoto
+                      url={player.photo_url}
+                      alt={player.name}
+                      size="sm"
+                    />
 
                     {/* Rank */}
                     <span
@@ -278,9 +309,7 @@ export default function DashboardPage() {
                         </span>
                         {player.team && (
                           <span className="text-[10px] shrink-0 flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
-                            {player.club_logo && (
-                              <img src={proxyImageUrl(player.club_logo)!} alt="" className="w-3.5 h-3.5 object-contain inline-block" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            )}
+                            <ClubLogo url={player.club_logo} alt="" className="w-3.5 h-3.5 object-contain inline-block" />
                             {player.team}
                           </span>
                         )}
