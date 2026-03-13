@@ -62,6 +62,7 @@ from services.calibration import (
 )
 from services.predictive_engine import ContractSuccessPredictor
 from services.fuzzy_match import build_skillcorner_index, find_skillcorner_player
+from services.player_assets import load_player_assets_csv, get_player_assets
 from services.database import init_scouting_tables, load_sheet_dataframe, has_data, get_sync_status
 from services.sync_sheets import sync_all_sheets
 from config.mappings import (
@@ -260,6 +261,12 @@ def _load_all_data():
     if "wyscout" in _data and len(_data["wyscout"]) > 0:
         from services.similarity import _get_percentile_matrix
         _get_percentile_matrix(_data["wyscout"])
+
+    # Load player assets CSV (photos, club logos, league logos)
+    try:
+        load_player_assets_csv()
+    except Exception as e:
+        logger.warning("Could not load player assets CSV: %s", e)
 
     _data_ready.set()
     _data_loading = False
@@ -959,11 +966,15 @@ async def get_rankings(
             if val is not None:
                 idx_values[idx_name] = round(val, 1)
 
+        player_name = str(row.get("Jogador", ""))
+        team_name = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
+        assets = get_player_assets(player_name, team_name)
+
         entries.append(RankingEntry(
             rank=rank,
-            name=str(row.get("Jogador", "")),
+            name=player_name,
             display_name=str(row.get("JogadorDisplay", row.get("Jogador", ""))),
-            team=str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
+            team=team_name,
             age=_safe_float(row.get("Idade")),
             league=resolve_actual_league(
                 row.get("Equipa"),
@@ -972,6 +983,9 @@ async def get_rankings(
             minutes=_safe_float(row.get("Minutos jogados:")),
             score=round(float(row.get("Score", 0)), 1),
             indices=idx_values,
+            photo_url=assets.get("photo_url"),
+            club_logo=assets.get("club_logo"),
+            league_logo=assets.get("league_logo"),
         ))
 
     result = RankingResponse(position=position, total=len(entries), players=entries)
@@ -1042,10 +1056,14 @@ async def get_prediction_rankings(
             minutes=minutes,
         )
 
+        pred_player_name = str(row.get("Jogador", ""))
+        pred_team_name = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
+        pred_assets = get_player_assets(pred_player_name, pred_team_name)
+
         results.append({
-            "name": str(row.get("Jogador", "")),
+            "name": pred_player_name,
             "display_name": str(row.get("JogadorDisplay", row.get("Jogador", ""))),
-            "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
+            "team": pred_team_name,
             "age": age,
             "league": league_origin,
             "minutes": minutes,
@@ -1055,6 +1073,9 @@ async def get_prediction_rankings(
             "league_gap": round(pred["league_gap"], 1),
             "tier_origin": pred["tier_origin"],
             "tier_target": pred["tier_target"],
+            "photo_url": pred_assets.get("photo_url"),
+            "club_logo": pred_assets.get("club_logo"),
+            "league_logo": pred_assets.get("league_logo"),
         })
 
     # Sort by P(Sucesso) descending

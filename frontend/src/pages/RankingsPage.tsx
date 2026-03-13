@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, ArrowUpDown, AlertCircle, Target } from 'lucide-react';
+import { Trophy, ArrowUpDown, AlertCircle, Target, User } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useRankings, usePositions, useLeagues } from '../hooks/usePlayers';
 import { getScoreColor, formatNumber } from '../lib/utils';
@@ -21,6 +21,9 @@ interface PredictionRankingEntry {
   league_gap: number;
   tier_origin: number;
   tier_target: number;
+  photo_url: string | null;
+  club_logo: string | null;
+  league_logo: string | null;
 }
 
 const LIGAS_TARGET = [
@@ -215,9 +218,28 @@ export default function RankingsPage() {
                   rankings.players.map((entry, i) => (
                     <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="transition-colors hover:bg-white/[0.02]">
                       <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs" style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>{entry.rank}</td>
-                      <td className="px-3 py-2.5 font-medium">{entry.name}</td>
-                      <td className="px-3 py-2.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>{entry.team || '—'}</td>
-                      <td className="px-3 py-2.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>{entry.league || '—'}</td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          {entry.photo_url ? (
+                            <img src={entry.photo_url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" style={{ background: 'var(--color-surface-2)' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}><User size={14} style={{ color: 'var(--color-text-muted)' }} /></div>
+                          )}
+                          <span className="font-medium whitespace-nowrap">{entry.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          {entry.club_logo && <img src={entry.club_logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                          <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{entry.team || '—'}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          {entry.league_logo && <img src={entry.league_logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{entry.league || '—'}</span>
+                        </div>
+                      </td>
                       <td className="px-3 py-2.5 text-right font-[var(--font-mono)] text-xs" style={{ color: 'var(--color-text-muted)' }}>{entry.age != null ? formatNumber(entry.age) : '—'}</td>
                       <td className="px-3 py-2.5 text-right font-[var(--font-mono)] text-xs" style={{ color: 'var(--color-text-muted)' }}>{entry.minutes != null ? formatNumber(entry.minutes) : '—'}</td>
                       {indexColumns.map((col) => {
@@ -275,9 +297,28 @@ export default function RankingsPage() {
                     return (
                       <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="transition-colors hover:bg-white/[0.02]">
                         <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs" style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>{entry.rank}</td>
-                        <td className="px-3 py-2.5 font-medium whitespace-nowrap">{entry.name}</td>
-                        <td className="px-3 py-2.5 text-xs whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>{entry.team || '—'}</td>
-                        <td className="px-3 py-2.5 text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{entry.league || '—'}</td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            {entry.photo_url ? (
+                              <img src={entry.photo_url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" style={{ background: 'var(--color-surface-2)' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}><User size={14} style={{ color: 'var(--color-text-muted)' }} /></div>
+                            )}
+                            <span className="font-medium whitespace-nowrap">{entry.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            {entry.club_logo && <img src={entry.club_logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                            <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>{entry.team || '—'}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            {entry.league_logo && <img src={entry.league_logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                            <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{entry.league || '—'}</span>
+                          </div>
+                        </td>
                         <td className="px-3 py-2.5 text-right font-[var(--font-mono)] text-xs" style={{ color: 'var(--color-text-muted)' }}>{formatNumber(entry.age)}</td>
                         <td className="px-3 py-2.5 text-right font-[var(--font-mono)] text-xs" style={{ color: 'var(--color-text-muted)' }}>{formatNumber(entry.minutes)}</td>
                         <td className="px-3 py-2.5 text-right font-[var(--font-mono)] text-xs" style={{ color: getScoreColor(entry.ssp) }}>{entry.ssp.toFixed(1)}</td>

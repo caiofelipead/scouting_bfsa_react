@@ -94,6 +94,9 @@ class RankingEntry(BaseModel):
     minutes: Optional[float] = None
     score: float
     indices: Dict[str, float] = {}
+    photo_url: Optional[str] = None
+    club_logo: Optional[str] = None
+    league_logo: Optional[str] = None
 
 
 class RankingResponse(BaseModel):

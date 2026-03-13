@@ -1,0 +1,166 @@
+"""
+player_assets.py — Lookup service for player photos, club logos, and league logos.
+
+Loads data from fotos_jogadores_clubes_ligas.csv (SofaScore-enriched)
+and provides fast lookups by player name + team.
+"""
+
+import os
+import csv
+import logging
+from typing import Dict, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+# Key: (normalized_player_name, normalized_team) → dict with asset URLs
+_player_assets: Dict[Tuple[str, str], dict] = {}
+
+# Fallback: player_name only (first high-quality match)
+_player_assets_by_name: Dict[str, dict] = {}
+
+# Club logo cache: normalized_team → logo_url
+_club_logos: Dict[str, str] = {}
+
+# League logo cache: league_name → logo_url
+_league_logos: Dict[str, str] = {}
+
+_loaded = False
+
+
+def _normalize(s: str) -> str:
+    """Normalize a string for fuzzy matching."""
+    if not s:
+        return ""
+    return s.strip().lower()
+
+
+def load_player_assets_csv(csv_path: str = None):
+    """Load the CSV file and build lookup indices."""
+    global _loaded
+
+    if _loaded:
+        return
+
+    if csv_path is None:
+        # Look for CSV in project root
+        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        csv_path = os.path.join(base, "fotos_jogadores_clubes_ligas.csv")
+
+    if not os.path.exists(csv_path):
+        logger.warning("Player assets CSV not found at %s", csv_path)
+        _loaded = True
+        return
+
+    count = 0
+    try:
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                quality = row.get("Qualidade_Match", "").strip().upper()
+                jogador = row.get("Jogador", "").strip()
+                equipa = row.get("Equipa_CSV", "").strip()
+                foto_url = row.get("Foto_Jogador_URL", "").strip()
+                escudo_url = row.get("Escudo_Clube_URL", "").strip()
+                liga = row.get("Liga", "").strip()
+                pais_liga = row.get("Pais_Liga", "").strip()
+                logo_liga_url = row.get("Logo_Liga_URL", "").strip()
+
+                if not jogador:
+                    continue
+
+                entry = {
+                    "photo_url": foto_url or None,
+                    "club_logo": escudo_url or None,
+                    "league_name": liga or None,
+                    "league_country": pais_liga or None,
+                    "league_logo": logo_liga_url or None,
+                    "quality": quality,
+                }
+
+                key = (_normalize(jogador), _normalize(equipa))
+                # Prefer ALTA quality matches
+                existing = _player_assets.get(key)
+                if existing is None or (quality == "ALTA" and existing.get("quality") != "ALTA"):
+                    _player_assets[key] = entry
+
+                # Name-only index (prefer ALTA)
+                name_key = _normalize(jogador)
+                existing_name = _player_assets_by_name.get(name_key)
+                if existing_name is None or (quality == "ALTA" and existing_name.get("quality") != "ALTA"):
+                    _player_assets_by_name[name_key] = entry
+
+                # Club logo index
+                if escudo_url:
+                    team_key = _normalize(equipa)
+                    if team_key and team_key not in _club_logos:
+                        _club_logos[team_key] = escudo_url
+
+                # League logo index
+                if logo_liga_url and liga:
+                    league_key = _normalize(liga)
+                    if league_key not in _league_logos:
+                        _league_logos[league_key] = logo_liga_url
+
+                count += 1
+
+    except Exception as e:
+        logger.error("Failed to load player assets CSV: %s", e)
+
+    _loaded = True
+    logger.info("Loaded %d player asset entries from CSV (%d unique players, %d clubs, %d leagues)",
+                count, len(_player_assets_by_name), len(_club_logos), len(_league_logos))
+
+
+def get_player_assets(player_name: str, team: str = None) -> dict:
+    """Look up player photo, club logo, and league logo.
+
+    Returns dict with keys: photo_url, club_logo, league_logo, league_name
+    All values may be None if not found.
+    """
+    if not _loaded:
+        load_player_assets_csv()
+
+    result = {"photo_url": None, "club_logo": None, "league_logo": None, "league_name": None}
+
+    name_norm = _normalize(player_name) if player_name else ""
+    team_norm = _normalize(team) if team else ""
+
+    # Try exact (name, team) match first
+    if name_norm and team_norm:
+        entry = _player_assets.get((name_norm, team_norm))
+        if entry:
+            result["photo_url"] = entry.get("photo_url")
+            result["club_logo"] = entry.get("club_logo")
+            result["league_logo"] = entry.get("league_logo")
+            result["league_name"] = entry.get("league_name")
+            return result
+
+    # Fallback: name-only
+    if name_norm:
+        entry = _player_assets_by_name.get(name_norm)
+        if entry:
+            result["photo_url"] = entry.get("photo_url")
+            result["club_logo"] = entry.get("club_logo")
+            result["league_logo"] = entry.get("league_logo")
+            result["league_name"] = entry.get("league_name")
+            return result
+
+    # At least try to get club logo by team name
+    if team_norm and team_norm in _club_logos:
+        result["club_logo"] = _club_logos[team_norm]
+
+    return result
+
+
+def get_club_logo(team: str) -> Optional[str]:
+    """Get club logo URL by team name."""
+    if not _loaded:
+        load_player_assets_csv()
+    return _club_logos.get(_normalize(team)) if team else None
+
+
+def get_league_logo(league: str) -> Optional[str]:
+    """Get league logo URL by league name."""
+    if not _loaded:
+        load_player_assets_csv()
+    return _league_logos.get(_normalize(league)) if league else None

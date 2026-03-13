@@ -74,6 +74,9 @@ export interface RankingEntry {
   minutes: number | null;
   score: number;
   indices: Record<string, number>;
+  photo_url: string | null;
+  club_logo: string | null;
+  league_logo: string | null;
 }
 
 export interface RankingResponse {
