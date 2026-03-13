@@ -276,7 +276,10 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         {player.team && (
-                          <span className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="text-[10px] truncate flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                            {player.club_logo && (
+                              <img src={player.club_logo} alt="" className="w-3.5 h-3.5 object-contain inline-block" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            )}
                             {player.team}
                           </span>
                         )}

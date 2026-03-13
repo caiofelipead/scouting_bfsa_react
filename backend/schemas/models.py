@@ -55,6 +55,8 @@ class PlayerSummary(BaseModel):
     league: Optional[str] = None
     minutes_played: Optional[float] = None
     photo_url: Optional[str] = None
+    club_logo: Optional[str] = None
+    league_logo: Optional[str] = None
     score: Optional[float] = None
 
 
