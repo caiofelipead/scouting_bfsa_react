@@ -51,7 +51,7 @@ function CoverageBanner({ covered, league }: { covered: boolean; league: string 
 
 // ── Metric card ──
 
-function MetricCard({ name, value, delay }: { name: string; value: number; delay: number }) {
+function MetricCard({ name, value, percentile, delay }: { name: string; value: number; percentile?: number; delay: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -69,6 +69,25 @@ function MetricCard({ name, value, delay }: { name: string; value: number; delay
       <div className="text-lg font-[var(--font-mono)] font-bold" style={{ color: 'var(--color-text-primary)' }}>
         {value.toFixed(2)}
       </div>
+      {percentile != null && (
+        <div className="mt-2">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-[9px]" style={{ color: 'var(--color-text-muted)' }}>Percentil</span>
+            <span className="text-[9px] font-[var(--font-mono)] font-semibold" style={{ color: getScoreColor(percentile) }}>
+              P{percentile.toFixed(0)}
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-surface-1)' }}>
+            <motion.div
+              className="h-full rounded-full"
+              style={{ background: getScoreColor(percentile) }}
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(percentile, 100)}%` }}
+              transition={{ duration: 0.6, delay: delay + 0.2 }}
+            />
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -211,7 +230,9 @@ export default function SkillCornerPage() {
   };
 
   const indices = scProfile?.indices ?? {};
+  const indicesPercentiles = scProfile?.indices_percentiles ?? {};
   const physical = scProfile?.physical ?? {};
+  const physicalPercentiles = scProfile?.physical_percentiles ?? {};
   const allMetrics = scProfile?.all_metrics ?? {};
   const indicesEntries = Object.entries(indices);
   const physicalEntries = Object.entries(physical);
@@ -280,7 +301,7 @@ export default function SkillCornerPage() {
             />
             {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
               <div
-                className="absolute top-full left-0 right-0 mt-1 rounded overflow-hidden z-20 max-h-48 overflow-y-auto"
+                className="absolute top-full left-0 right-0 mt-1 rounded overflow-hidden z-50 max-h-48 overflow-y-auto"
                 style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-active)' }}
               >
                 {players.map((p, i) => (
@@ -399,18 +420,20 @@ export default function SkillCornerPage() {
                         exit={{ opacity: 0, height: 0 }}
                         className="px-5 pb-5"
                       >
-                        {/* Radar for indices */}
-                        {indicesEntries.length >= 2 && (
+                        {/* Radar for indices using percentiles */}
+                        {indicesEntries.length >= 2 && Object.keys(indicesPercentiles).length >= 2 && (
                           <div className="max-w-sm mx-auto mb-4">
                             <RadarChart
                               labels={indicesEntries.map(([k]) => k.replace(/ index$/i, ''))}
-                              values={indicesEntries.map(([, v]) => Math.min(v * 10, 100))}
+                              values={indicesEntries.map(([k]) => indicesPercentiles[k] ?? 50)}
                               size={320}
                             />
                           </div>
                         )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {indicesEntries.map(([name, value], i) => (
+                          {indicesEntries.map(([name, value], i) => {
+                            const pct = indicesPercentiles[name];
+                            return (
                             <motion.div
                               key={name}
                               initial={{ opacity: 0, x: 8 }}
@@ -421,24 +444,32 @@ export default function SkillCornerPage() {
                                 <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                                   {name.replace(/ index$/i, '')}
                                 </span>
-                                <span
-                                  className="text-xs font-[var(--font-mono)] font-semibold"
-                                  style={{ color: getScoreColor(value * 10) }}
-                                >
-                                  {value.toFixed(2)}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  {pct != null && (
+                                    <span className="text-[9px] font-[var(--font-mono)]" style={{ color: getScoreColor(pct) }}>
+                                      P{pct.toFixed(0)}
+                                    </span>
+                                  )}
+                                  <span
+                                    className="text-xs font-[var(--font-mono)] font-semibold"
+                                    style={{ color: getScoreColor(pct ?? value * 10) }}
+                                  >
+                                    {value.toFixed(2)}
+                                  </span>
+                                </div>
                               </div>
                               <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-surface-2)' }}>
                                 <motion.div
                                   className="h-full rounded-full"
-                                  style={{ background: getScoreColor(value * 10) }}
+                                  style={{ background: getScoreColor(pct ?? value * 10) }}
                                   initial={{ width: 0 }}
-                                  animate={{ width: `${Math.min(value * 10, 100)}%` }}
+                                  animate={{ width: `${Math.min(pct ?? value * 10, 100)}%` }}
                                   transition={{ duration: 0.6, delay: 0.2 + i * 0.06 }}
                                 />
                               </div>
                             </motion.div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </motion.div>
                     )}
@@ -473,7 +504,7 @@ export default function SkillCornerPage() {
                       >
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                           {physicalEntries.map(([name, value], i) => (
-                            <MetricCard key={name} name={name} value={value} delay={0.2 + i * 0.05} />
+                            <MetricCard key={name} name={name} value={value} percentile={physicalPercentiles[name]} delay={0.2 + i * 0.05} />
                           ))}
                         </div>
                       </motion.div>

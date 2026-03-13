@@ -74,14 +74,14 @@ export default function PredictionPage() {
         </div>
       )}
 
-      <div className="card-glass rounded-lg p-5 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
+      <div className="card-glass rounded-lg p-5 space-y-4" style={{ overflow: 'visible' }}>
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3 items-end" style={{ overflow: 'visible' }}>
           <div>
             <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR</label>
             <div className="relative">
               <input type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)} placeholder="Digite o nome..." className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
               {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 rounded overflow-hidden z-20 max-h-48 overflow-y-auto" style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-active)' }}>
+                <div className="absolute top-full left-0 right-0 mt-1 rounded overflow-hidden z-50 max-h-48 overflow-y-auto" style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-active)' }}>
                   {players.map((p, i) => (
                     <button key={i} onClick={() => { setSelectedPlayer(p.display_name || p.name); setSearch(p.display_name || p.name); setDebouncedSearch(''); }} className="w-full text-left px-3 py-2 text-sm hover:bg-white/5 cursor-pointer" style={{ borderBottom: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }}>
                       <div>{p.display_name || p.name}</div>

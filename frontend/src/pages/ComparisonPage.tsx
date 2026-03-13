@@ -19,7 +19,7 @@ function PlayerSearchInput({ label, value, onChange, onSelect, players, showDrop
       <div className="relative">
         <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder="Digite o nome..." className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
         {showDropdown && players.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 rounded overflow-hidden z-20 max-h-48 overflow-y-auto" style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-active)' }}>
+          <div className="absolute top-full left-0 right-0 mt-1 rounded overflow-hidden z-50 max-h-48 overflow-y-auto" style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-active)' }}>
             {players.map((p, i) => (
               <button key={i} onClick={() => onSelect(p.display_name || p.name)} className="w-full text-left px-3 py-2 text-sm hover:bg-white/5 cursor-pointer" style={{ borderBottom: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }}>
                 <div>{p.display_name || p.name}</div>
