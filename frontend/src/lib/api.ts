@@ -30,11 +30,12 @@ api.interceptors.response.use(
     const isNetworkError = !err.response;
     const isColdStartError = RETRYABLE_STATUSES.has(err.response?.status);
 
-    if ((isNetworkError || isColdStartError) && config._retryCount < 3) {
+    if ((isNetworkError || isColdStartError) && config._retryCount < 6) {
       config._retryCount += 1;
-      const delay = config._retryCount * 2000; // 2s, 4s, 6s
+      // Exponential backoff: 3s, 6s, 12s, 24s, 30s, 30s (total ~105s)
+      const delay = Math.min(3000 * Math.pow(2, config._retryCount - 1), 30000);
       console.warn(
-        `[api] ${isNetworkError ? 'Network error' : err.response?.status} on ${config.url} — retry ${config._retryCount}/3 in ${delay}ms`,
+        `[api] ${isNetworkError ? 'Network error' : err.response?.status} on ${config.url} — retry ${config._retryCount}/6 in ${delay}ms`,
       );
       await new Promise((r) => setTimeout(r, delay));
       return api(config);
