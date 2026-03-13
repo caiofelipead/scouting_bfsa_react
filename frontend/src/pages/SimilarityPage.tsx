@@ -88,7 +88,7 @@ export default function SimilarityPage() {
               />
               {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
                 <div
-                  className="absolute top-full left-0 right-0 mt-1 rounded overflow-hidden z-20 max-h-48 overflow-y-auto"
+                  className="absolute top-full left-0 right-0 mt-1 rounded overflow-hidden z-50 max-h-48 overflow-y-auto"
                   style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-active)' }}
                 >
                   {players.map((p, i) => (

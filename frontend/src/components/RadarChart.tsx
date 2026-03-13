@@ -23,8 +23,10 @@ export default function RadarChart({
   playerName,
   className = '',
 }: RadarChartProps) {
-  const center = size / 2;
-  const radius = size * 0.38;
+  const pad = size * 0.12;          // extra padding for labels
+  const fullSize = size + pad * 2;  // expanded viewBox
+  const center = fullSize / 2;
+  const radius = size * 0.34;
   const rings = [0.25, 0.5, 0.75, 1.0];
   const n = labels.length;
 
@@ -85,10 +87,11 @@ export default function RadarChart({
       )}
 
       <svg
-        viewBox={`0 0 ${size} ${size}`}
+        viewBox={`0 0 ${fullSize} ${fullSize}`}
         width="100%"
         height="100%"
         className="drop-shadow-lg"
+        style={{ overflow: 'visible' }}
       >
         {/* Ring grid lines */}
         {rings.map((ringPct, ri) => {
@@ -187,7 +190,7 @@ export default function RadarChart({
         {/* Labels */}
         {labels.map((label, i) => {
           const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
-          const labelR = radius + 28;
+          const labelR = radius + 32;
           const lx = center + labelR * Math.cos(angle);
           const ly = center + labelR * Math.sin(angle);
           const val = values[i];

@@ -272,18 +272,21 @@ export default function DashboardPage() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-                        {player.name}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                          {player.name}
+                        </span>
                         {player.team && (
-                          <span className="text-[10px] truncate flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="text-[10px] shrink-0 flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                             {player.club_logo && (
                               <img src={proxyImageUrl(player.club_logo)!} alt="" className="w-3.5 h-3.5 object-contain inline-block" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             )}
                             {player.team}
                           </span>
                         )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+
                         {player.position && (
                           <span
                             className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"

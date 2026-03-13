@@ -943,13 +943,18 @@ async def get_player_profile(
             }
             logger.debug("Análises match for '%s': found '%s'", player_display_name, ana_match.get("Nome"))
 
-    # Try to get photo_url from WyScout data first, then from análises
-    photo_url = None
-    for photo_col in ("photo_url", "Foto", "ImageDataURL", "image_url"):
-        val = row.get(photo_col)
-        if val is not None and pd.notna(val) and str(val).strip():
-            photo_url = str(val).strip()
-            break
+    # Get photo, club logo, and league logo from asset service (CSV with SofaScore data)
+    assets = get_player_assets(jogador_name, team_name_sc)
+    photo_url = assets.get("photo_url")
+    club_logo_url = assets.get("club_logo")
+
+    # Fallback: try WyScout DataFrame columns for photo_url
+    if not photo_url:
+        for photo_col in ("photo_url", "Foto", "ImageDataURL", "image_url"):
+            val = row.get(photo_col)
+            if val is not None and pd.notna(val) and str(val).strip():
+                photo_url = str(val).strip()
+                break
     # Fallback: get photo from análises sheet
     if not photo_url and ana_match is not None:
         foto_val = ana_match.get("Foto")
@@ -962,7 +967,7 @@ async def get_player_profile(
             "name": str(row.get("Jogador", "")),
             "display_name": str(row.get("JogadorDisplay", "")),
             "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
-            "club_logo": CLUB_LOGOS.get(str(row.get("Equipa", ""))) if pd.notna(row.get("Equipa")) else None,
+            "club_logo": club_logo_url or (CLUB_LOGOS.get(str(row.get("Equipa", ""))) if pd.notna(row.get("Equipa")) else None),
             "position": position,
             "age": age,
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
@@ -2151,6 +2156,25 @@ async def get_skillcorner_player_profile(
         if val is not None:
             physical[label] = round(val, 2)
 
+    # Compute percentiles relative to the full SkillCorner dataset
+    physical_percentiles = {}
+    for col, label in _SC_PHYSICAL_COLS.items():
+        val = _safe_float(sc_match.get(col))
+        if val is not None and col in sc_df.columns:
+            col_data = pd.to_numeric(sc_df[col], errors="coerce").dropna()
+            if len(col_data) > 0:
+                pct = (col_data < val).sum() / len(col_data) * 100
+                physical_percentiles[label] = round(pct, 1)
+
+    indices_percentiles = {}
+    for idx_name in sc_indices_keys:
+        val = _safe_float(sc_match.get(idx_name))
+        if val is not None and idx_name in sc_df.columns:
+            col_data = pd.to_numeric(sc_df[idx_name], errors="coerce").dropna()
+            if len(col_data) > 0:
+                pct = (col_data < val).sum() / len(col_data) * 100
+                indices_percentiles[idx_name] = round(pct, 1)
+
     return {
         "found": True,
         "covered": covered,
@@ -2160,7 +2184,9 @@ async def get_skillcorner_player_profile(
         "matched_team": str(sc_match.get("team_name", "")) if pd.notna(sc_match.get("team_name")) else None,
         "matched_position": str(sc_match.get("position_group", "")) if pd.notna(sc_match.get("position_group")) else None,
         "indices": sc_indices,
+        "indices_percentiles": indices_percentiles,
         "physical": physical,
+        "physical_percentiles": physical_percentiles,
         "all_metrics": all_metrics,
     }
 

@@ -227,7 +227,9 @@ export interface SkillCornerPlayerProfile {
   matched_team?: string;
   matched_position?: string;
   indices?: Record<string, number>;
+  indices_percentiles?: Record<string, number>;
   physical?: Record<string, number>;
+  physical_percentiles?: Record<string, number>;
   all_metrics?: Record<string, number>;
   reason?: string;
   searched_name?: string;
