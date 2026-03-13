@@ -618,11 +618,15 @@ async def list_players(
     total = len(df)
     df = df.iloc[offset: offset + limit]
 
+    # Pre-compute percentile matrix for fast scoring
+    from services.similarity import _get_percentile_matrix
+    perc_matrix = _get_percentile_matrix(df_all)
+
     players = []
     for idx, row in df.iterrows():
         pos_raw = str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else None
         pos_cat = get_posicao_categoria(pos_raw) if pos_raw else None
-        score = calculate_overall_score(row, pos_cat, df_all) if pos_cat else None
+        score = calculate_overall_score(row, pos_cat, df_all, _perc_matrix=perc_matrix) if pos_cat else None
 
         # Get photo, club logo, and league logo from asset service
         player_name = str(row.get("Jogador", ""))

@@ -15,6 +15,7 @@ import {
   BarChart3,
   X,
   MapPin,
+  Filter,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -59,10 +60,15 @@ const LINK_ICONS: Record<string, { label: string }> = {
 };
 
 function getAnalysisScoreColor(score: number): string {
-  if (score >= 8) return '#22c55e';
-  if (score >= 6) return '#eab308';
-  if (score >= 4) return '#f97316';
-  return '#ef4444';
+  // Proportional color scale for 1-5 range
+  // 1=red, 2=orange, 3=green, 4=bright green, 5=emerald
+  const clamped = Math.max(1, Math.min(5, score));
+  const t = (clamped - 1) / 4; // 0 to 1
+  // Shift hue so 3.0 (~t=0.5) already lands on green (120°)
+  const hue = t * 150; // 0° (red) → 150° (teal-green)
+  const sat = 70 + (1 - Math.abs(t - 0.5) * 2) * 15;
+  const light = 45 + (1 - Math.abs(t - 0.5) * 2) * 5;
+  return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
 function getModeloStyle(modelo: string) {
@@ -376,6 +382,10 @@ export default function AnalysesPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<AnalysesPlayer | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>('analise');
   const [scOverride, setScOverride] = useState<string | null>(null);
+  const [filterPosition, setFilterPosition] = useState('');
+  const [filterModelo, setFilterModelo] = useState('');
+  const [filterLiga, setFilterLiga] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -384,7 +394,36 @@ export default function AnalysesPage() {
   }, [search]);
 
   const { data, isLoading, error } = useAnalysesPlayers(debouncedSearch);
-  const players = data?.players ?? [];
+  const allPlayers = data?.players ?? [];
+
+  // Extract unique filter options from data
+  const filterOptions = useMemo(() => {
+    const positions = new Set<string>();
+    const modelos = new Set<string>();
+    const ligas = new Set<string>();
+    for (const p of allPlayers) {
+      if (p.posicao) positions.add(p.posicao);
+      if (p.modelo) modelos.add(p.modelo);
+      if (p.liga) ligas.add(p.liga);
+    }
+    return {
+      positions: [...positions].sort(),
+      modelos: [...modelos].sort(),
+      ligas: [...ligas].sort(),
+    };
+  }, [allPlayers]);
+
+  // Apply client-side filters
+  const players = useMemo(() => {
+    return allPlayers.filter((p) => {
+      if (filterPosition && p.posicao !== filterPosition) return false;
+      if (filterModelo && p.modelo !== filterModelo) return false;
+      if (filterLiga && p.liga !== filterLiga) return false;
+      return true;
+    });
+  }, [allPlayers, filterPosition, filterModelo, filterLiga]);
+
+  const activeFilterCount = [filterPosition, filterModelo, filterLiga].filter(Boolean).length;
 
   // Reset SC override when player changes
   useEffect(() => {
@@ -413,25 +452,124 @@ export default function AnalysesPage() {
             Analises do Scout
           </h1>
           <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-            {data?.total ?? 0} jogadores analisados
+            {players.length}{players.length !== (data?.total ?? 0) ? ` de ${data?.total ?? 0}` : ''} jogadores analisados
           </p>
 
-          {/* Search */}
-          <div className="relative mt-3">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar jogador..."
-              className="w-full pl-9 pr-3 py-2 rounded text-xs outline-none"
+          {/* Search + Filter toggle */}
+          <div className="flex items-center gap-2 mt-3">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar jogador..."
+                className="w-full pl-9 pr-3 py-2 rounded text-xs outline-none"
+                style={{
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border-subtle)',
+                  color: 'var(--color-text-primary)',
+                }}
+              />
+            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-1 px-2.5 py-2 rounded text-xs transition-colors cursor-pointer shrink-0"
               style={{
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-border-subtle)',
-                color: 'var(--color-text-primary)',
+                background: showFilters || activeFilterCount > 0 ? 'var(--color-accent-glow)' : 'var(--color-surface-2)',
+                border: `1px solid ${showFilters || activeFilterCount > 0 ? 'rgba(220,38,38,0.3)' : 'var(--color-border-subtle)'}`,
+                color: showFilters || activeFilterCount > 0 ? 'var(--color-accent)' : 'var(--color-text-muted)',
               }}
-            />
+            >
+              <Filter size={13} />
+              {activeFilterCount > 0 && <span className="text-[9px] font-bold">{activeFilterCount}</span>}
+            </button>
           </div>
+
+          {/* Filters panel */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-3 space-y-2">
+                  {/* Position filter */}
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: 'var(--color-text-muted)' }}>Posicao</label>
+                    <select
+                      value={filterPosition}
+                      onChange={(e) => setFilterPosition(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded text-xs outline-none cursor-pointer"
+                      style={{
+                        background: 'var(--color-surface-2)',
+                        border: '1px solid var(--color-border-subtle)',
+                        color: filterPosition ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                      }}
+                    >
+                      <option value="">Todas posicoes</option>
+                      {filterOptions.positions.map((pos) => (
+                        <option key={pos} value={pos}>{pos}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Modelo/Status filter */}
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: 'var(--color-text-muted)' }}>Status</label>
+                    <select
+                      value={filterModelo}
+                      onChange={(e) => setFilterModelo(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded text-xs outline-none cursor-pointer"
+                      style={{
+                        background: 'var(--color-surface-2)',
+                        border: '1px solid var(--color-border-subtle)',
+                        color: filterModelo ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                      }}
+                    >
+                      <option value="">Todos status</option>
+                      {filterOptions.modelos.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Liga filter */}
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: 'var(--color-text-muted)' }}>Liga</label>
+                    <select
+                      value={filterLiga}
+                      onChange={(e) => setFilterLiga(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded text-xs outline-none cursor-pointer"
+                      style={{
+                        background: 'var(--color-surface-2)',
+                        border: '1px solid var(--color-border-subtle)',
+                        color: filterLiga ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                      }}
+                    >
+                      <option value="">Todas ligas</option>
+                      {filterOptions.ligas.map((l) => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Clear filters */}
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={() => { setFilterPosition(''); setFilterModelo(''); setFilterLiga(''); }}
+                      className="w-full text-[10px] py-1.5 rounded cursor-pointer transition-colors hover:bg-white/5"
+                      style={{ color: 'var(--color-accent)', border: '1px solid rgba(220,38,38,0.2)' }}
+                    >
+                      Limpar filtros
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Player list */}
