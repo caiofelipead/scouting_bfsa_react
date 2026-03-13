@@ -263,8 +263,7 @@ LEAGUE_LOGOS = {
 # ============================================
 SERIE_B_TEAMS = [
     'Amazonas', 'Amazonas FC', 'América Mineiro', 'América MG', 'América-MG',
-    'Athletic Club', 'Athletico Paranaense', 'Athletico-PR',
-    'Atlético GO', 'Atlético Goianiense', 'Atlético-GO',
+    'Athletic Club',
     'Avaí', 'Avaí FC', 'Botafogo SP', 'Botafogo-SP',
     'Chapecoense', 'Chapecoense AF', 'Coritiba', 'Coritiba FC', 'CRB',
     'Criciúma', 'Criciúma EC', 'Cuiabá', 'Cuiabá EC',
@@ -1004,7 +1003,14 @@ for t in ['Atlas', 'Atlético de San Luis']:
 for t in [
     'América de Cali', 'Atlético Bucaramanga', 'Atlético Nacional',
     'Boyacá Chicó', 'Deportivo Cali', 'Deportivo Pasto', 'Deportivo Pereira',
-    'Envigado', 'Medellin',
+    'Envigado',
+    'Medellin', 'Medellín', 'Independiente Medellín', 'Independiente Medellin', 'DIM',
+    'Junior', 'Junior FC', 'Junior de Barranquilla',
+    'Millonarios', 'Millonarios FC',
+    'Once Caldas', 'Patriotas', 'Patriotas FC',
+    'Santa Fe', 'Independiente Santa Fe',
+    'Tolima', 'Deportes Tolima',
+    'Águilas Doradas', 'Aguilas Doradas', 'Jaguares de Córdoba', 'Jaguares',
 ]:
     CLUB_LEAGUE_MAP.setdefault(t, 'Liga Colombia')
 for t in ['Atlético Huila', 'Cortuluá', 'Deportes Quindío', 'Union Magdalena']:

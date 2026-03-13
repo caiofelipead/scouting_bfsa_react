@@ -265,7 +265,7 @@ SERIE_B_TEAMS = [
     'Amazonas', 'América Mineiro', 'Athletic Club', 'Athletico Paranaense',
     'Atlético GO', 'Avaí', 'Botafogo SP', 'Chapecoense', 'Coritiba', 'CRB',
     'Criciúma', 'Cuiabá', 'Ferroviária', 'Goiás', 'Grêmio Novorizontino',
-    'Operário PR', 'Paysandu', 'Remo', 'Vila Nova', 'Volta Redonda',
+    'Operário PR', 'Paysandu', 'Vila Nova', 'Volta Redonda',
 ]
 
 
@@ -450,9 +450,13 @@ for t in [
     CLUB_LEAGUE_MAP.setdefault(t, 'Liga Uruguai')
 
 for t in [
-    'Atlético Nacional', 'Millonarios', 'Junior', 'Junior Barranquilla',
-    'América de Cali', 'Santa Fe', 'Deportivo Cali', 'Deportes Tolima',
-    'Once Caldas', 'Bucaramanga',
+    'Atlético Nacional', 'Millonarios', 'Millonarios FC', 'Junior', 'Junior FC', 'Junior Barranquilla',
+    'Junior de Barranquilla', 'América de Cali', 'Santa Fe', 'Independiente Santa Fe',
+    'Deportivo Cali', 'Deportes Tolima', 'Tolima',
+    'Once Caldas', 'Bucaramanga', 'Atlético Bucaramanga',
+    'Medellin', 'Medellín', 'Independiente Medellín', 'Independiente Medellin', 'DIM',
+    'Deportivo Pasto', 'Deportivo Pereira', 'Envigado', 'Boyacá Chicó',
+    'Águilas Doradas', 'Aguilas Doradas', 'Jaguares de Córdoba', 'Jaguares', 'Patriotas',
 ]:
     CLUB_LEAGUE_MAP.setdefault(t, 'Liga Colombia')
 
