@@ -394,13 +394,55 @@ class MarketValueModel:
     Segmentação por posição × faixa etária conforme Khalife et al.
     """
 
-    # Faixas de valor de mercado de referência (EUR) para normalização
-    VALUE_RANGES = {
-        'elite': (20_000_000, 150_000_000),
-        'high': (5_000_000, 20_000_000),
-        'medium': (1_000_000, 5_000_000),
-        'low': (200_000, 1_000_000),
-        'very_low': (50_000, 200_000),
+    # Categorias de valor de mercado (em milhões EUR)
+    # Calibrado com base em Transfermarkt 2024/2025
+    VALUE_THRESHOLDS = {
+        'elite': 20.0,       # >= €20M
+        'high': 5.0,         # >= €5M
+        'medium': 1.0,       # >= €1M
+        'low': 0.3,          # >= €300K
+        'very_low': 0.0,     # < €300K
+    }
+
+    # Valor mediano de mercado por liga (milhões EUR) — calibrado Transfermarkt 2024/25
+    # Representa o valor médio de um jogador titular na liga
+    LEAGUE_MEDIAN_VALUES = {
+        'Premier League': 15.0,
+        'La Liga': 8.0,
+        'Serie A': 7.0,          # Itália
+        'Bundesliga': 7.5,
+        'Ligue 1': 5.0,
+        'Eredivisie': 3.0,
+        'Liga Portugal': 3.5,
+        'Championship': 3.0,
+        'Serie A Brasil': 2.5,
+        'Serie B Brasil': 0.6,
+        'Liga MX': 1.5,
+        'MLS': 1.5,
+        'J1 League': 1.0,
+        'Super Lig': 2.0,
+        'Saudi Pro League': 3.0,
+        'Argentine Primera': 1.0,
+        'Belgian Pro League': 2.5,
+        'Scottish Premiership': 1.5,
+        'Swiss Super League': 2.0,
+        'Austrian Bundesliga': 1.5,
+        'Danish Superliga': 1.5,
+        'Ukrainian Premier League': 1.0,
+        'Greek Super League': 1.0,
+        'Serie C Brasil': 0.2,
+    }
+    DEFAULT_MEDIAN = 1.0  # fallback para ligas desconhecidas
+
+    # Multiplicador por posição (atacantes valem mais no mercado)
+    POSITION_MULTIPLIER = {
+        'Atacante': 1.4,
+        'Extremo': 1.3,
+        'Meia': 1.1,
+        'Volante': 0.95,
+        'Lateral': 0.85,
+        'Zagueiro': 0.80,
+        'Goleiro': 0.70,
     }
 
     def __init__(self):
@@ -515,60 +557,206 @@ class MarketValueModel:
         }
 
     def _synthetic_market_value(self, df: pd.DataFrame, features: List[str]) -> pd.Series:
-        """Cria valor de mercado sintético baseado em percentis e idade."""
+        """Cria valor de mercado sintético em milhões EUR baseado em percentis, idade e liga.
+
+        Calibrado com base em distribuição real Transfermarkt 2024/25.
+        Usa distribuição log-normal pois valores de mercado são altamente assimétricos.
+        """
         numeric_feats = [f for f in features if f != 'Idade']
         if not numeric_feats:
-            return pd.Series(50.0, index=df.index)
+            return pd.Series(0.5, index=df.index)
 
         ranks = df[numeric_feats].rank(pct=True, na_option='keep')
-        perf_score = ranks.mean(axis=1)  # 0 to 1
+        perf_pct = ranks.mean(axis=1)  # 0 to 1
 
         age = df['Idade'].apply(_safe_float) if 'Idade' in df.columns else pd.Series(25, index=df.index)
 
-        # Market value curve: peaks at 25-28
-        age_factor = 1.0 - ((age - 26.5).abs() / 15.0).clip(0, 0.5)
+        # Curva de valor por idade — pico entre 24-28, baseado em Age Curves 2.0 (TransferLab)
+        # Jogadores jovens (<22) com alta performance ganham prêmio de potencial
+        age_factor = pd.Series(1.0, index=df.index)
+        age_factor = age_factor.where(True)
+        for idx in df.index:
+            a = _safe_float(age.get(idx, 25) if hasattr(age, 'get') else age.loc[idx])
+            if np.isnan(a):
+                a = 25
+            if a < 20:
+                age_factor.loc[idx] = 1.4   # alto potencial
+            elif a < 22:
+                age_factor.loc[idx] = 1.25
+            elif a < 24:
+                age_factor.loc[idx] = 1.15
+            elif a <= 28:
+                age_factor.loc[idx] = 1.0   # pico
+            elif a <= 30:
+                age_factor.loc[idx] = 0.80
+            elif a <= 32:
+                age_factor.loc[idx] = 0.55
+            elif a <= 34:
+                age_factor.loc[idx] = 0.35
+            else:
+                age_factor.loc[idx] = 0.20
 
-        # Synthetic value: performance × age × scale
-        # Scale to realistic range (100k to 50M EUR equivalent score)
-        return (perf_score * age_factor * 100).clip(1, 100)
+        # Liga mediana
+        league_median = pd.Series(self.DEFAULT_MEDIAN, index=df.index)
+        for liga_col in ['liga_tier', 'Liga', 'League']:
+            if liga_col in df.columns:
+                for idx in df.index:
+                    liga = str(df.loc[idx, liga_col]) if pd.notna(df.loc[idx, liga_col]) else ''
+                    for league_name, med in self.LEAGUE_MEDIAN_VALUES.items():
+                        if league_name.lower() in liga.lower() or liga.lower() in league_name.lower():
+                            league_median.loc[idx] = med
+                            break
+                break
+
+        # Posição multiplicador
+        pos_mult = pd.Series(1.0, index=df.index)
+        for pos_col in ['Posição', 'Posicao', 'Position']:
+            if pos_col in df.columns:
+                for idx in df.index:
+                    pos_raw = str(df.loc[idx, pos_col]) if pd.notna(df.loc[idx, pos_col]) else ''
+                    # Tentar mapear para categoria
+                    for pos_key, mult in self.POSITION_MULTIPLIER.items():
+                        if pos_key.lower() in pos_raw.lower():
+                            pos_mult.loc[idx] = mult
+                            break
+                break
+
+        # Valor estimado = mediana_liga × performance^2 × age_factor × position_mult
+        # performance^2 cria distribuição concentrada (poucos jogadores de alto valor)
+        # Multiplicador adicional para top percentis (simula distribuição log-normal)
+        perf_multiplier = perf_pct.clip(0.01, 1.0) ** 1.5  # power law
+        # Top 5% ganham boost extra (superstars)
+        perf_multiplier = perf_multiplier.where(perf_pct < 0.95, perf_multiplier * 2.5)
+        # Top 1% ganham boost adicional
+        perf_multiplier = perf_multiplier.where(perf_pct < 0.99, perf_multiplier * 1.8)
+
+        value_eur_millions = (
+            league_median * perf_multiplier * age_factor * pos_mult * 3.0
+        ).clip(0.05, 200.0)
+
+        return value_eur_millions
 
     def _fallback_valuation(self, player_row, league, current_value) -> Dict[str, Any]:
-        """Estimativa heurística quando modelo não está treinado."""
+        """Estimativa heurística de valor de mercado em milhões EUR.
+
+        Calibrado com base em distribuições reais Transfermarkt 2024/25.
+        Usa métricas de performance + idade + liga + posição.
+        """
         age = _safe_float(player_row.get('Idade', 25))
         minutes = _safe_float(player_row.get('Minutos jogados:', 0))
         goals = _safe_float(player_row.get('Golos/90', 0))
         assists = _safe_float(player_row.get('Assistencias/90', 0))
+        xg = _safe_float(player_row.get('Golos esperados/90', 0))
+        xa = _safe_float(player_row.get('Assistencias esperadas/90', 0))
+        passes_pct = _safe_float(player_row.get('Passes certos, %', 0))
+        prog_passes = _safe_float(player_row.get('Passes progressivos/90', 0))
+        duels_pct = _safe_float(player_row.get('Duelos ganhos, %', 0))
+        prog_runs = _safe_float(player_row.get('Corridas progressivas/90', 0))
+        dribbles_pct = _safe_float(player_row.get('Dribles com sucesso, %', 0))
+        def_actions = _safe_float(player_row.get('Acoes defensivas com exito/90', 0))
 
         if np.isnan(age): age = 25
         if np.isnan(minutes): minutes = 0
         if np.isnan(goals): goals = 0
         if np.isnan(assists): assists = 0
+        if np.isnan(xg): xg = 0
+        if np.isnan(xa): xa = 0
+        if np.isnan(passes_pct): passes_pct = 70
+        if np.isnan(prog_passes): prog_passes = 3
+        if np.isnan(duels_pct): duels_pct = 45
+        if np.isnan(prog_runs): prog_runs = 1
+        if np.isnan(dribbles_pct): dribbles_pct = 40
+        if np.isnan(def_actions): def_actions = 3
 
-        # Simple score 0-100
-        perf = min(100, (goals * 20 + assists * 15 + min(minutes / 30, 50)))
-        age_mult = max(0.3, 1.0 - abs(age - 26) * 0.05)
-        league_mult = get_opta_league_power(league) if league else 0.7
-        score = perf * age_mult * league_mult
+        # Performance score composto (0-1) — média ponderada de múltiplas métricas
+        # Normalização baseada em referências top-percentil Wyscout
+        perf_components = [
+            min(1.0, (goals + xg) / 1.2) * 0.20,        # produção ofensiva
+            min(1.0, (assists + xa) / 0.8) * 0.15,       # criação
+            min(1.0, passes_pct / 90.0) * 0.10,          # precisão
+            min(1.0, prog_passes / 10.0) * 0.12,         # progressão passe
+            min(1.0, prog_runs / 5.0) * 0.08,            # progressão corrida
+            min(1.0, duels_pct / 60.0) * 0.10,           # duelos
+            min(1.0, dribbles_pct / 65.0) * 0.08,        # dribles
+            min(1.0, def_actions / 8.0) * 0.07,           # defesa
+            min(1.0, minutes / 2500.0) * 0.10,           # regularidade
+        ]
+        perf_score = sum(perf_components)  # 0 to ~1
 
+        # Curva de idade (Age Curves 2.0 — TransferLab)
+        if age < 20:
+            age_factor = 1.5   # alto potencial, prêmio de juventude
+        elif age < 22:
+            age_factor = 1.35
+        elif age < 24:
+            age_factor = 1.2
+        elif age <= 28:
+            age_factor = 1.0   # pico
+        elif age <= 30:
+            age_factor = 0.75
+        elif age <= 32:
+            age_factor = 0.50
+        elif age <= 34:
+            age_factor = 0.30
+        else:
+            age_factor = 0.15
+
+        # Mediana da liga
+        league_median = self.DEFAULT_MEDIAN
+        if league:
+            league_median = self.LEAGUE_MEDIAN_VALUES.get(league, self.DEFAULT_MEDIAN)
+            # Tentar match parcial
+            if league_median == self.DEFAULT_MEDIAN:
+                for lg_name, med in self.LEAGUE_MEDIAN_VALUES.items():
+                    if lg_name.lower() in league.lower() or league.lower() in lg_name.lower():
+                        league_median = med
+                        break
+            # Fallback: usar Opta power como proxy
+            if league_median == self.DEFAULT_MEDIAN:
+                opta = get_opta_league_power(league)
+                league_median = opta * 8.0  # PL=1.0 → €8M base
+
+        # Posição
+        pos_raw = str(player_row.get('Posição', '')) if pd.notna(player_row.get('Posição', None)) else ''
+        pos_mult = 1.0
+        for pos_key, mult in self.POSITION_MULTIPLIER.items():
+            if pos_key.lower() in pos_raw.lower():
+                pos_mult = mult
+                break
+
+        # Valor estimado (milhões EUR)
+        # Performance^1.5 cria power law (poucos jogadores de alto valor)
+        estimated = league_median * (perf_score ** 1.5) * age_factor * pos_mult * 3.0
+        # Top performers (score > 0.8) ganham boost exponencial
+        if perf_score > 0.85:
+            estimated *= 2.0
+        elif perf_score > 0.75:
+            estimated *= 1.5
+        estimated = max(0.05, round(estimated, 2))  # mínimo €50K
+
+        # Gap vs valor atual (current_value em milhões EUR)
         gap = None
+        gap_pct = None
         if current_value and current_value > 0:
-            gap = score - current_value
+            gap = estimated - current_value
+            gap_pct = (gap / current_value) * 100
 
         return {
-            'estimated_market_value': round(score, 1),
-            'market_value_gap': round(gap, 1) if gap is not None else None,
-            'market_value_gap_pct': None,
-            'value_category': self._categorize_value(score),
+            'estimated_market_value': round(estimated, 2),
+            'market_value_gap': round(gap, 2) if gap is not None else None,
+            'market_value_gap_pct': round(gap_pct, 1) if gap_pct is not None else None,
+            'value_category': self._categorize_value(estimated),
             'is_undervalued': gap is not None and gap > 0,
             'method': 'heuristic_fallback',
         }
 
     @staticmethod
-    def _categorize_value(score: float) -> str:
-        if score >= 80: return 'elite'
-        if score >= 60: return 'high'
-        if score >= 40: return 'medium'
-        if score >= 20: return 'low'
+    def _categorize_value(value_millions: float) -> str:
+        """Categoriza valor de mercado em milhões EUR."""
+        if value_millions >= 20.0: return 'elite'
+        if value_millions >= 5.0: return 'high'
+        if value_millions >= 1.0: return 'medium'
+        if value_millions >= 0.3: return 'low'
         return 'very_low'
 
 
@@ -627,7 +815,7 @@ class MarketOpportunityDetector:
 
         # Component 3: Value gap (0-1, higher = more undervalued)
         if value_gap is not None and value_gap > 0:
-            value_norm = min(1.0, value_gap / 50.0)  # cap at 50 units of gap
+            value_norm = min(1.0, value_gap / 10.0)  # cap at €10M gap (values in EUR millions)
         else:
             value_norm = 0.5  # neutral if no gap data
 

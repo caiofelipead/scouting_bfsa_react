@@ -2422,10 +2422,16 @@ async def predict_market_value(
     engine = _get_scouting_engine()
     mv = engine.market_model.predict_market_value(row_data, league, req.current_value)
 
+    team = str(row_data.get("Equipa", "")) if pd.notna(row_data.get("Equipa")) else None
+    age_val = pd.to_numeric(row_data.get("Idade"), errors="coerce")
+
     return MarketValueResponse(
         player=str(row_data.get("Jogador", "")),
         display_name=player_name,
         position=pos,
+        team=team,
+        league=league,
+        age=float(age_val) if pd.notna(age_val) else None,
         estimated_market_value=mv.get("estimated_market_value"),
         market_value_gap=mv.get("market_value_gap"),
         market_value_gap_pct=mv.get("market_value_gap_pct"),

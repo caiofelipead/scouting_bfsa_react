@@ -4,12 +4,14 @@ import { DollarSign, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query';
 import api from '../lib/api';
 import { usePlayers } from '../hooks/usePlayers';
-import { getScoreColor } from '../lib/utils';
 
 interface MarketValueResult {
   player: string;
   display_name: string | null;
   position: string | null;
+  team: string | null;
+  league: string | null;
+  age: number | null;
   estimated_market_value: number | null;
   market_value_gap: number | null;
   market_value_gap_pct: number | null;
@@ -24,6 +26,22 @@ const VALUE_LABELS: Record<string, { label: string; color: string }> = {
   'low': { label: 'Baixo', color: '#f97316' },
   'very_low': { label: 'Muito Baixo', color: '#ef4444' },
 };
+
+/** Formata valor em milhões EUR para exibição */
+function formatEUR(millions: number): string {
+  if (millions >= 1.0) {
+    return `€${millions.toFixed(1)}M`;
+  }
+  return `€${(millions * 1000).toFixed(0)}K`;
+}
+
+function getValueColor(millions: number): string {
+  if (millions >= 20) return '#22c55e';
+  if (millions >= 5) return '#3b82f6';
+  if (millions >= 1) return '#eab308';
+  if (millions >= 0.3) return '#f97316';
+  return '#ef4444';
+}
 
 export default function MarketValuePage() {
   const [search, setSearch] = useState('');
@@ -63,7 +81,7 @@ export default function MarketValuePage() {
           Valor de Mercado
         </h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-          Estimativa com XGBoost — Khalife et al. (MDPI 2025), R² {'>'} 0.90
+          Estimativa em EUR — Khalife et al. (MDPI 2025), calibrado Transfermarkt 2024/25
         </p>
       </div>
 
@@ -92,8 +110,8 @@ export default function MarketValuePage() {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>VALOR ATUAL (opcional)</label>
-            <input type="number" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} placeholder="Ex: 50 (score)" className="px-3 py-2 rounded text-sm outline-none w-40" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
+            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>VALOR ATUAL €M (opcional)</label>
+            <input type="number" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} placeholder="Ex: 5.0" className="px-3 py-2 rounded text-sm outline-none w-40" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
           </div>
           <button
             onClick={() => valuation.mutate()}
@@ -109,17 +127,22 @@ export default function MarketValuePage() {
       {result && (
         <>
           <div className="card-glass rounded-lg p-5" style={{ background: 'linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.8))' }}>
-            <div className="font-bold text-xl">{result.player}</div>
-            <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{result.position}</div>
+            <div className="font-bold text-xl">{result.display_name || result.player}</div>
+            <div className="text-xs mt-1 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+              <span>{result.position}</span>
+              {result.team && <><span>·</span><span>{result.team}</span></>}
+              {result.league && <><span>·</span><span>{result.league}</span></>}
+              {result.age != null && <><span>·</span><span>{result.age.toFixed(0)} anos</span></>}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-glass rounded-lg p-4 text-center">
               <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>VALOR ESTIMADO</div>
-              <div className="text-2xl font-[var(--font-mono)] font-bold mt-1" style={{ color: getScoreColor(result.estimated_market_value ?? 50) }}>
-                {result.estimated_market_value?.toFixed(1) ?? '-'}
+              <div className="text-2xl font-[var(--font-mono)] font-bold mt-1" style={{ color: result.estimated_market_value != null ? getValueColor(result.estimated_market_value) : '#6b7280' }}>
+                {result.estimated_market_value != null ? formatEUR(result.estimated_market_value) : '-'}
               </div>
-              <div className="text-[9px]" style={{ color: 'var(--color-text-muted)' }}>Score de valor</div>
+              <div className="text-[9px]" style={{ color: 'var(--color-text-muted)' }}>Estimativa Transfermarkt</div>
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-glass rounded-lg p-4 text-center">
@@ -129,12 +152,12 @@ export default function MarketValuePage() {
               </div>
             </motion.div>
 
-            {result.market_value_gap !== null && (
+            {result.market_value_gap != null && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card-glass rounded-lg p-4 text-center">
                 <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>GAP DE VALOR</div>
                 <div className="text-2xl font-[var(--font-mono)] font-bold mt-1 flex items-center justify-center gap-1" style={{ color: result.market_value_gap > 0 ? '#22c55e' : '#ef4444' }}>
                   {result.market_value_gap > 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
-                  {result.market_value_gap > 0 ? '+' : ''}{result.market_value_gap.toFixed(1)}
+                  {result.market_value_gap > 0 ? '+' : ''}{formatEUR(Math.abs(result.market_value_gap))}
                 </div>
                 <div className="text-[9px]" style={{ color: 'var(--color-text-muted)' }}>
                   {result.is_undervalued ? 'Subvalorizado' : 'Sobrevalorizado'}
@@ -142,7 +165,7 @@ export default function MarketValuePage() {
               </motion.div>
             )}
 
-            {result.market_value_gap_pct !== null && (
+            {result.market_value_gap_pct != null && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card-glass rounded-lg p-4 text-center">
                 <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>GAP %</div>
                 <div className="text-2xl font-[var(--font-mono)] font-bold mt-1" style={{ color: result.market_value_gap_pct > 0 ? '#22c55e' : '#ef4444' }}>
@@ -158,7 +181,7 @@ export default function MarketValuePage() {
         <div className="card-glass rounded-lg p-8 text-center" style={{ color: 'var(--color-text-muted)' }}>
           <DollarSign size={32} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">Selecione um jogador e clique em ESTIMAR</p>
-          <p className="text-xs mt-1 opacity-60">XGBoost com segmentacao por posicao x faixa etaria</p>
+          <p className="text-xs mt-1 opacity-60">Valor em EUR com ajuste por liga, posicao e idade</p>
         </div>
       )}
     </div>

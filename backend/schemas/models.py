@@ -191,6 +191,9 @@ class MarketValueResponse(BaseModel):
     player: str
     display_name: Optional[str] = None
     position: Optional[str] = None
+    team: Optional[str] = None
+    league: Optional[str] = None
+    age: Optional[float] = None
     estimated_market_value: Optional[float] = None
     market_value_gap: Optional[float] = None
     market_value_gap_pct: Optional[float] = None
