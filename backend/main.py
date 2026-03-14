@@ -2308,6 +2308,11 @@ async def get_skillcorner_coverage(current_user: dict = Depends(get_current_user
 _ALLOWED_IMAGE_HOSTS = {
     "api.sofascore.com",
     "images.fotmob.com",
+    "logodetimes.com",
+    "www.logodetimes.com",
+    "upload.wikimedia.org",
+    "tmssl.akamaized.net",
+    "img.a.transfermarkt.technology",
 }
 
 # Simple in-memory cache for proxied images (URL → (content_type, bytes))
@@ -2321,8 +2326,11 @@ async def image_proxy(url: str):
     from urllib.parse import urlparse
 
     parsed = urlparse(url)
-    if parsed.hostname not in _ALLOWED_IMAGE_HOSTS:
-        raise HTTPException(status_code=400, detail="Domain not allowed")
+    if not parsed.hostname or not parsed.scheme.startswith("http"):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+
+    # Allow any image host — the proxy exists to avoid CORS/hotlink issues
+    # (restrict to http/https only for safety)
 
     # Check cache
     if url in _image_cache:
@@ -2335,7 +2343,12 @@ async def image_proxy(url: str):
             async with session.get(
                 url,
                 timeout=aiohttp.ClientTimeout(total=10),
-                headers={"User-Agent": "Mozilla/5.0 (compatible; ScoutingBot/1.0)"},
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                    "Referer": f"{parsed.scheme}://{parsed.hostname}/",
+                },
+                allow_redirects=True,
             ) as resp:
                 if resp.status != 200:
                     raise HTTPException(status_code=resp.status, detail="Upstream image fetch failed")

@@ -55,12 +55,12 @@ api.interceptors.response.use(
 );
 
 /**
- * Route external image URLs through the backend proxy to avoid 403 errors.
- * Only proxies URLs from known external hosts; passes through others unchanged.
+ * Route external image URLs through the backend proxy to avoid CORS/hotlink 403 errors.
+ * Proxies all absolute http(s) URLs; local/relative URLs pass through unchanged.
  */
 export function proxyImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
-  if (url.includes('api.sofascore.com') || url.includes('images.fotmob.com')) {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
     return `/api/image-proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
