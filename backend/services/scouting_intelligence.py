@@ -5,22 +5,79 @@ scouting_intelligence.py — Scouting Intelligence Engine v1.0
 Expande o predictive_engine existente com 6 modelos de ML para scouting avançado:
 
 1. PlayerTrajectoryModel   — prever evolução de carreira (Gradient Boosting)
-2. MarketValueModel        — estimar valor de mercado (XGBoost)
+2. MarketValueModel        — estimar valor de mercado em EUR (XGBoost)
 3. MarketOpportunityDetector — identificar oportunidades de mercado
 4. PlayerReplacementEngine — sugerir substitutos com similaridade multi-método
 5. TemporalPerformanceTrend — detectar tendências de performance
 6. LeagueStrengthAdjuster  — ajuste por nível de liga
 
-Base científica:
-- Bhatt et al. (2025): KickClone — Cosine Similarity + PCA para substituição
-- FPSRec (IEEE BigData 2024): Recomendação com similaridade + IA generativa
-- Khalife et al. (MDPI 2025): Valuation com XGBoost, R² > 0.90
-- Gyarmati & Stanojevic (2016): Análise temporal de performance
-- Decroos et al. (2019), Pappalardo et al. (2019): Trajectory prediction
-- Bransen & Van Haaren (2020): Player trajectory models
-- MDPI 2025 Systematic Review: RF, XGBoost, GBM, SVM mais utilizados
-
 Integra-se ao predictive_engine.py sem alterar pipeline existente.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BASE CIENTÍFICA — MAPA REFERÊNCIA × MODELO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Modelo 1 — PlayerTrajectoryModel:
+  - Decroos et al. (KDD 2019): VAEP — Valuing Actions by Estimating Probabilities.
+    VAEP(ação) = ΔP(marca gol) + (−ΔP(sofre gol)).
+    Base teórica para vaep_rating_per90 como proxy de performance.
+    Implementação open-source: socceraction (ML-KULeuven).
+  - Bransen & Van Haaren (2020): On-the-Ball Contributions from Passes.
+    Justifica progressive_passes e xA_per90 como features.
+  - MDPI Applied Sciences (2025): SciSkill Forecasting.
+    86 features, RF melhor para ETV, XGBoost melhor para SciSkill.
+    Janela de previsão = 1 ano. Valida diretamente a arquitetura do M1.
+  - ICSPORTS (2025): Can We Predict Success? 8.770 jogadores.
+    SHAP: trajetórias de desenvolvimento > atributos estáticos.
+    Janela 22-26 anos: F1 = 0.86. Late bloomers = maior desafio.
+  - Age Curves 2.0 (TransferLab / Analytics FC):
+    Drible decai cedo, passe e leitura permanecem estáveis.
+    Velocidade: declínio linear após ~26 anos.
+
+Modelo 2 — MarketValueModel:
+  - Khalife et al. (MDPI 2025): Dynamic Financial Valuation com XGBoost.
+    9 modelos segmentados (posição × faixa etária). R² > 0.91 atacantes jovens.
+    Feature mais crítica: 'potential'. Validação: R² com/sem potencial.
+    Valores calibrados Transfermarkt 2024/25 em milhões EUR.
+  - Poli, Besson, Ravenel (CIES / MDPI 2021): Econometric Approach.
+    MLR com R² > 85%. +1 ano contrato = +22% fee. -1 ano idade = +12%.
+    Inflação: +9.6% ao ano (2012-2021).
+  - Gyarmati & Stanojevic (2016): Data-Driven Player Assessment.
+    Precursor: estimar valor de mercado a partir de métricas de performance.
+  - GDA (TransferLab / Analytics FC): Goal Difference Added per 90min.
+    Cadeias de Markov: GDA_per90 como proxy superior ao player_rating.
+
+Modelo 3 — MarketOpportunityDetector:
+  - Brighton & Hove Albion (Starlizard): Blueprint de recrutamento analytics.
+    Caicedo £4.5m → £115m. Mitoma £3m → ~£50m+. Cucurella £15m → £63m.
+    Estratégia: xPts + Justiça de Tabela + Players Subvalorizados.
+  - Brentford (Matthew Benham / Smartodds): Modelos estatísticos + scouting humano.
+  - FC Midtjylland: Ligas submonitoradas, gaps de informação.
+  - VAEP (Decroos 2019) + Age Curves 2.0: componentes do opportunity score.
+
+Modelo 4 — PlayerReplacementEngine:
+  - Bhatt et al. (AIMV 2025): KickClone. Pipeline: Normalização → PCA → Cosine
+    Similarity → Top-K substitutos. Dataset: +200K jogadores EAFC 24.
+    Cosine mede ângulo (estilo independente de volume). PCA elimina redundância.
+  - Spatial Similarity Index (PMC/NCBI 2025): Estatística de Lee.
+    Dimensão espacial/tática: onde o jogador atua, não apenas o que faz.
+    Complemento ideal: 50% cosine + 30% mahalanobis + 20% spatial.
+  - FPSRec (IEEE BigData 2024): IA generativa para relatórios interpretativos
+    dos Top-20 substitutos identificados via similaridade.
+
+Modelo 5 — TemporalPerformanceTrend:
+  - Age Curves 2.0 (TransferLab): Curvas de decaimento por habilidade.
+  - Gyarmati & Stanojevic (2016): Análise temporal de performance.
+
+Modelo 6 — LeagueStrengthAdjuster:
+  - Opta Power Rankings (Stats Perform 2025): Elo modificado, 0-100.
+    +13.500 clubes classificados. Ratings ajustados por resultado × força adversário.
+    PL ~88-92, La Liga ~85-88, Serie A Brasil ~78-81, Serie B Brasil ~64-68.
+
+Revisões Sistemáticas:
+  - MDPI 2025 (172 artigos): RF, XGBoost, GBM = algoritmos mais maduros.
+  - LJMU + KU Leuven (Science & Medicine in Football, 2025): Agenda futura.
+  - Frost & Groom (2025): Integração dados + scouting humano = essencial.
 """
 
 import numpy as np
@@ -202,18 +259,26 @@ def _prepare_feature_matrix(df: pd.DataFrame, features: List[str],
 # ================================================================
 
 class PlayerTrajectoryModel:
-    """Prevê evolução de performance de jogadores.
+    """Prevê evolução de performance de jogadores (predicted_rating_next_season).
 
     Base científica:
-    - Decroos et al. (2019): Actions Speak Louder than Goals
-    - Pappalardo et al. (2019): PlayeRank
-    - Bransen & Van Haaren (2020): Player trajectory analysis
+    - Decroos et al. (KDD 2019): VAEP — Actions Speak Louder than Goals.
+      VAEP(ação) = ΔP(marca gol) − ΔP(sofre gol). Framework base para
+      vaep_rating_per90 como proxy de performance individual.
+    - Bransen & Van Haaren (2020): On-the-Ball Contributions from Passes.
+      Justifica progressive_passes e xA_per90 como features preditivas.
+    - SciSkill Forecasting (MDPI Applied Sciences, 2025): 86 features,
+      RF melhor para ETV, XGBoost melhor para SciSkill. Janela = 1 ano.
+    - ICSPORTS (2025): Can We Predict Success? N=8.770.
+      SHAP: trajetórias > atributos estáticos. Janela 22-26: F1=0.86.
+    - Age Curves 2.0 (TransferLab): Drible decai cedo, passe estável.
+      Velocidade: declínio linear após ~26 anos.
 
     Pipeline:
     1. Normalização z-score
     2. Feature selection via mutual information
     3. Gradient Boosting Regression
-    4. Cross-validation
+    4. Cross-validation (5-fold)
     """
 
     def __init__(self):
@@ -384,14 +449,20 @@ class PlayerTrajectoryModel:
 # ================================================================
 
 class MarketValueModel:
-    """Estima valor de mercado com XGBoost.
+    """Estima valor de mercado em milhões EUR com XGBoost.
+
+    Valores calibrados com distribuição real Transfermarkt 2024/25.
+    Medianas por liga + multiplicador por posição + Age Curves 2.0.
 
     Base científica:
-    - Khalife et al. (MDPI 2025): Dynamic Financial Valuation, R² > 0.90
-    - Nunes (UFMG 2025): Fuzzy + RF para valuation
-    - Bryson et al. (2021): Market value determinants
-
-    Segmentação por posição × faixa etária conforme Khalife et al.
+    - Khalife et al. (MDPI 2025): Dynamic Financial Valuation com XGBoost.
+      9 modelos segmentados (posição × faixa etária). R² > 0.91 atacantes jovens.
+      Feature mais crítica: 'potential'. Com/sem potencial: R²=0.91 vs 0.74.
+    - Poli, Besson, Ravenel (CIES / MDPI 2021): Econometric Approach.
+      MLR R² > 85%. +1 ano contrato = +22% fee. -1 ano idade = +12%.
+    - Gyarmati & Stanojevic (2016): Precursor data-driven assessment.
+    - GDA (TransferLab): Goal Difference Added per 90min via Cadeias de Markov.
+    - Age Curves 2.0 (TransferLab): Curvas de decaimento por habilidade.
     """
 
     # Categorias de valor de mercado (em milhões EUR)
@@ -896,14 +967,20 @@ class PlayerReplacementEngine:
     """Motor de busca de substitutos para jogadores.
 
     Base científica:
-    - Bhatt et al. (2025): KickClone — Cosine Similarity + PCA
-    - FPSRec (IEEE BigData 2024): Similarity + AI for scouting
-    - Spatial Similarity Index (PMC/NCBI 2025): Lee's Spatial Statistic
+    - Bhatt et al. (AIMV 2025): KickClone — Normalização → PCA → Cosine
+      Similarity → Top-K. Dataset: +200K jogadores EAFC 24.
+      Cosine mede ângulo (estilo independente de volume).
+      PCA elimina correlação entre features redundantes.
+    - Spatial Similarity Index (PMC/NCBI 2025): Estatística de Lee.
+      Dimensão espacial/tática: onde o jogador atua, não apenas o que faz.
+      Complemento ideal: 50% cosine + 30% mahalanobis + 20% spatial.
+    - FPSRec (IEEE BigData 2024): IA generativa para relatórios
+      interpretativos dos Top-20 substitutos via similaridade.
 
     Similaridade multi-método:
-    1. Cosine Similarity (Bhatt et al.)
-    2. Mahalanobis Distance (distribuição multivariada)
-    3. Cluster Proximity (KickClone approach)
+    1. Cosine Similarity (45%) — perfil técnico
+    2. Mahalanobis Distance (35%) — distribuição multivariada
+    3. Cluster Proximity (20%) — proximidade tática
     """
 
     COSINE_WEIGHT = 0.45
@@ -1091,7 +1168,9 @@ class TemporalPerformanceTrend:
     """Análise temporal de tendência de performance.
 
     Base científica:
-    - Gyarmati & Stanojevic (2016): Analyzing player performance over time
+    - Gyarmati & Stanojevic (2016): Analyzing player performance over time.
+    - Age Curves 2.0 (TransferLab): Diferentes habilidades decaem em
+      idades diferentes — drible decai cedo, passe permanece estável.
 
     Calcula:
     performance_trend = rolling_mean(last) - rolling_mean(previous)
@@ -1191,6 +1270,12 @@ class TemporalPerformanceTrend:
 
 class LeagueStrengthAdjuster:
     """Ajuste de métricas por nível de liga.
+
+    Base científica:
+    - Opta Power Rankings (Stats Perform 2025): Elo modificado, escala 0-100.
+      +13.500 clubes classificados globalmente.
+      Ratings ajustados após cada partida: resultado × força do adversário.
+      PL ~88-92, La Liga ~85-88, Serie A Brasil ~78-81, Serie B Brasil ~64-68.
 
     Combina:
     - UEFA coefficient logic (hierarquia de ligas)

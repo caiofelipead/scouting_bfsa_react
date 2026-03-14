@@ -2,7 +2,7 @@
 calibration.py — Coeficientes Reais Calibrados pela Literatura Acadêmica
 =========================================================================
 
-Fonte dos coeficientes:
+Fonte dos coeficientes (Motor Original — predictive_engine.py):
 
 1. PIBITI João Vitor Oliveira (Insper, 2025)
    → Regressão Linear Múltipla sobre dados SofaScore
@@ -29,6 +29,16 @@ Fonte dos coeficientes:
    → Gradient Boosting para predição de GoalRatio
    → RMSE = 0.016 (melhor resultado com z-score normalization)
    → Classificação de desempenho em 5 classes
+
+Base científica complementar (Scouting Intelligence Engine — scouting_intelligence.py):
+  - Decroos et al. (KDD 2019): VAEP — Valuing Actions by Estimating Probabilities
+  - Khalife et al. (MDPI 2025): Dynamic Financial Valuation, R² > 0.91
+  - Bhatt et al. (AIMV 2025): KickClone — Cosine Similarity + PCA
+  - Age Curves 2.0 (TransferLab): Curvas de decaimento por habilidade
+  - Opta Power Rankings (Stats Perform 2025): Elo modificado, +13.500 clubes
+  - SciSkill Forecasting (MDPI 2025): 86 features, RF + XGBoost
+  - Brighton / Brentford / Midtjylland: Validação empírica do opportunity score
+  Ver docstring completa em scouting_intelligence.py para mapeamento detalhado.
 """
 
 import numpy as np

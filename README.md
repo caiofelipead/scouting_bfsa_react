@@ -80,29 +80,56 @@ Ajuste de métricas por nível de liga via Opta Power Ranking.
 
 ---
 
-## Referências Científicas
+## Base Científica — Mapa Referência × Modelo
 
-### Modelos de Similaridade e Substituição
-- Bhatt, Pandya, Raje, Shah (2025). *KickClone: A Machine Learning Model Built to Revolutionize Football Scouting.* AIMV 2025.
-- *FPSRec: Football Players Scouting Recommendation System.* IEEE BigData 2024.
-- *Spatial Similarity Index for Scouting in Football.* PMC/NCBI 2025.
+| Referência | Modelo(s) |
+|-----------|-----------|
+| Decroos et al. (KDD 2019) — VAEP | M1 Trajectory, M3 Opportunity |
+| Bransen & Van Haaren (2020) | M1 Trajectory |
+| SciSkill Forecasting (MDPI 2025) | M1 Trajectory + M3 Opportunity |
+| Can We Predict Success? (ICSPORTS 2025) | M1 Trajectory |
+| Age Curves 2.0 — TransferLab | M1 Trajectory + M5 Trend |
+| Khalife et al. (MDPI 2025) | M2 Market Value |
+| Poli / Bryson et al. (CIES / MDPI 2021) | M2 Market Value |
+| Gyarmati & Stanojevic (2016) | M2 Market Value |
+| GDA — TransferLab / Analytics FC | M1 Trajectory + M3 Opportunity |
+| Brighton Analytics (Starlizard) | M3 Opportunity |
+| KickClone — Bhatt et al. (AIMV 2025) | M4 Replacement Engine |
+| Spatial Similarity Index (PMC 2025) | M4 Replacement Engine |
+| FPSRec (IEEE BigData 2024) | M4 Replacement Engine |
+| Opta Power Rankings (Stats Perform 2025) | M6 League Adjustment |
+| MDPI 2025 Systematic Review (172 artigos) | Visão geral |
+| LJMU + KU Leuven (2025) | Visão geral / agenda |
+| Frost & Groom (2025) | Processo de integração |
 
-### Revisões Sistemáticas
-- *Artificial Intelligence in Football Scouting: Systematic Literature Review and Application with Unsupervised Machine Learning.* 2025.
-- *Machine Learning Applied to Professional Football.* MDPI 2025 (172 artigos, 2019-2024).
+### Referências Detalhadas
 
-### Valuation de Jogadores
-- Khalife et al. (2025). *Dynamic Financial Valuation of Football Players: A Machine Learning Approach.* MDPI.
+**Trajectory & Performance Prediction:**
+- Decroos, Bransen, Van Haaren, Davis (KDD 2019). *Actions Speak Louder than Goals: Valuing Player Actions in Soccer (VAEP).* VAEP(ação) = ΔP(gol) − ΔP(sofrer gol). Implementação: socceraction (ML-KULeuven).
+- Bransen & Van Haaren (2020). *Measuring Players' On-the-Ball Contributions from Passes.*
+- MDPI Applied Sciences (2025). *Forecasting Future Development in Quality and Value of Football Players.* 86 features, RF melhor para ETV, XGBoost para SciSkill.
+- ICSPORTS (2025). *Can We Really Predict Which Football Players Will Succeed?* N=8.770. SHAP: trajetórias > atributos estáticos. Janela 22-26: F1=0.86.
+- Age Curves 2.0 (TransferLab / Analytics FC). Curvas de decaimento por habilidade: drible decai cedo, passe estável.
 
-### Frameworks de Scouting com ML
-- *A Machine Learning Framework to Scout Football Players.* National College of Ireland.
-- *An xG-Based Football Scouting System Using Machine Learning Techniques.* 2024.
+**Market Value & Opportunity:**
+- Khalife et al. (MDPI 2025). *Dynamic Financial Valuation of Football Players.* XGBoost, 9 modelos (posição × faixa etária). R² > 0.91 atacantes jovens.
+- Poli, Besson, Ravenel (CIES / MDPI 2021). *Econometric Approach to Assessing Transfer Fees.* MLR R² > 85%.
+- Gyarmati & Stanojevic (2016). *Towards Data-Driven Football Player Assessment.*
+- GDA (TransferLab / Analytics FC). Goal Difference Added per 90min via Cadeias de Markov.
+- Brighton & Hove Albion (Starlizard). Caicedo £4.5m → £115m. Mitoma £3m → ~£50m+.
 
-### Análise de Performance e Recrutamento
-- Frost & Groom (2025). *The Use of Performance Analysis and Data-Driven Approaches within Senior Men's Football Recruitment.*
-- Liverpool JMU + KU Leuven (2025). *Perspectives on Data Analytics for Gaining a Competitive Advantage in Football.* Science & Medicine in Football.
+**Similaridade & Substituição:**
+- Bhatt, Pandya, Raje, Shah (AIMV 2025). *KickClone.* Normalização → PCA → Cosine Similarity → Top-K. +200K jogadores.
+- *Spatial Similarity Index for Scouting in Football.* PMC/NCBI 2025. Estatística de Lee.
+- *FPSRec: Football Players Scouting Recommendation System.* IEEE BigData 2024. IA generativa para relatórios.
 
-### Calibração do Motor Original
+**Revisões Sistemáticas:**
+- MDPI 2025. *Machine Learning Applied to Professional Football.* 172 artigos (2019-2024). RF, XGBoost, GBM = mais utilizados.
+- LJMU + KU Leuven (2025). *Perspectives on Data Analytics for Gaining a Competitive Advantage in Football.* Science & Medicine in Football.
+- Frost & Groom (2025). *The Use of Performance Analysis and Data-Driven Approaches within Football Recruitment.*
+- Opta Power Rankings (Stats Perform 2025). Elo modificado, +13.500 clubes, escala 0-100.
+
+### Calibração do Motor Original (predictive_engine.py)
 - PIBITI João Vitor Oliveira (Insper, 2025): Coeficientes β de rating por posição.
 - Victor Valvano Schimidt (UNESP, 2021): Coeficientes de win-probability.
 - Eduardo Baptista dos Santos (MBA USP/ICMC, 2024): Classificação de jogadores por posição.
@@ -110,7 +137,6 @@ Ajuste de métricas por nível de liga via Opta Power Ranking.
 - Tiago Pinto (ISEP Porto, 2024): Gradient Boosting para predição de performance.
 - Felipe Nunes (UFMG, 2025): Fuzzy + Random Forest para recrutamento.
 - Gabriel Buso (UFSC, 2025): Modelos xG e xGOT.
-- Gyarmati & Stanojevic (2016): Análise temporal de jogadores.
 
 ---
 
