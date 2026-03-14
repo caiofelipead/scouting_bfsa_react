@@ -1495,19 +1495,25 @@ class ContractImpactAnalyzer:
     tática, perfil etário, eficiência financeira e risco.
 
     Base Científica:
+      - Bransen & Van Haaren (2020): Player Chemistry — MIT Sloan.
+        Prediz chemistry ofensiva/defensiva entre pares de jogadores,
+        inclusive jogadores que nunca jogaram juntos. Team Builder algorithm.
+      - Saebo & Hvattum (2019): Marginal Financial Contribution.
+        Mesmo jogador = valor diferente por contexto de elenco.
+        Victor Moses: £5.2M para QPR, £0.1M para Chelsea.
       - Pappalardo et al. (2019): PlayeRank — Role-aware multi-dimensional
         player evaluation. Avalia impacto marginal por posição.
-      - Fernandez et al. (2021): Expected Possession Value (EPV).
-        Valor incremental de posse para estimar contribuição marginal.
+      - Scully (1974) / Gerrard (2001): MRP = MPC × MWR + PIV.
+        Marginal Playing Contribution × Marginal Win Revenue + Player Image Value.
       - Poli, Besson, Ravenel (CIES 2021): Econometric transfer fees.
         +1 ano contrato = +22% fee. Ajuste financeiro por contrato.
-      - Gerrard (2001): Sport Finance — Marginal Revenue Product (MRP).
-        MRP = ΔRevenue / ΔWins × ΔWins / ΔPerformance.
-      - Tunaru & Viney (2010): Sports Finance. Valor incremental ao squad.
       - Kuper & Szymanski (2009): Soccernomics. Wages correlate w/ league
         position (R² > 0.90); signing quality = ΔExpected Points.
+      - Pantuso (2017): Football Team Composition Problem.
+        Stochastic programming para otimização de elenco sob restrições.
       - Age Curves 2.0 (TransferLab): Horizonte de valorização do ativo.
       - VAEP (Decroos et al. 2019): Contribuição marginal por ação.
+      - Frost & Groom (2025): Integration challenges em recrutamento.
     """
 
     # Pesos do score composto final (soma = 1.0)
