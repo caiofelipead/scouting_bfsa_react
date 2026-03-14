@@ -20,6 +20,7 @@ import TrajectoryPage from './pages/TrajectoryPage';
 import MarketValuePage from './pages/MarketValuePage';
 import OpportunitiesPage from './pages/OpportunitiesPage';
 import ReplacementsPage from './pages/ReplacementsPage';
+import ContractImpactPage from './pages/ContractImpactPage';
 
 function App() {
   const { user, isAuthenticated, loading, error, login, logout } = useAuth();
@@ -61,6 +62,8 @@ function App() {
         return <OpportunitiesPage />;
       case 'replacements':
         return <ReplacementsPage />;
+      case 'contract_impact':
+        return <ContractImpactPage />;
       default:
         return <DashboardPage />;
     }

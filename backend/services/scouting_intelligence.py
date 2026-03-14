@@ -2,14 +2,15 @@
 scouting_intelligence.py — Scouting Intelligence Engine v1.0
 =============================================================
 
-Expande o predictive_engine existente com 6 modelos de ML para scouting avançado:
+Expande o predictive_engine existente com 7 modelos de ML para scouting avançado:
 
-1. PlayerTrajectoryModel   — prever evolução de carreira (Gradient Boosting)
-2. MarketValueModel        — estimar valor de mercado em EUR (XGBoost)
+1. PlayerTrajectoryModel     — prever evolução de carreira (Gradient Boosting)
+2. MarketValueModel          — estimar valor de mercado em EUR (XGBoost)
 3. MarketOpportunityDetector — identificar oportunidades de mercado
-4. PlayerReplacementEngine — sugerir substitutos com similaridade multi-método
-5. TemporalPerformanceTrend — detectar tendências de performance
-6. LeagueStrengthAdjuster  — ajuste por nível de liga
+4. PlayerReplacementEngine   — sugerir substitutos com similaridade multi-método
+5. TemporalPerformanceTrend  — detectar tendências de performance
+6. LeagueStrengthAdjuster    — ajuste por nível de liga
+7. ContractImpactAnalyzer    — impacto de contratação no elenco
 
 Integra-se ao predictive_engine.py sem alterar pipeline existente.
 
@@ -1483,11 +1484,782 @@ class LeagueStrengthAdjuster:
 
 
 # ================================================================
+# MODELO 7 — CONTRACT IMPACT ANALYZER
+# ================================================================
+
+class ContractImpactAnalyzer:
+    """Modelo 7: Análise de impacto de contratação no elenco existente.
+
+    Calcula o impacto potencial de um jogador-alvo no elenco do Botafogo-SP,
+    considerando necessidade posicional, ganho de qualidade, complementaridade
+    tática, perfil etário, eficiência financeira e risco.
+
+    Base Científica:
+      - Bransen & Van Haaren (2020): Player Chemistry — MIT Sloan.
+        Prediz chemistry ofensiva/defensiva entre pares de jogadores,
+        inclusive jogadores que nunca jogaram juntos. Team Builder algorithm.
+      - Saebo & Hvattum (2019): Marginal Financial Contribution.
+        Mesmo jogador = valor diferente por contexto de elenco.
+        Victor Moses: £5.2M para QPR, £0.1M para Chelsea.
+      - Pappalardo et al. (2019): PlayeRank — Role-aware multi-dimensional
+        player evaluation. Avalia impacto marginal por posição.
+      - Scully (1974) / Gerrard (2001): MRP = MPC × MWR + PIV.
+        Marginal Playing Contribution × Marginal Win Revenue + Player Image Value.
+      - Poli, Besson, Ravenel (CIES 2021): Econometric transfer fees.
+        +1 ano contrato = +22% fee. Ajuste financeiro por contrato.
+      - Kuper & Szymanski (2009): Soccernomics. Wages correlate w/ league
+        position (R² > 0.90); signing quality = ΔExpected Points.
+      - Pantuso (2017): Football Team Composition Problem.
+        Stochastic programming para otimização de elenco sob restrições.
+      - Age Curves 2.0 (TransferLab): Horizonte de valorização do ativo.
+      - VAEP (Decroos et al. 2019): Contribuição marginal por ação.
+      - Frost & Groom (2025): Integration challenges em recrutamento.
+    """
+
+    # Pesos do score composto final (soma = 1.0)
+    COMPONENT_WEIGHTS = {
+        'positional_need': 0.20,
+        'quality_uplift': 0.25,
+        'tactical_complementarity': 0.15,
+        'age_profile_fit': 0.10,
+        'financial_efficiency': 0.15,
+        'risk_assessment': 0.15,
+    }
+
+    # Posições agrupadas por setor para análise de profundidade
+    POSITION_SECTORS = {
+        'Goleiro': 'goalkeeper',
+        'Zagueiro': 'defense',
+        'Lateral Direito': 'defense',
+        'Lateral Esquerdo': 'defense',
+        'Volante': 'midfield',
+        'Meia': 'midfield',
+        'Extremo': 'attack',
+        'Atacante': 'attack',
+    }
+
+    # Ideal squad depth per position (for 38-game Série B season)
+    IDEAL_DEPTH = {
+        'Goleiro': 3,
+        'Zagueiro': 5,
+        'Lateral Direito': 2,
+        'Lateral Esquerdo': 2,
+        'Volante': 4,
+        'Meia': 3,
+        'Extremo': 4,
+        'Atacante': 3,
+    }
+
+    # Ideal age distribution targets (Kuper & Szymanski, Age Curves 2.0)
+    IDEAL_AGE_DISTRIBUTION = {
+        'young': (0.25, 0.35),      # 18-22: development pipeline
+        'prime': (0.40, 0.50),      # 23-29: core performers
+        'experienced': (0.15, 0.25), # 30+: leadership & stability
+    }
+
+    # Performance metrics by position for quality comparison
+    QUALITY_METRICS = {
+        'Goleiro': [
+            'Golos sofridos/90', 'Defesas/90', 'Saidas/90',
+        ],
+        'Zagueiro': [
+            'Acoes defensivas com exito/90', 'Duelos ganhos, %',
+            'Duelos aereos ganhos, %', 'Intercecoes/90',
+            'Passes certos, %', 'Passes progressivos/90',
+        ],
+        'Lateral Direito': [
+            'Acoes defensivas com exito/90', 'Cruzamentos/90',
+            'Cruzamentos certos, %', 'Passes progressivos/90',
+            'Corridas progressivas/90', 'Duelos ganhos, %',
+        ],
+        'Lateral Esquerdo': [
+            'Acoes defensivas com exito/90', 'Cruzamentos/90',
+            'Cruzamentos certos, %', 'Passes progressivos/90',
+            'Corridas progressivas/90', 'Duelos ganhos, %',
+        ],
+        'Volante': [
+            'Acoes defensivas com exito/90', 'Duelos ganhos, %',
+            'Intercecoes/90', 'Passes certos, %',
+            'Passes progressivos/90', 'Corridas progressivas/90',
+        ],
+        'Meia': [
+            'Passes chave/90', 'Assistencias/90', 'Assistencias esperadas/90',
+            'Passes progressivos/90', 'Passes certos, %',
+            'Golos/90', 'Dribles com sucesso, %',
+        ],
+        'Extremo': [
+            'Golos/90', 'Assistencias/90', 'Dribles/90',
+            'Dribles com sucesso, %', 'Cruzamentos/90',
+            'Passes chave/90', 'Corridas progressivas/90',
+        ],
+        'Atacante': [
+            'Golos/90', 'Golos esperados/90', 'Remates/90',
+            'Remates a baliza, %', 'Assistencias/90',
+            'Toques na area/90', 'Duelos aereos ganhos, %',
+        ],
+    }
+
+    def __init__(self):
+        self._squad_data = None
+
+    def _load_squad(self) -> Dict[str, Any]:
+        """Load Botafogo-SP squad reference from mappings."""
+        if self._squad_data is not None:
+            return self._squad_data
+        try:
+            from config.mappings import BOTAFOGO_SP_SQUAD
+            self._squad_data = BOTAFOGO_SP_SQUAD
+        except ImportError:
+            self._squad_data = {}
+        return self._squad_data
+
+    def _get_squad_by_position(self) -> Dict[str, List[Dict]]:
+        """Group squad players by position."""
+        squad = self._load_squad()
+        by_pos: Dict[str, List[Dict]] = {}
+        current_year = 2026
+        for name, (pos, birth_year, full_name) in squad.items():
+            age = (current_year - birth_year) if birth_year else 27
+            entry = {'name': name, 'full_name': full_name, 'position': pos, 'age': age}
+            by_pos.setdefault(pos, []).append(entry)
+        return by_pos
+
+    def _get_squad_ages(self) -> List[int]:
+        """Get list of all squad ages."""
+        squad = self._load_squad()
+        current_year = 2026
+        return [current_year - by for _, (_, by, _) in squad.items() if by]
+
+    def analyze_contract_impact(
+        self,
+        candidate_row,
+        df_all: pd.DataFrame,
+        candidate_position: str,
+        candidate_league: Optional[str] = None,
+        candidate_estimated_value: Optional[float] = None,
+        trajectory_model: Optional['PlayerTrajectoryModel'] = None,
+        market_model: Optional['MarketValueModel'] = None,
+    ) -> Dict[str, Any]:
+        """Analyze the impact of signing a candidate player on the squad.
+
+        Args:
+            candidate_row: Wyscout row of the candidate player
+            df_all: Full dataset for percentile comparisons
+            candidate_position: Position category of the candidate
+            candidate_league: League of the candidate
+            candidate_estimated_value: Estimated market value in EUR millions
+            trajectory_model: Optional trajectory model for predictions
+            market_model: Optional market model for valuations
+
+        Returns:
+            Dict with impact scores, components, and recommendation
+        """
+        result: Dict[str, Any] = {}
+
+        # Basic candidate info
+        candidate_name = str(candidate_row.get('JogadorDisplay',
+                              candidate_row.get('Jogador', 'Unknown')))
+        candidate_age = _safe_float(candidate_row.get('Idade', 25))
+        if np.isnan(candidate_age):
+            candidate_age = 25.0
+        candidate_minutes = _safe_float(candidate_row.get('Minutos jogados:', 0))
+        if np.isnan(candidate_minutes):
+            candidate_minutes = 0.0
+
+        result['candidate'] = {
+            'name': candidate_name,
+            'position': candidate_position,
+            'age': candidate_age,
+            'league': candidate_league,
+            'estimated_value': candidate_estimated_value,
+        }
+
+        # ── 1. Positional Need Score ──────────────────────────────
+        pos_need = self._calculate_positional_need(candidate_position)
+        result['positional_need'] = pos_need
+
+        # ── 2. Quality Uplift ─────────────────────────────────────
+        quality = self._calculate_quality_uplift(
+            candidate_row, candidate_position, df_all
+        )
+        result['quality_uplift'] = quality
+
+        # ── 3. Tactical Complementarity ───────────────────────────
+        tactical = self._calculate_tactical_complementarity(
+            candidate_row, candidate_position, df_all
+        )
+        result['tactical_complementarity'] = tactical
+
+        # ── 4. Age Profile Fit ────────────────────────────────────
+        age_fit = self._calculate_age_profile_fit(candidate_age, candidate_position)
+        result['age_profile_fit'] = age_fit
+
+        # ── 5. Financial Efficiency ───────────────────────────────
+        financial = self._calculate_financial_efficiency(
+            candidate_row, candidate_position, candidate_league,
+            candidate_estimated_value, trajectory_model, market_model
+        )
+        result['financial_efficiency'] = financial
+
+        # ── 6. Risk Assessment ────────────────────────────────────
+        risk = self._calculate_risk_assessment(
+            candidate_age, candidate_minutes, candidate_league,
+            candidate_position
+        )
+        result['risk_assessment'] = risk
+
+        # ── Composite Impact Score ────────────────────────────────
+        scores = {
+            'positional_need': pos_need['score'],
+            'quality_uplift': quality['score'],
+            'tactical_complementarity': tactical['score'],
+            'age_profile_fit': age_fit['score'],
+            'financial_efficiency': financial['score'],
+            'risk_assessment': risk['score'],
+        }
+
+        impact_score = sum(
+            scores[k] * self.COMPONENT_WEIGHTS[k]
+            for k in self.COMPONENT_WEIGHTS
+        )
+        # Scale to 0-100
+        impact_score = round(max(0, min(100, impact_score * 100)), 1)
+
+        result['impact_score'] = impact_score
+        result['component_scores'] = {k: round(v * 100, 1) for k, v in scores.items()}
+        result['component_weights'] = {k: round(v * 100) for k, v in self.COMPONENT_WEIGHTS.items()}
+
+        # Classification
+        if impact_score >= 80:
+            classification = 'high_impact'
+            recommendation = 'Contratação de alto impacto — prioridade máxima'
+        elif impact_score >= 65:
+            classification = 'positive_impact'
+            recommendation = 'Impacto positivo — recomendado'
+        elif impact_score >= 50:
+            classification = 'moderate_impact'
+            recommendation = 'Impacto moderado — avaliar custo-benefício'
+        elif impact_score >= 35:
+            classification = 'low_impact'
+            recommendation = 'Impacto baixo — considerar alternativas'
+        else:
+            classification = 'negative_impact'
+            recommendation = 'Impacto negativo — não recomendado'
+
+        result['classification'] = classification
+        result['recommendation'] = recommendation
+
+        # Squad context
+        squad_by_pos = self._get_squad_by_position()
+        current_at_pos = squad_by_pos.get(candidate_position, [])
+        result['squad_context'] = {
+            'current_players_at_position': [
+                {'name': p['name'], 'age': p['age']} for p in current_at_pos
+            ],
+            'squad_size': sum(len(v) for v in squad_by_pos.values()),
+            'position_depth': len(current_at_pos),
+            'ideal_depth': self.IDEAL_DEPTH.get(candidate_position, 3),
+        }
+
+        return result
+
+    def _calculate_positional_need(self, position: str) -> Dict[str, Any]:
+        """Calculate how much the squad needs reinforcement at this position.
+
+        Uses squad depth analysis vs ideal depth targets.
+        Reference: Kuper & Szymanski (2009) — squad balance optimization.
+        """
+        squad_by_pos = self._get_squad_by_position()
+        current_count = len(squad_by_pos.get(position, []))
+        ideal_count = self.IDEAL_DEPTH.get(position, 3)
+
+        # Need ratio: higher when understaffed
+        if ideal_count == 0:
+            need_ratio = 0.5
+        else:
+            ratio = current_count / ideal_count
+            if ratio <= 0.5:
+                need_ratio = 1.0  # Critical need
+            elif ratio <= 0.75:
+                need_ratio = 0.85  # High need
+            elif ratio <= 1.0:
+                need_ratio = 0.65  # Moderate need
+            elif ratio <= 1.25:
+                need_ratio = 0.40  # Low need — already covered
+            else:
+                need_ratio = 0.20  # Overstaffed
+
+        # Age quality at position — if squad players are old, need is higher
+        pos_players = squad_by_pos.get(position, [])
+        avg_age = np.mean([p['age'] for p in pos_players]) if pos_players else 27
+        age_urgency = 0.0
+        if avg_age >= 32:
+            age_urgency = 0.15  # Aging squad at position
+        elif avg_age >= 30:
+            age_urgency = 0.08
+
+        score = min(1.0, need_ratio + age_urgency)
+
+        # Determine need level description
+        if score >= 0.85:
+            level = 'critica'
+        elif score >= 0.65:
+            level = 'alta'
+        elif score >= 0.45:
+            level = 'moderada'
+        else:
+            level = 'baixa'
+
+        return {
+            'score': score,
+            'current_depth': current_count,
+            'ideal_depth': ideal_count,
+            'avg_age_at_position': round(avg_age, 1),
+            'need_level': level,
+        }
+
+    def _calculate_quality_uplift(
+        self, candidate_row, position: str, df_all: pd.DataFrame
+    ) -> Dict[str, Any]:
+        """Calculate performance quality uplift vs current squad players.
+
+        Measures how much better the candidate is compared to existing
+        players at the same position using position-specific metrics.
+        Reference: Pappalardo et al. (2019) PlayeRank, VAEP (Decroos 2019).
+        """
+        metrics = self.QUALITY_METRICS.get(position, self.QUALITY_METRICS.get('Meia', []))
+
+        # Get candidate's metric values
+        candidate_vals = {}
+        for m in metrics:
+            v = _safe_float(candidate_row.get(m, 0))
+            candidate_vals[m] = v if not np.isnan(v) else 0.0
+
+        # Calculate candidate's percentile rank within dataset
+        from config.mappings import get_posicao_categoria
+        pos_mask = df_all['Posição'].apply(
+            lambda x: get_posicao_categoria(str(x)) if pd.notna(x) else ''
+        ) == position
+        df_pos = df_all[pos_mask]
+
+        percentiles = {}
+        for m in metrics:
+            if m in df_pos.columns:
+                col = pd.to_numeric(df_pos[m], errors='coerce').dropna()
+                if len(col) > 5 and candidate_vals[m] != 0:
+                    pct = (col < candidate_vals[m]).mean()
+                    percentiles[m] = round(pct * 100, 1)
+
+        avg_percentile = np.mean(list(percentiles.values())) if percentiles else 50.0
+
+        # Compare with Botafogo-SP squad players at same position
+        squad_by_pos = self._get_squad_by_position()
+        squad_names = [p['name'] for p in squad_by_pos.get(position, [])]
+
+        squad_avg_metrics = {}
+        for m in metrics:
+            squad_vals = []
+            for sname in squad_names:
+                mask = (df_all['JogadorDisplay'] == sname) | (df_all['Jogador'].str.contains(sname, case=False, na=False))
+                if mask.any():
+                    v = _safe_float(df_all.loc[mask.idxmax()].get(m, 0))
+                    if not np.isnan(v):
+                        squad_vals.append(v)
+            if squad_vals:
+                squad_avg_metrics[m] = np.mean(squad_vals)
+
+        # Quality uplift = how much better candidate is vs squad average
+        uplift_ratios = []
+        metric_comparison = {}
+        for m in metrics:
+            cand_v = candidate_vals.get(m, 0)
+            squad_v = squad_avg_metrics.get(m)
+            if squad_v is not None and squad_v > 0 and cand_v > 0:
+                ratio = cand_v / squad_v
+                uplift_ratios.append(ratio)
+                metric_comparison[m] = {
+                    'candidate': round(cand_v, 2),
+                    'squad_avg': round(squad_v, 2),
+                    'ratio': round(ratio, 2),
+                }
+
+        if uplift_ratios:
+            avg_ratio = np.mean(uplift_ratios)
+            # Convert ratio to 0-1 score: ratio=1.0→0.5, ratio=2.0→0.9, ratio=0.5→0.15
+            score = 1.0 / (1.0 + np.exp(-2.5 * (avg_ratio - 1.0)))
+        else:
+            # Fallback: use percentile directly
+            score = avg_percentile / 100.0
+
+        return {
+            'score': min(1.0, max(0.0, score)),
+            'avg_percentile': round(avg_percentile, 1),
+            'uplift_ratio': round(np.mean(uplift_ratios), 2) if uplift_ratios else None,
+            'metrics_compared': len(metric_comparison),
+            'top_metrics': dict(sorted(
+                metric_comparison.items(),
+                key=lambda x: x[1].get('ratio', 0), reverse=True
+            )[:5]),
+        }
+
+    def _calculate_tactical_complementarity(
+        self, candidate_row, position: str, df_all: pd.DataFrame
+    ) -> Dict[str, Any]:
+        """Calculate tactical complementarity with existing squad.
+
+        Measures whether the candidate fills a tactical gap or adds
+        a profile the squad currently lacks.
+        Reference: Spatial Similarity Index (PMC 2025), KickClone (2025).
+        """
+        squad_by_pos = self._get_squad_by_position()
+        sector = self.POSITION_SECTORS.get(position, 'midfield')
+
+        # Get all sector positions
+        sector_positions = [p for p, s in self.POSITION_SECTORS.items() if s == sector]
+        sector_players = []
+        for sp in sector_positions:
+            sector_players.extend(squad_by_pos.get(sp, []))
+
+        # Check profile diversity — does the candidate offer something different?
+        metrics = self.QUALITY_METRICS.get(position, self.QUALITY_METRICS.get('Meia', []))
+
+        # Build candidate profile vector
+        cand_profile = []
+        for m in metrics:
+            v = _safe_float(candidate_row.get(m, 0))
+            cand_profile.append(v if not np.isnan(v) else 0.0)
+
+        # Build existing players' profiles
+        squad_profiles = []
+        for sp_name in [p['name'] for p in sector_players]:
+            mask = (df_all['JogadorDisplay'] == sp_name) | (
+                df_all['Jogador'].str.contains(sp_name, case=False, na=False)
+            )
+            if mask.any():
+                row = df_all.loc[mask.idxmax()]
+                profile = []
+                for m in metrics:
+                    v = _safe_float(row.get(m, 0))
+                    profile.append(v if not np.isnan(v) else 0.0)
+                squad_profiles.append(profile)
+
+        # Calculate uniqueness (inverse of average similarity to existing players)
+        if squad_profiles and any(v != 0 for v in cand_profile):
+            cand_arr = np.array(cand_profile).reshape(1, -1)
+            squad_arr = np.array(squad_profiles)
+
+            # Normalize
+            combined = np.vstack([cand_arr, squad_arr])
+            col_max = combined.max(axis=0)
+            col_max[col_max == 0] = 1
+            cand_norm = cand_arr / col_max
+            squad_norm = squad_arr / col_max
+
+            # Cosine similarity
+            from numpy.linalg import norm
+            similarities = []
+            for sp in squad_norm:
+                n1, n2 = norm(cand_norm.flatten()), norm(sp)
+                if n1 > 0 and n2 > 0:
+                    sim = np.dot(cand_norm.flatten(), sp) / (n1 * n2)
+                    similarities.append(sim)
+
+            if similarities:
+                avg_sim = np.mean(similarities)
+                max_sim = max(similarities)
+                # High uniqueness (low similarity) is good for complementarity
+                # But extremely low similarity might mean poor fit
+                # Optimal: moderately different (sim 0.3-0.7)
+                if avg_sim < 0.3:
+                    uniqueness_score = 0.5  # Too different — might not fit system
+                elif avg_sim < 0.5:
+                    uniqueness_score = 0.85  # Good complement — different profile
+                elif avg_sim < 0.7:
+                    uniqueness_score = 0.70  # Similar but adds depth
+                elif avg_sim < 0.85:
+                    uniqueness_score = 0.50  # Very similar — redundant
+                else:
+                    uniqueness_score = 0.30  # Near-duplicate profile
+            else:
+                uniqueness_score = 0.6
+        else:
+            avg_sim = None
+            max_sim = None
+            uniqueness_score = 0.6  # Neutral when no data
+
+        # Sector balance bonus
+        sector_count = len(sector_players)
+        total_squad = sum(len(v) for v in squad_by_pos.values())
+        sector_ratio = sector_count / max(total_squad, 1)
+
+        # Ideal sector ratios
+        ideal_ratios = {'goalkeeper': 0.08, 'defense': 0.30, 'midfield': 0.32, 'attack': 0.30}
+        ideal = ideal_ratios.get(sector, 0.25)
+        balance_gap = max(0, ideal - sector_ratio)
+        balance_bonus = min(0.15, balance_gap * 2)
+
+        score = min(1.0, uniqueness_score + balance_bonus)
+
+        return {
+            'score': score,
+            'avg_similarity_to_sector': round(avg_sim, 3) if avg_sim is not None else None,
+            'max_similarity': round(max_sim, 3) if max_sim is not None else None,
+            'sector': sector,
+            'sector_player_count': sector_count,
+            'profile_type': (
+                'complementar' if uniqueness_score >= 0.7 else
+                'similar' if uniqueness_score >= 0.45 else
+                'redundante'
+            ),
+        }
+
+    def _calculate_age_profile_fit(self, candidate_age: float, position: str) -> Dict[str, Any]:
+        """Calculate how well the candidate's age fits squad needs.
+
+        Reference: Age Curves 2.0 (TransferLab), Kuper & Szymanski (2009).
+        """
+        squad_ages = self._get_squad_ages()
+        if not squad_ages:
+            return {'score': 0.5, 'category': 'unknown'}
+
+        total = len(squad_ages)
+        young_pct = sum(1 for a in squad_ages if a <= 22) / total
+        prime_pct = sum(1 for a in squad_ages if 23 <= a <= 29) / total
+        exp_pct = sum(1 for a in squad_ages if a >= 30) / total
+
+        # Determine which age bracket the candidate falls into
+        if candidate_age <= 22:
+            cand_category = 'young'
+            ideal_range = self.IDEAL_AGE_DISTRIBUTION['young']
+            current_pct = young_pct
+        elif candidate_age <= 29:
+            cand_category = 'prime'
+            ideal_range = self.IDEAL_AGE_DISTRIBUTION['prime']
+            current_pct = prime_pct
+        else:
+            cand_category = 'experienced'
+            ideal_range = self.IDEAL_AGE_DISTRIBUTION['experienced']
+            current_pct = exp_pct
+
+        # Score: higher if the squad needs more players in this age bracket
+        if current_pct < ideal_range[0]:
+            # Below ideal — adding this category is beneficial
+            deficit = ideal_range[0] - current_pct
+            score = 0.70 + min(0.30, deficit * 3)
+        elif current_pct <= ideal_range[1]:
+            # Within ideal range — acceptable
+            score = 0.55
+        else:
+            # Above ideal — squad already has enough in this bracket
+            excess = current_pct - ideal_range[1]
+            score = max(0.15, 0.50 - excess * 2)
+
+        # Position-specific age value adjustment (Age Curves 2.0)
+        if position in ('Atacante', 'Extremo'):
+            # Attackers/wingers peak earlier, decline faster
+            if candidate_age <= 27:
+                score = min(1.0, score + 0.10)
+            elif candidate_age >= 31:
+                score = max(0.0, score - 0.15)
+        elif position in ('Volante', 'Meia', 'Zagueiro'):
+            # Midfielders/defenders maintain longer
+            if candidate_age <= 30:
+                score = min(1.0, score + 0.05)
+        elif position == 'Goleiro':
+            # Goalkeepers maintain until ~35
+            if candidate_age <= 33:
+                score = min(1.0, score + 0.08)
+
+        # Remaining career window (years of useful service)
+        if position in ('Atacante', 'Extremo'):
+            career_end = 33
+        elif position == 'Goleiro':
+            career_end = 37
+        else:
+            career_end = 35
+        remaining_years = max(0, career_end - candidate_age)
+
+        return {
+            'score': round(min(1.0, max(0.0, score)), 3),
+            'candidate_category': cand_category,
+            'squad_distribution': {
+                'young_pct': round(young_pct * 100, 1),
+                'prime_pct': round(prime_pct * 100, 1),
+                'experienced_pct': round(exp_pct * 100, 1),
+            },
+            'remaining_career_years': remaining_years,
+            'avg_squad_age': round(np.mean(squad_ages), 1),
+        }
+
+    def _calculate_financial_efficiency(
+        self,
+        candidate_row,
+        position: str,
+        league: Optional[str],
+        estimated_value: Optional[float],
+        trajectory_model: Optional['PlayerTrajectoryModel'] = None,
+        market_model: Optional['MarketValueModel'] = None,
+    ) -> Dict[str, Any]:
+        """Calculate financial efficiency of the signing.
+
+        Combines cost assessment with projected ROI using trajectory and
+        market value models.
+        Reference: Poli et al. (CIES 2021), MRP (Gerrard 2001),
+        Soccernomics (Kuper & Szymanski 2009).
+        """
+        # Get trajectory prediction for expected development
+        trajectory_score = None
+        predicted_rating = None
+        if trajectory_model:
+            try:
+                traj = trajectory_model.predict_trajectory(candidate_row, league)
+                trajectory_score = traj.get('trajectory_score', 0)
+                predicted_rating = traj.get('predicted_rating_next_season')
+            except Exception:
+                pass
+
+        # Get market value prediction
+        mv_estimated = estimated_value
+        value_gap = None
+        if market_model:
+            try:
+                mv = market_model.predict_market_value(candidate_row, league, estimated_value)
+                if mv_estimated is None:
+                    mv_estimated = mv.get('estimated_market_value')
+                value_gap = mv.get('market_value_gap')
+            except Exception:
+                pass
+
+        # Serie B Brasil context: typical transfer budget ~€0.5-2M per player
+        serie_b_budget_ref = 1.0  # €1M reference
+
+        if mv_estimated is not None and mv_estimated > 0:
+            # Cost efficiency relative to Serie B budget
+            cost_ratio = mv_estimated / serie_b_budget_ref
+            if cost_ratio <= 0.3:
+                cost_score = 0.95  # Very affordable
+            elif cost_ratio <= 0.8:
+                cost_score = 0.80  # Affordable
+            elif cost_ratio <= 1.5:
+                cost_score = 0.60  # Moderate cost
+            elif cost_ratio <= 3.0:
+                cost_score = 0.35  # Expensive for Serie B
+            else:
+                cost_score = 0.15  # Very expensive
+
+            # Value gap bonus (is player undervalued?)
+            if value_gap is not None and value_gap > 0:
+                cost_score = min(1.0, cost_score + 0.10)
+        else:
+            cost_score = 0.50  # Unknown cost
+
+        # Trajectory bonus — player with positive trajectory = better investment
+        trajectory_bonus = 0.0
+        if trajectory_score is not None:
+            if trajectory_score > 5:
+                trajectory_bonus = 0.10
+            elif trajectory_score > 2:
+                trajectory_bonus = 0.05
+            elif trajectory_score < -3:
+                trajectory_bonus = -0.10
+
+        score = min(1.0, max(0.0, cost_score + trajectory_bonus))
+
+        return {
+            'score': score,
+            'estimated_value_eur_m': round(mv_estimated, 2) if mv_estimated else None,
+            'serie_b_budget_ref': serie_b_budget_ref,
+            'value_gap': round(value_gap, 2) if value_gap is not None else None,
+            'trajectory_score': round(trajectory_score, 2) if trajectory_score is not None else None,
+            'predicted_rating': round(predicted_rating, 1) if predicted_rating is not None else None,
+            'is_undervalued': value_gap is not None and value_gap > 0,
+        }
+
+    def _calculate_risk_assessment(
+        self,
+        age: float,
+        minutes: float,
+        league: Optional[str],
+        position: str,
+    ) -> Dict[str, Any]:
+        """Assess risk factors of the signing.
+
+        Considers: league adaptation gap, injury risk proxy (age + minutes),
+        position-specific adaptation difficulty.
+        Reference: Frost & Groom (2025) — integration challenges,
+        Opta Power Rankings for league gap assessment.
+        """
+        risks = []
+        risk_score = 0.70  # Start at moderate-low risk (higher = less risky)
+
+        # 1. League adaptation gap
+        target_power = get_opta_league_power('Serie B Brasil')
+        source_power = get_opta_league_power(league) if league else DEFAULT_OPTA_POWER
+        league_gap = abs(source_power - target_power)
+
+        if league_gap > 25:
+            risk_score -= 0.20
+            risks.append('Grande diferença de nível de liga')
+        elif league_gap > 15:
+            risk_score -= 0.10
+            risks.append('Diferença moderada de nível de liga')
+        elif league_gap < 5:
+            risk_score += 0.05  # Same level — easy adaptation
+
+        # 2. Age-related risk
+        if age >= 33:
+            risk_score -= 0.15
+            risks.append('Idade avançada — risco de declínio')
+        elif age >= 30:
+            risk_score -= 0.05
+            risks.append('Fase final de carreira')
+        elif age <= 19:
+            risk_score -= 0.08
+            risks.append('Muito jovem — precisa de desenvolvimento')
+
+        # 3. Minutes played (fitness/injury proxy)
+        if minutes < 300:
+            risk_score -= 0.15
+            risks.append('Poucos minutos jogados — risco de lesão/inatividade')
+        elif minutes < 800:
+            risk_score -= 0.05
+            risks.append('Tempo de jogo limitado')
+
+        # 4. Position-specific adaptation difficulty
+        if position in ('Goleiro',):
+            risk_score += 0.05  # GKs adapt more easily to lower leagues
+        elif position in ('Atacante', 'Extremo'):
+            risk_score -= 0.03  # Offensive players more volatile
+
+        # Ensure 0-1 range
+        score = max(0.0, min(1.0, risk_score))
+
+        # Risk classification
+        if score >= 0.70:
+            risk_level = 'baixo'
+        elif score >= 0.50:
+            risk_level = 'moderado'
+        elif score >= 0.30:
+            risk_level = 'alto'
+        else:
+            risk_level = 'muito_alto'
+
+        return {
+            'score': score,
+            'risk_level': risk_level,
+            'risks': risks,
+            'league_gap': round(league_gap, 1),
+            'source_league_power': round(source_power, 1),
+            'target_league_power': round(target_power, 1),
+        }
+
+
+# ================================================================
 # SCOUTING INTELLIGENCE ENGINE (integrador)
 # ================================================================
 
 class ScoutingIntelligenceEngine:
-    """Motor integrador que combina todos os 6 modelos.
+    """Motor integrador que combina todos os 7 modelos.
 
     Expõe interface unificada para o backend FastAPI.
     """
@@ -1499,6 +2271,7 @@ class ScoutingIntelligenceEngine:
         self.replacement_engine = PlayerReplacementEngine()
         self.trend_analyzer = TemporalPerformanceTrend()
         self.league_adjuster = LeagueStrengthAdjuster()
+        self.contract_impact = ContractImpactAnalyzer()
         self._df_pool = None
         self._fitted = False
 
@@ -1624,3 +2397,17 @@ class ScoutingIntelligenceEngine:
 
         results = self.opportunity_detector.batch_detect(players)
         return results[:top_n]
+
+    def analyze_impact(self, candidate_row, df_all: pd.DataFrame,
+                       position: str, league: Optional[str] = None,
+                       estimated_value: Optional[float] = None) -> Dict[str, Any]:
+        """Analisa impacto de contratação no elenco do Botafogo-SP."""
+        return self.contract_impact.analyze_contract_impact(
+            candidate_row=candidate_row,
+            df_all=df_all,
+            candidate_position=position,
+            candidate_league=league,
+            candidate_estimated_value=estimated_value,
+            trajectory_model=self.trajectory_model,
+            market_model=self.market_model,
+        )

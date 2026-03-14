@@ -258,5 +258,41 @@ class ReplacementResponse(BaseModel):
     replacements: List[ReplacementEntry]
 
 
+# ── Contract Impact ───────────────────────────────────────────────
+
+class ContractImpactRequest(BaseModel):
+    player_name: str
+    league: Optional[str] = None
+    estimated_value: Optional[float] = None
+
+
+class ContractImpactSquadPlayer(BaseModel):
+    name: str
+    age: Optional[float] = None
+
+
+class ContractImpactSquadContext(BaseModel):
+    current_players_at_position: List[ContractImpactSquadPlayer] = []
+    squad_size: int = 0
+    position_depth: int = 0
+    ideal_depth: int = 0
+
+
+class ContractImpactResponse(BaseModel):
+    candidate: Dict[str, Any] = {}
+    impact_score: float
+    classification: str
+    recommendation: str
+    component_scores: Dict[str, float] = {}
+    component_weights: Dict[str, float] = {}
+    positional_need: Dict[str, Any] = {}
+    quality_uplift: Dict[str, Any] = {}
+    tactical_complementarity: Dict[str, Any] = {}
+    age_profile_fit: Dict[str, Any] = {}
+    financial_efficiency: Dict[str, Any] = {}
+    risk_assessment: Dict[str, Any] = {}
+    squad_context: Dict[str, Any] = {}
+
+
 # Fix forward reference
 TokenResponse.model_rebuild()

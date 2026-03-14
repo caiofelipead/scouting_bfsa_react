@@ -13,7 +13,7 @@ PostgreSQL
      ↓
 FastAPI Backend
      ├── predictive_engine.py    (Scout Score Preditivo, clustering, similaridade)
-     ├── scouting_intelligence.py (6 modelos de ML — Scouting Intelligence Engine)
+     ├── scouting_intelligence.py (7 modelos de ML — Scouting Intelligence Engine)
      ├── league_power_model.py   (Opta Power Ranking, ajuste por liga)
      ├── calibration.py          (coeficientes calibrados por literatura acadêmica)
      └── similarity.py           (índices compostos, percentis, ranking)
@@ -67,6 +67,14 @@ Ajuste de métricas por nível de liga via Opta Power Ranking.
 
 - **Fórmula:** `adjusted_metric = metric × league_strength_factor × opta_league_power`
 - **Endpoint:** `GET /api/league_powers`
+
+### Modelo 7: Contract Impact Analyzer
+Análise de impacto de contratação no elenco do Botafogo-SP.
+
+- **Componentes:** necessidade posicional (20%), ganho de qualidade (25%), complementaridade tática (15%), perfil etário (10%), eficiência financeira (15%), avaliação de risco (15%)
+- **Referências:** Pappalardo et al. (2019) PlayeRank, Kuper & Szymanski (2009) Soccernomics, Poli et al. (CIES 2021), Age Curves 2.0, Frost & Groom (2025)
+- **Saída:** `impact_score` (0-100), classificação, recomendação, detalhamento por componente
+- **Endpoint:** `POST /api/contract_impact`
 
 ---
 
@@ -149,6 +157,7 @@ Ajuste de métricas por nível de liga via Opta Power Ranking.
 | POST | `/api/market_value` | Estimativa de valor de mercado |
 | POST | `/api/market_opportunities` | Detecção de oportunidades |
 | POST | `/api/replacements` | Busca de substitutos |
+| POST | `/api/contract_impact` | Análise de impacto de contratação |
 | GET | `/api/league_powers` | Coeficientes Opta Power por liga |
 
 ### Core (existentes)
@@ -190,6 +199,7 @@ npm run dev
 - **Valuation:** Estimativa de valor de mercado com XGBoost
 - **Oportunidades:** Detecção de talentos subvalorizados
 - **Substituição:** Motor de busca de substitutos multi-método
+- **Impacto de Contratação:** Análise de impacto no elenco com 6 dimensões
 - **Análise Temporal:** Tendências de performance
 
 ---

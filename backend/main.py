@@ -55,6 +55,8 @@ from schemas.models import (
     ReplacementRequest,
     ReplacementEntry,
     ReplacementResponse,
+    ContractImpactRequest,
+    ContractImpactResponse,
 )
 from services.similarity import (
     INVERTED_METRICS,
@@ -2548,6 +2550,50 @@ async def find_replacements(
         total=len(entries),
         replacements=entries,
     )
+
+
+@app.post("/api/contract_impact", response_model=ContractImpactResponse)
+async def analyze_contract_impact(
+    req: ContractImpactRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Analyze the impact of signing a player on the Botafogo-SP squad.
+
+    Scientific basis: Pappalardo et al. (2019) PlayeRank, Kuper & Szymanski (2009)
+    Soccernomics, Poli et al. (CIES 2021), Age Curves 2.0 (TransferLab),
+    Frost & Groom (2025) integration challenges.
+
+    Components: positional need, quality uplift, tactical complementarity,
+    age profile fit, financial efficiency, risk assessment.
+    """
+    df = _get_wyscout()
+    player_name = req.player_name
+
+    mask = df["JogadorDisplay"] == player_name
+    if mask.sum() == 0:
+        mask = df["JogadorDisplay"].str.lower() == player_name.lower()
+    if mask.sum() == 0:
+        raise HTTPException(status_code=404, detail="Jogador não encontrado")
+
+    row_data = df.loc[mask.idxmax()]
+    pos_raw = str(row_data.get("Posição", "")) if pd.notna(row_data.get("Posição")) else "Meia"
+    pos = get_posicao_categoria(pos_raw)
+
+    league = req.league
+    if not league:
+        liga_tier = str(row_data.get("liga_tier", "")) if pd.notna(row_data.get("liga_tier")) else None
+        league = resolve_actual_league(row_data.get("Equipa"), fallback_liga_tier=liga_tier)
+
+    engine = _get_scouting_engine()
+    impact = engine.analyze_impact(
+        candidate_row=row_data,
+        df_all=df,
+        position=pos,
+        league=league,
+        estimated_value=req.estimated_value,
+    )
+
+    return ContractImpactResponse(**impact)
 
 
 @app.get("/api/league_powers")
