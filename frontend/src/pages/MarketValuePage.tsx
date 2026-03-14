@@ -32,6 +32,9 @@ function formatEUR(millions: number): string {
   if (millions >= 1.0) {
     return `€${millions.toFixed(1)}M`;
   }
+  if (millions >= 0.1) {
+    return `€${(millions * 1000).toFixed(0)}K`;
+  }
   return `€${(millions * 1000).toFixed(0)}K`;
 }
 

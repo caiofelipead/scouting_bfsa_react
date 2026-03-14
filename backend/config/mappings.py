@@ -271,9 +271,57 @@ SERIE_B_TEAMS = [
     'Grêmio Novorizontino', 'Novorizontino',
     'Operário PR', 'Operário-PR', 'Operário Ferroviário',
     'Paysandu', 'Paysandu SC',
+    'Santos', 'Santos FC',
     'Vila Nova', 'Vila Nova FC', 'Volta Redonda', 'Volta Redonda FC',
     # Common alternate names / WyScout variants
 ]
+
+
+# ============================================
+# ELENCO BOTAFOGO-SP — REFERÊNCIA PARA VALIDAÇÃO DE MODELOS
+# ============================================
+# Dados usados para calibrar e validar MarketValueModel e TrajectoryModel.
+# Jogadores da Serie B devem produzir valores realistas (€0.03M-€1.5M).
+BOTAFOGO_SP_SQUAD = {
+    # nome_display: (posicao, ano_nasc, nome_completo)
+    'Victor Souza': ('Goleiro', 1992, 'Victor Bernardes Andrade e Souza'),
+    'Adriano': ('Goleiro', 2006, 'Adriano Vasconcelos da Silva Júnior'),
+    'Brenno Klippel': ('Goleiro', 2003, 'Brenno Faro Klippel'),
+    'Jordan Esteves': ('Goleiro', 1998, 'Jordan Esteves da Costa Daniel'),
+    'Ericson': ('Zagueiro', 1999, 'Ericson da Silva'),
+    'Gustavo Vilar': ('Zagueiro', 2000, 'Gustavo Vilar dos Santos'),
+    'Carlos Eduardo': ('Zagueiro', 2001, 'Carlos Eduardo da Silva Santos'),
+    'Wallace Fortuna': ('Zagueiro', 1994, 'Wallace Fortuna dos Santos'),
+    'Guilherme Mariano': ('Zagueiro', 1999, 'Guilherme Mariano Barbosa'),
+    'Darlan Batista': ('Zagueiro', 2004, 'Darlan Batista Cobo da Silva'),
+    'Hebert Badaró': ('Zagueiro', 2005, 'Hebert William Badaró Oliveira'),
+    'Jonathan Lemos': ('Lateral Direito', 1992, 'Jonathan Francisco Lemos'),
+    'Gabriel Inocêncio': ('Lateral Direito', 1994, 'Gabriel de Souza Inocêncio'),
+    'Pedrinho': ('Lateral Direito', 2006, 'Pedro Henrique Souza do Nascimento'),
+    'Patrick Brey': ('Lateral Esquerdo', 1997, 'Patrick de Carvalho Brey'),
+    'Felipe Vieira': ('Lateral Esquerdo', 1999, 'Felipe Vieira Augusto'),
+    'Henrique Teles': ('Lateral Esquerdo', 2006, 'Henrique Lôvo Teles'),
+    'Leandro Maciel': ('Volante', 1995, 'Leandro Isaac Maciel'),
+    'Everton Morelli': ('Volante', 1997, 'Everton Morelli Casimiro'),
+    'Matheus Sales': ('Volante', 1995, 'Matheus de Sales Cabral'),
+    'Thiaguinho': ('Volante', 1998, 'Thiago Henrique Moraes'),
+    'Pedro Tortello': ('Volante', 2004, 'Pedro Henrique Tortello'),
+    'Yuri Felipe': ('Volante', 2006, 'Yuri Felipe Santos da Conceição'),
+    'Érik': ('Volante', 2005, 'Erik Rebello de Castro'),
+    'Rafael Gava': ('Meia', 1993, 'Rafael Gustavo Meneghel Gava'),
+    'Marquinho': ('Meia', None, 'Marquinho'),
+    'Felipe Penha': ('Meia', 2006, 'Felipe Penha de Souza'),
+    'Thalles': ('Meia', 2005, 'Thalles Eduardo Gomes Ferreira dos Ramos'),
+    'Kelvin Giacobe': ('Extremo', 1997, 'Kelvin Giacobe'),
+    'Jéfferson Nem': ('Extremo', 1996, 'Jefferson Vasconcelos Braz da Silva'),
+    'Márcio Maranhão': ('Extremo', 1999, 'Márcio Carlos Pestana Dutra'),
+    'Wesley Pinheiro': ('Extremo', 2000, 'Wesley Pinheiro Santos'),
+    'Zé Hugo': ('Extremo', 1999, 'José Hugo Sousa dos Santos'),
+    'Whalacy Ermeliano': ('Extremo', 2006, 'Whalacy Wilhan Gonçalves Ermeliano'),
+    'Hygor Cléber': ('Atacante', 1992, 'Hygor Cléber Garcia Silva'),
+    'Guilherme Queiróz': ('Atacante', 1990, 'Guilherme de Queiróz Gonçalves'),
+    'Luizão': ('Atacante', 2003, 'Luiz Guilherme Vieira da Silva'),
+}
 
 
 # ============================================
