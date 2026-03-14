@@ -2569,9 +2569,18 @@ async def analyze_contract_impact(
     df = _get_wyscout()
     player_name = req.player_name
 
+    # Exact match
     mask = df["JogadorDisplay"] == player_name
     if mask.sum() == 0:
         mask = df["JogadorDisplay"].str.lower() == player_name.lower()
+    # Fallback: contains match (handles partial names, parenthetical disambiguation)
+    if mask.sum() == 0:
+        mask = df["JogadorDisplay"].str.lower().str.contains(
+            player_name.lower().split("(")[0].strip(), na=False
+        )
+    # Fallback: search in Jogador column too
+    if mask.sum() == 0:
+        mask = df["Jogador"].str.lower().str.contains(player_name.lower(), na=False)
     if mask.sum() == 0:
         raise HTTPException(status_code=404, detail="Jogador não encontrado")
 
