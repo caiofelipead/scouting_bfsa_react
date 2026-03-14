@@ -869,6 +869,9 @@ async def get_player_profile(
 
         # 2) Fuzzy match if no exact match found
         if ana_match is None:
+            # Get player team from WyScout row for disambiguation
+            _player_team = str(row.get("Equipa", "")).strip().lower() if pd.notna(row.get("Equipa")) else ""
+
             best_score = 0.0
             best_idx = None
             for _candidate in _names_to_try:
@@ -883,14 +886,32 @@ async def get_player_profile(
                         _fuzz.ratio(name_norm, aname) / 100.0,
                         _fuzz.token_sort_ratio(name_norm, aname) / 100.0,
                     )
-                    # Containment bonus
-                    if name_norm in aname or aname in name_norm:
+                    # Containment bonus — only when one name fully contains the other
+                    # and the shorter name has at least 4 chars (avoid partial matches)
+                    shorter = min(len(name_norm), len(aname))
+                    if shorter >= 4 and (name_norm in aname or aname in name_norm):
                         sim = max(sim, 0.85)
+                    # Team boost: if análises row has a team column matching WyScout team
+                    if _player_team:
+                        _ana_team = ""
+                        for _tc in ("Equipe", "equipe", "Clube", "clube", "Time", "time"):
+                            _tv = arow.get(_tc)
+                            if _tv is not None and pd.notna(_tv) and str(_tv).strip():
+                                _ana_team = str(_tv).strip().lower()
+                                break
+                        if _ana_team and (_ana_team in _player_team or _player_team in _ana_team):
+                            sim += 0.10
                     if sim > best_score:
                         best_score = sim
                         best_idx = aidx
-            if best_idx is not None and best_score >= 0.65:
+            if best_idx is not None and best_score >= 0.78:
                 ana_match = analises_df.loc[best_idx]
+                logger.info(
+                    "Análises fuzzy match for '%s': matched '%s' (score=%.2f)",
+                    player_display_name,
+                    ana_match.get("Nome", "?"),
+                    best_score,
+                )
 
         if ana_match is not None:
             # Score columns
