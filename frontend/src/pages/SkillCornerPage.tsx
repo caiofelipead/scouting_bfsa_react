@@ -18,7 +18,6 @@ import {
   useSkillCornerCoverage,
 } from '../hooks/usePlayers';
 import { getScoreColor } from '../lib/utils';
-import RadarChart from '../components/RadarChart';
 
 // ── Coverage banner ──
 
@@ -201,7 +200,7 @@ export default function SkillCornerPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState('');
   const [scOverride, setScOverride] = useState<string | null>(null);
-  const [expandedSection, setExpandedSection] = useState<string | null>('indices');
+  const [expandedSection, setExpandedSection] = useState<string | null>('physical');
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: positions = [] } = usePositions();
@@ -230,16 +229,19 @@ export default function SkillCornerPage() {
   };
 
   const indices = scProfile?.indices ?? {};
-  const indicesPercentiles = scProfile?.indices_percentiles ?? {};
   const physical = scProfile?.physical ?? {};
   const physicalPercentiles = scProfile?.physical_percentiles ?? {};
   const allMetrics = scProfile?.all_metrics ?? {};
-  const indicesEntries = Object.entries(indices);
   const physicalEntries = Object.entries(physical);
 
   // Separate remaining metrics (not indices, not physical)
   const indexKeys = new Set(Object.keys(indices));
-  const physicalOriginalKeys = new Set(['sprint_count_per_90', 'hi_count_per_90', 'distance_per_90', 'avg_psv99', 'avg_top_5_psv99']);
+  const physicalOriginalKeys = new Set([
+    'sprint_count_per_90', 'hi_count_per_90', 'distance_per_90',
+    'high_speed_running_distance_per_90', 'accelerations_per_90', 'decelerations_per_90',
+    'max_speed', 'avg_speed', 'pressing_index_per_90',
+    'avg_psv99', 'avg_top_5_psv99',
+  ]);
   const otherMetrics = Object.entries(allMetrics).filter(
     ([k]) => !indexKeys.has(k) && !physicalOriginalKeys.has(k) && !['age', 'count_match'].includes(k)
   );
@@ -395,88 +397,6 @@ export default function SkillCornerPage() {
           {/* Data sections */}
           {scProfile.found && (
             <>
-              {/* Indices */}
-              {indicesEntries.length > 0 && (
-                <div className="card-glass rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => setExpandedSection(expandedSection === 'indices' ? null : 'indices')}
-                    className="w-full flex items-center justify-between px-5 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      {expandedSection === 'indices' ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      <span className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
-                        INDICES POR POSICAO ({scProfile.position})
-                      </span>
-                    </div>
-                    <span className="text-xs font-[var(--font-mono)]" style={{ color: 'var(--color-text-muted)' }}>
-                      {indicesEntries.length} indices
-                    </span>
-                  </button>
-                  <AnimatePresence>
-                    {expandedSection === 'indices' && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="px-5 pb-5"
-                      >
-                        {/* Radar for indices using percentiles */}
-                        {indicesEntries.length >= 2 && Object.keys(indicesPercentiles).length >= 2 && (
-                          <div className="max-w-sm mx-auto mb-4">
-                            <RadarChart
-                              labels={indicesEntries.map(([k]) => k.replace(/ index$/i, ''))}
-                              values={indicesEntries.map(([k]) => indicesPercentiles[k] ?? 50)}
-                              size={320}
-                            />
-                          </div>
-                        )}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {indicesEntries.map(([name, value], i) => {
-                            const pct = indicesPercentiles[name];
-                            return (
-                            <motion.div
-                              key={name}
-                              initial={{ opacity: 0, x: 8 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: i * 0.06 }}
-                            >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                                  {name.replace(/ index$/i, '')}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  {pct != null && (
-                                    <span className="text-[9px] font-[var(--font-mono)]" style={{ color: getScoreColor(pct) }}>
-                                      P{pct.toFixed(0)}
-                                    </span>
-                                  )}
-                                  <span
-                                    className="text-xs font-[var(--font-mono)] font-semibold"
-                                    style={{ color: getScoreColor(pct ?? value * 10) }}
-                                  >
-                                    {value.toFixed(2)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-surface-2)' }}>
-                                <motion.div
-                                  className="h-full rounded-full"
-                                  style={{ background: getScoreColor(pct ?? value * 10) }}
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${Math.min(pct ?? value * 10, 100)}%` }}
-                                  transition={{ duration: 0.6, delay: 0.2 + i * 0.06 }}
-                                />
-                              </div>
-                            </motion.div>
-                            );
-                          })}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-
               {/* Physical data */}
               {physicalEntries.length > 0 && (
                 <div className="card-glass rounded-lg overflow-hidden">
@@ -502,7 +422,7 @@ export default function SkillCornerPage() {
                         exit={{ opacity: 0, height: 0 }}
                         className="px-5 pb-5"
                       >
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                           {physicalEntries.map(([name, value], i) => (
                             <MetricCard key={name} name={name} value={value} percentile={physicalPercentiles[name]} delay={0.2 + i * 0.05} />
                           ))}

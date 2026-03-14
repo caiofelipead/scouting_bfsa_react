@@ -2168,6 +2168,12 @@ async def get_skillcorner_player_profile(
         "sprint_count_per_90": "Sprints/90",
         "hi_count_per_90": "High Intensity Runs/90",
         "distance_per_90": "Distance/90",
+        "high_speed_running_distance_per_90": "High Speed Running Dist/90",
+        "accelerations_per_90": "Accelerations/90",
+        "decelerations_per_90": "Decelerations/90",
+        "max_speed": "Max Speed (km/h)",
+        "avg_speed": "Avg Speed (km/h)",
+        "pressing_index_per_90": "Pressing Index/90",
         "avg_psv99": "Avg PSV-99",
         "avg_top_5_psv99": "Avg Top 5 PSV-99",
     }
