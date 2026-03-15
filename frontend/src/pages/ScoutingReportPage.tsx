@@ -265,7 +265,7 @@ export default function ScoutingReportPage() {
       const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
       if (!slides.length) { setExporting(false); return; }
 
-      // Pre-convert all <img> with src starting with /api/ to data URLs so html2canvas can render them
+      // ── 1. Pre-convert proxy images to data URLs ──
       const imgRestoreMap: Array<{ el: HTMLImageElement; original: string }> = [];
       const allImgs = reportRef.current.querySelectorAll<HTMLImageElement>('img[src^="/api/"]');
       await Promise.all(
@@ -278,17 +278,47 @@ export default function ScoutingReportPage() {
         }),
       );
 
-      // Wait a tick for re-render
-      await new Promise((r) => setTimeout(r, 100));
+      // ── 2. Temporarily un-scale all SlideScaler wrappers ──
+      // Structure: wrapperDiv > scaleDiv(transform:scale) > slideDiv[data-slide]
+      const scaleRestoreMap: Array<{
+        scaleDiv: HTMLElement; wrapperDiv: HTMLElement;
+        origTransform: string; origWidth: string; origHeight: string;
+        origWrapperWidth: string; origWrapperHeight: string; origWrapperMargin: string;
+      }> = [];
+      slides.forEach((slide) => {
+        const scaleDiv = slide.parentElement;
+        const wrapperDiv = scaleDiv?.parentElement;
+        if (scaleDiv && wrapperDiv) {
+          scaleRestoreMap.push({
+            scaleDiv, wrapperDiv,
+            origTransform: scaleDiv.style.transform,
+            origWidth: scaleDiv.style.width,
+            origHeight: scaleDiv.style.height,
+            origWrapperWidth: wrapperDiv.style.width,
+            origWrapperHeight: wrapperDiv.style.height,
+            origWrapperMargin: wrapperDiv.style.margin,
+          });
+          // Remove scale transform — render at native 1440×809
+          scaleDiv.style.transform = 'none';
+          scaleDiv.style.width = `${PAGE_WIDTH}px`;
+          scaleDiv.style.height = `${PAGE_HEIGHT}px`;
+          wrapperDiv.style.width = `${PAGE_WIDTH}px`;
+          wrapperDiv.style.height = `${PAGE_HEIGHT}px`;
+          wrapperDiv.style.margin = '0';
+        }
+      });
 
-      // PDF in landscape 16:9 — use px-based dimensions converted to mm
-      const pdfWidthMm = PAGE_WIDTH * 0.2646; // px to mm at 96dpi
+      // Wait for reflow + font rendering
+      await document.fonts.ready;
+      await new Promise((r) => setTimeout(r, 200));
+
+      // ── 3. Capture each slide at native resolution ──
+      const pdfWidthMm = PAGE_WIDTH * 0.2646;
       const pdfHeightMm = PAGE_HEIGHT * 0.2646;
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [pdfWidthMm, pdfHeightMm] });
 
       for (let i = 0; i < slides.length; i++) {
         const slide = slides[i];
-        // Hide no-print elements
         const noPrintEls = slide.querySelectorAll<HTMLElement>('.no-print');
         noPrintEls.forEach((el) => { el.style.display = 'none'; });
 
@@ -301,6 +331,22 @@ export default function ScoutingReportPage() {
           logging: false,
           windowWidth: PAGE_WIDTH,
           windowHeight: PAGE_HEIGHT,
+          // Ensure all cloned slides render without transform interference
+          onclone: (clonedDoc) => {
+            clonedDoc.querySelectorAll('[data-slide]').forEach((el) => {
+              const parent = (el as HTMLElement).parentElement;
+              if (parent) {
+                parent.style.transform = 'none';
+                parent.style.width = `${PAGE_WIDTH}px`;
+                parent.style.height = `${PAGE_HEIGHT}px`;
+              }
+              const wrapper = parent?.parentElement;
+              if (wrapper) {
+                wrapper.style.width = `${PAGE_WIDTH}px`;
+                wrapper.style.height = `${PAGE_HEIGHT}px`;
+              }
+            });
+          },
         });
 
         noPrintEls.forEach((el) => { el.style.display = ''; });
@@ -310,7 +356,15 @@ export default function ScoutingReportPage() {
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidthMm, pdfHeightMm);
       }
 
-      // Restore original image srcs
+      // ── 4. Restore everything ──
+      scaleRestoreMap.forEach(({ scaleDiv, wrapperDiv, origTransform, origWidth, origHeight, origWrapperWidth, origWrapperHeight, origWrapperMargin }) => {
+        scaleDiv.style.transform = origTransform;
+        scaleDiv.style.width = origWidth;
+        scaleDiv.style.height = origHeight;
+        wrapperDiv.style.width = origWrapperWidth;
+        wrapperDiv.style.height = origWrapperHeight;
+        wrapperDiv.style.margin = origWrapperMargin;
+      });
       imgRestoreMap.forEach(({ el, original }) => { el.src = original; });
 
       const playerName = data?.player.name ?? 'relatorio';
@@ -341,8 +395,18 @@ export default function ScoutingReportPage() {
         }
         @media print {
           .no-print { display: none !important; }
-          @page { margin: 0; size: landscape; }
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          @page { margin: 0; size: ${PAGE_WIDTH}px ${PAGE_HEIGHT}px landscape; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
+          /* Remove SlideScaler transforms for native print */
+          [data-slide] {
+            width: ${PAGE_WIDTH}px !important;
+            height: ${PAGE_HEIGHT}px !important;
+            page-break-after: always;
+            break-after: page;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+          }
+          [data-slide] > * { transform: none !important; }
         }
       `}</style>
 
