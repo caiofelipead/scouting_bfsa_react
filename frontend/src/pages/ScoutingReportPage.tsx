@@ -65,7 +65,9 @@ function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadd
     <SlideScaler>
       <div data-slide style={{
         ...pageStyles.page,
-        padding: noPadding ? 0 : '40px 56px 56px',
+        padding: noPadding ? 0 : '32px 48px 40px',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         {/* Shield watermark */}
         <img
@@ -75,10 +77,12 @@ function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadd
         />
         {/* Footer */}
         <div style={pageStyles.footer}>
-          <img src={BFSA_SHIELD} alt="" style={{ width: 20, height: 20, objectFit: 'contain', opacity: 0.5 }} />
+          <img src={BFSA_SHIELD} alt="" style={{ width: 16, height: 16, objectFit: 'contain', opacity: 0.5 }} />
           <span style={pageStyles.footerText}>BOTAFOGO FUTEBOL SA — DEPARTAMENTO DE SCOUTING</span>
         </div>
-        {children}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {children}
+        </div>
       </div>
     </SlideScaler>
   );
@@ -98,25 +102,25 @@ const pageStyles: Record<string, React.CSSProperties> = {
   },
   watermark: {
     position: 'absolute',
-    bottom: 32,
-    right: 44,
-    width: 80,
-    height: 80,
+    bottom: 24,
+    right: 36,
+    width: 60,
+    height: 60,
     objectFit: 'contain',
     opacity: 0.04,
     pointerEvents: 'none',
   },
   footer: {
     position: 'absolute',
-    bottom: 14,
-    left: 56,
+    bottom: 10,
+    left: 48,
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   footerText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 9,
+    fontSize: 7,
     fontWeight: 600,
     letterSpacing: '0.12em',
     color: '#C0C0C0',
@@ -580,7 +584,7 @@ export default function ScoutingReportPage() {
                 <ReportPage>
 
                   <SectionDivider number={1} title="Análise Descritiva" />
-                  <div style={styles.card}>
+                  <div style={{ ...styles.card, flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <div style={styles.analysisHeader}>
                       {data.player.clubLogo && (
                         <img src={`/api/image-proxy?url=${encodeURIComponent(data.player.clubLogo)}`} alt={data.player.club} style={{ width: 24, height: 24, objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -607,7 +611,7 @@ export default function ScoutingReportPage() {
                         })}
                       </div>
                     )}
-                    <div style={styles.analysisText} contentEditable suppressContentEditableWarning>
+                    <div style={{ ...styles.analysisText, flex: 1 }} contentEditable suppressContentEditableWarning>
                       {data.analysis.text || 'Análise descritiva não disponível para este jogador. Clique aqui para inserir manualmente.'}
                     </div>
                     {(data.analysis.faixaSalarial || data.analysis.transferLuvas) && (
@@ -1072,7 +1076,8 @@ const styles: Record<string, React.CSSProperties> = {
   grid2: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: 28,
+    gap: 24,
+    flex: 1,
   },
   grid2x2: {
     display: 'grid',
