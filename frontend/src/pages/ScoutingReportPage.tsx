@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Printer, Loader2, Eye } from 'lucide-react';
-import { useScoutingReport, useAnalysesPlayers } from '../hooks/useScoutingReport';
+import { Search, Printer, Loader2, Eye, Zap } from 'lucide-react';
+import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport } from '../hooks/useScoutingReport';
 import { usePlayers } from '../hooks/usePlayers';
 import ReportHeader from '../components/report/ReportHeader';
 import SectionDivider from '../components/report/SectionDivider';
@@ -21,6 +21,9 @@ function injectFonts() {
   link.href = FONTS_HREF;
   document.head.appendChild(link);
 }
+
+// ── Botafogo shield path (public) ──
+const BFSA_SHIELD = '/3154_imgbank_1685113109.png';
 
 // ── Colors ──
 const C = {
@@ -50,6 +53,75 @@ const QUADRANT = {
   mental: C.blue,
 };
 
+// ── A4 page dimensions (mm → proportion for screen) ──
+// A4 = 210mm × 297mm → ratio 1:1.414
+const PAGE_WIDTH = 794; // pixels at ~96dpi for A4 width
+const PAGE_HEIGHT = 1123; // pixels at ~96dpi for A4 height
+
+// ── Page wrapper component with shield watermark ──
+function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
+  return (
+    <div style={{
+      ...pageStyles.page,
+      padding: noPadding ? 0 : '40px 48px 60px',
+    }}>
+      {/* Shield watermark */}
+      <img
+        src={BFSA_SHIELD}
+        alt=""
+        style={pageStyles.watermark}
+      />
+      {/* Footer */}
+      <div style={pageStyles.footer}>
+        <img src={BFSA_SHIELD} alt="" style={{ width: 16, height: 16, objectFit: 'contain', opacity: 0.5 }} />
+        <span style={pageStyles.footerText}>BOTAFOGO FUTEBOL SA — DEPARTAMENTO DE SCOUTING</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const pageStyles: Record<string, React.CSSProperties> = {
+  page: {
+    width: PAGE_WIDTH,
+    minHeight: PAGE_HEIGHT,
+    background: '#FFFFFF',
+    borderRadius: 4,
+    boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
+    marginBottom: 32,
+    position: 'relative',
+    overflow: 'hidden',
+    pageBreakAfter: 'always',
+    boxSizing: 'border-box',
+  },
+  watermark: {
+    position: 'absolute',
+    bottom: 40,
+    right: 40,
+    width: 80,
+    height: 80,
+    objectFit: 'contain',
+    opacity: 0.04,
+    pointerEvents: 'none',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 48,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  footerText: {
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 7,
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    color: '#C0C0C0',
+    textTransform: 'uppercase',
+  },
+};
+
 // ── Skeleton ──
 function Skeleton({ width, height }: { width: string | number; height: string | number }) {
   return (
@@ -70,24 +142,33 @@ function Skeleton({ width, height }: { width: string | number; height: string | 
 export default function ScoutingReportPage() {
   injectFonts();
 
+  // Independent selectors — none depends on the other
   const [playerSearch, setPlayerSearch] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [incumbentSearch, setIncumbentSearch] = useState('');
   const [selectedIncumbent, setSelectedIncumbent] = useState<string | null>(null);
   const [showPlayerDropdown, setShowPlayerDropdown] = useState(false);
   const [showIncumbentDropdown, setShowIncumbentDropdown] = useState(false);
+
+  // Analyses (independent)
   const [showAnalysesDropdown, setShowAnalysesDropdown] = useState(false);
   const [analysesSearch, setAnalysesSearch] = useState('');
   const [selectedAnalysesPlayer, setSelectedAnalysesPlayer] = useState<import('../hooks/useScoutingReport').AnalysesPlayerData | null>(null);
+
+  // SkillCorner (independent)
+  const [scSearch, setScSearch] = useState('');
+  const [selectedSC, setSelectedSC] = useState<string | null>(null);
+  const [showSCDropdown, setShowSCDropdown] = useState(false);
 
   const reportRef = useRef<HTMLDivElement>(null);
 
   const playersQuery = usePlayers({ search: playerSearch, limit: 8 });
   const incumbentQuery = usePlayers({ search: incumbentSearch, limit: 8 });
   const analysesQuery = useAnalysesPlayers(analysesSearch);
+  const scSearchQuery = useSkillCornerSearchReport(scSearch);
 
   const { data, isLoading, isError, predictionLoading, similarityLoading, skillCornerLoading, comparisonLoading } =
-    useScoutingReport(selectedPlayer, selectedIncumbent, selectedAnalysesPlayer);
+    useScoutingReport(selectedPlayer, selectedIncumbent, selectedAnalysesPlayer, selectedSC);
 
   const fadeIn = (delay = 0) => ({
     initial: { opacity: 0, y: 16 },
@@ -109,7 +190,7 @@ export default function ScoutingReportPage() {
         }
         @media print {
           .no-print { display: none !important; }
-          @page { margin: 0.4in; size: A4 portrait; }
+          @page { margin: 0; size: A4 portrait; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
@@ -118,7 +199,7 @@ export default function ScoutingReportPage() {
         {/* ── Toolbar ── */}
         <div className="no-print" style={styles.toolbar}>
           <div style={styles.toolbarInner}>
-            {/* Player search */}
+            {/* Player search (WyScout) */}
             <div style={styles.searchGroup}>
               <label style={styles.searchLabel}>Jogador</label>
               <div style={styles.searchWrapper}>
@@ -144,7 +225,6 @@ export default function ScoutingReportPage() {
                       onMouseDown={() => {
                         setSelectedPlayer(p.display_name ?? p.name);
                         setPlayerSearch(p.display_name ?? p.name);
-                        setSelectedAnalysesPlayer(null);
                         setShowPlayerDropdown(false);
                       }}
                     >
@@ -158,7 +238,7 @@ export default function ScoutingReportPage() {
               ) : null}
             </div>
 
-            {/* Analyses player selector */}
+            {/* Analyses player selector (independent) */}
             <div style={styles.searchGroup}>
               <label style={styles.searchLabel}>
                 <Eye size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
@@ -168,7 +248,7 @@ export default function ScoutingReportPage() {
                 <Search size={14} color={C.textMuted} style={{ flexShrink: 0 }} />
                 <input
                   style={styles.searchInput}
-                  placeholder="Buscar atleta com análise..."
+                  placeholder="Buscar atleta analisado..."
                   value={analysesSearch}
                   onChange={(e) => {
                     setAnalysesSearch(e.target.value);
@@ -181,14 +261,13 @@ export default function ScoutingReportPage() {
               {showAnalysesDropdown && analysesQuery.data?.players?.length ? (
                 <div style={styles.dropdown}>
                   {analysesQuery.data.players.map((p, idx) => {
-                    // Use wyscout_match (JogadorDisplay format) for API calls,
-                    // fallback to nome if not available
                     const apiName = p.wyscout_match ?? p.nome;
                     return (
                       <button
                         key={`${p.nome}-${idx}`}
                         style={styles.dropdownItem}
                         onMouseDown={() => {
+                          // Set both: player API name AND analyses override
                           setSelectedPlayer(apiName);
                           setPlayerSearch(apiName);
                           setAnalysesSearch(p.nome);
@@ -208,7 +287,49 @@ export default function ScoutingReportPage() {
               ) : null}
             </div>
 
-            {/* Incumbent search */}
+            {/* SkillCorner selector (fully independent) */}
+            <div style={styles.searchGroup}>
+              <label style={styles.searchLabel}>
+                <Zap size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                SkillCorner
+              </label>
+              <div style={styles.searchWrapper}>
+                <Search size={14} color={C.textMuted} style={{ flexShrink: 0 }} />
+                <input
+                  style={styles.searchInput}
+                  placeholder="Buscar jogador SkillCorner..."
+                  value={scSearch}
+                  onChange={(e) => {
+                    setScSearch(e.target.value);
+                    setShowSCDropdown(true);
+                  }}
+                  onFocus={() => setShowSCDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowSCDropdown(false), 200)}
+                />
+              </div>
+              {showSCDropdown && scSearchQuery.data?.length ? (
+                <div style={styles.dropdown}>
+                  {scSearchQuery.data.map((p, idx) => (
+                    <button
+                      key={`${p.player_name}-${idx}`}
+                      style={styles.dropdownItem}
+                      onMouseDown={() => {
+                        setSelectedSC(p.player_name);
+                        setScSearch(p.short_name || p.player_name);
+                        setShowSCDropdown(false);
+                      }}
+                    >
+                      <span style={styles.dropdownName}>{p.short_name || p.player_name}</span>
+                      <span style={styles.dropdownMeta}>
+                        {p.team_name ?? ''} · {p.position_group ?? ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            {/* Incumbent search (independent) */}
             <div style={styles.searchGroup}>
               <label style={styles.searchLabel}>Titular (Delta)</label>
               <div style={styles.searchWrapper}>
@@ -261,7 +382,10 @@ export default function ScoutingReportPage() {
             <div style={styles.emptyState}>
               <Search size={48} color={C.textMuted} />
               <p style={styles.emptyText}>
-                Selecione um jogador acima para gerar o relatório prescritivo
+                Selecione um jogador acima para gerar o relatório prescritivo.
+              </p>
+              <p style={{ ...styles.emptyText, fontSize: 11, marginTop: 0 }}>
+                Cada seletor funciona de forma independente. Selecione o jogador WyScout, o atleta analisado, o jogador SkillCorner e o titular para comparação separadamente.
               </p>
             </div>
           )}
@@ -271,13 +395,12 @@ export default function ScoutingReportPage() {
               <Loader2 size={32} color={C.red} style={{ animation: 'spin 1s linear infinite' }} />
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               <p style={{ ...styles.emptyText, marginTop: 16 }}>Carregando dados do relatório...</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', marginTop: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', marginTop: 24, maxWidth: PAGE_WIDTH, margin: '24px auto 0' }}>
                 <Skeleton width="100%" height={180} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <Skeleton width="100%" height={200} />
                   <Skeleton width="100%" height={200} />
                 </div>
-                <Skeleton width="100%" height={300} />
               </div>
             </div>
           )}
@@ -297,187 +420,498 @@ export default function ScoutingReportPage() {
 
           {selectedPlayer && data && (
             <>
-              {/* 1. COVER PAGE */}
+              {/* ═══════ PAGE 1: COVER ═══════ */}
               <motion.div {...fadeIn(0)}>
-                <ReportHeader
-                  name={data.player.name}
-                  badges={data.player.badges}
-                  clusterDef={data.player.clusterDef}
-                  photo={data.player.photo}
-                  clubLogo={data.player.clubLogo}
-                  position={data.player.position}
-                  age={data.player.age}
-                  height={data.player.height}
-                  club={data.player.club}
-                  league={data.player.league}
-                  contract={data.player.contract}
-                  links={data.analysis.links}
-                />
+                <ReportPage noPadding>
+                  <div style={{ padding: '40px 48px 60px' }}>
+                    <ReportHeader
+                      name={data.player.name}
+                      badges={data.player.badges}
+                      clusterDef={data.player.clusterDef}
+                      photo={data.player.photo}
+                      clubLogo={data.player.clubLogo}
+                      position={data.player.position}
+                      age={data.player.age}
+                      height={data.player.height}
+                      club={data.player.club}
+                      league={data.player.league}
+                      contract={data.player.contract}
+                      links={data.analysis.links}
+                    />
+                  </div>
+                </ReportPage>
               </motion.div>
 
-              {/* 2. ANÁLISE DESCRITIVA */}
+              {/* ═══════ PAGE 2: ANÁLISE DESCRITIVA + IDENTIFICAÇÃO ═══════ */}
               <motion.div {...fadeIn(0.05)}>
-                <SectionDivider number={1} title="Análise Descritiva" />
-                <div style={styles.card}>
-                  {/* Analysis header */}
-                  <div style={styles.analysisHeader}>
-                    {data.player.clubLogo && (
-                      <img
-                        src={`/api/image-proxy?url=${encodeURIComponent(data.player.clubLogo)}`}
-                        alt={data.player.club}
-                        style={{ width: 32, height: 32, objectFit: 'contain' }}
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                    )}
-                    <div>
-                      <div style={styles.analysisLabel}>ANÁLISE</div>
-                      <div style={styles.analysisPlayerName}>
-                        <span style={{ fontWeight: 700 }}>{data.player.name.split(' ')[0]?.toUpperCase()}</span>{' '}
-                        {data.player.name.split(' ').slice(1).join(' ').toUpperCase()}
+                <ReportPage>
+                  <SectionDivider number={1} title="Análise Descritiva" />
+                  <div style={styles.card}>
+                    {/* Analysis header */}
+                    <div style={styles.analysisHeader}>
+                      {data.player.clubLogo && (
+                        <img
+                          src={`/api/image-proxy?url=${encodeURIComponent(data.player.clubLogo)}`}
+                          alt={data.player.club}
+                          style={{ width: 32, height: 32, objectFit: 'contain' }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      )}
+                      <div>
+                        <div style={styles.analysisLabel}>ANÁLISE</div>
+                        <div style={styles.analysisPlayerName}>
+                          <span style={{ fontWeight: 700 }}>{data.player.name.split(' ')[0]?.toUpperCase()}</span>{' '}
+                          {data.player.name.split(' ').slice(1).join(' ').toUpperCase()}
+                        </div>
                       </div>
+                      {data.analysis.modelo && (
+                        <span style={{
+                          ...styles.modeloBadge,
+                          background: data.analysis.modelo === 'Descartado' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
+                          color: data.analysis.modelo === 'Descartado' ? '#ef4444' : '#3b82f6',
+                          border: `1px solid ${data.analysis.modelo === 'Descartado' ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.2)'}`,
+                        }}>
+                          {data.analysis.modelo}
+                        </span>
+                      )}
                     </div>
-                    {data.analysis.modelo && (
-                      <span style={{
-                        ...styles.modeloBadge,
-                        background: data.analysis.modelo === 'Descartado' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
-                        color: data.analysis.modelo === 'Descartado' ? '#ef4444' : '#3b82f6',
-                        border: `1px solid ${data.analysis.modelo === 'Descartado' ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.2)'}`,
-                      }}>
-                        {data.analysis.modelo}
-                      </span>
+
+                    {/* Score grades */}
+                    {Object.keys(data.analysis.scores).length > 0 && (
+                      <div style={styles.scoresGrid}>
+                        {Object.entries(data.analysis.scores).map(([key, value]) => {
+                          const label = key === 'Nota_Desempenho' ? 'Desempenho' : key === 'Técnica' ? 'Técnica' : key;
+                          const scoreColor = value >= 4 ? '#1B9E5A' : value >= 3 ? '#3B82F6' : value >= 2 ? '#D97706' : '#C8102E';
+                          return (
+                            <div key={key} style={styles.scoreBox}>
+                              <div style={styles.scoreLabel}>{label}</div>
+                              <div style={{ ...styles.scoreValue, color: scoreColor }}>
+                                {value.toFixed(1)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Analysis text */}
+                    <div
+                      style={styles.analysisText}
+                      contentEditable
+                      suppressContentEditableWarning
+                    >
+                      {data.analysis.text || 'Análise descritiva não disponível para este jogador. Clique aqui para inserir manualmente.'}
+                    </div>
+
+                    {/* Financial info */}
+                    {(data.analysis.faixaSalarial || data.analysis.transferLuvas) && (
+                      <div style={styles.financialRow}>
+                        {data.analysis.faixaSalarial && (
+                          <div style={styles.financialTag}>
+                            <span style={{ color: C.textTertiary }}>Salário:</span>{' '}
+                            <span style={{ fontWeight: 600 }}>{data.analysis.faixaSalarial}</span>
+                          </div>
+                        )}
+                        {data.analysis.transferLuvas && (
+                          <div style={styles.financialTag}>
+                            <span style={{ color: C.textTertiary }}>Transfer/Luvas:</span>{' '}
+                            <span style={{ fontWeight: 600 }}>{data.analysis.transferLuvas}</span>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
-                  {/* Score grades */}
-                  {Object.keys(data.analysis.scores).length > 0 && (
-                    <div style={styles.scoresGrid}>
-                      {Object.entries(data.analysis.scores).map(([key, value]) => {
-                        const label = key === 'Nota_Desempenho' ? 'Desempenho' : key === 'Técnica' ? 'Técnica' : key;
-                        const scoreColor = value >= 4 ? '#1B9E5A' : value >= 3 ? '#3B82F6' : value >= 2 ? '#D97706' : '#C8102E';
-                        return (
-                          <div key={key} style={styles.scoreBox}>
-                            <div style={styles.scoreLabel}>{label}</div>
-                            <div style={{ ...styles.scoreValue, color: scoreColor }}>
-                              {value.toFixed(1)}
+                  {/* Identificação & Veredito */}
+                  <SectionDivider number={2} title="Identificação & Veredito Preditivo" />
+                  <div style={styles.grid2}>
+                    {/* Left: Player ID */}
+                    <div style={styles.card}>
+                      <h3 style={styles.cardTitle}>Dados do Jogador</h3>
+                      <div style={styles.idGrid}>
+                        {[
+                          ['Nome', data.player.name],
+                          ['Idade', data.player.age ? `${data.player.age} anos` : '—'],
+                          ['Posição', data.player.position],
+                          ['Altura', data.player.height],
+                          ['Pé', data.player.foot],
+                          ['Clube', data.player.club],
+                          ['Liga', data.player.league],
+                          ['Contrato', data.player.contract],
+                        ].map(([label, value]) => (
+                          <div key={label} style={styles.idRow}>
+                            <span style={styles.idLabel}>{label}</span>
+                            <span style={styles.idValue}>{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Right: Verdict */}
+                    <div>
+                      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                        <StatBox
+                          label="Impact Score"
+                          value={data.predict.impactScore.toFixed(1)}
+                          color={C.green}
+                          subtitle="SSP / 10"
+                        />
+                        <StatBox
+                          label="P(Sucesso)"
+                          value={`${data.predict.pSuccess}%`}
+                          color={C.blue}
+                        />
+                        <StatBox
+                          label="Risco"
+                          value={data.predict.risk}
+                          color={data.predict.riskColor}
+                        />
+                      </div>
+                      {predictionLoading ? (
+                        <Skeleton width="100%" height={80} />
+                      ) : (
+                        <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}` }}>
+                          <div style={styles.verdictLabel}>VEREDITO</div>
+                          <p
+                            style={styles.verdictText}
+                            contentEditable
+                            suppressContentEditableWarning
+                          >
+                            {data.predict.verdict}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </ReportPage>
+              </motion.div>
+
+              {/* ═══════ PAGE 3: FOUR CORNERS + RADAR ═══════ */}
+              <motion.div {...fadeIn(0.1)}>
+                <ReportPage>
+                  <SectionDivider number={3} title="Matriz Qualitativa — Four Corners" />
+                  <div style={styles.grid2x2}>
+                    {(
+                      [
+                        { key: 'tactical' as const, label: 'TÁTICO', color: QUADRANT.tactical },
+                        { key: 'technical' as const, label: 'TÉCNICO', color: QUADRANT.technical },
+                        { key: 'physical' as const, label: 'FÍSICO', color: QUADRANT.physical },
+                        { key: 'mental' as const, label: 'MENTAL', color: QUADRANT.mental },
+                      ] as const
+                    ).map((q) => (
+                      <div
+                        key={q.key}
+                        style={{ ...styles.cardElevated, borderTop: `3px solid ${q.color}` }}
+                      >
+                        <div style={{ ...styles.quadrantLabel, color: q.color }}>{q.label}</div>
+                        <ul style={styles.bulletList}>
+                          {data.qualitative[q.key].map((item, i) => (
+                            <li
+                              key={i}
+                              style={styles.bulletItem}
+                              contentEditable
+                              suppressContentEditableWarning
+                            >
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Índices Compostos */}
+                  <SectionDivider number={4} title="Índices Compostos & Filtro de Elite" />
+                  <div style={styles.grid2}>
+                    {/* Radar */}
+                    <div style={styles.card}>
+                      <h3 style={styles.cardTitle}>Radar de Índices</h3>
+                      {data.composites.length ? (
+                        <ReportRadar data={data.composites} size={340} />
+                      ) : (
+                        <Skeleton width="100%" height={300} />
+                      )}
+                    </div>
+
+                    {/* Elite filter table */}
+                    <div style={styles.card}>
+                      <h3 style={styles.cardTitle}>Filtro de Elite (P85+)</h3>
+                      {data.eliteMetrics.length ? (
+                        <>
+                          <div style={styles.eliteSummary}>
+                            <span style={styles.eliteCount}>{data.eliteMetrics.length}</span>
+                            <span style={styles.eliteSummaryText}>
+                              métricas no nível elite
+                            </span>
+                          </div>
+                          <table style={styles.table}>
+                            <thead>
+                              <tr>
+                                <th style={styles.th}>Métrica</th>
+                                <th style={{ ...styles.th, textAlign: 'center' }}>Percentil</th>
+                                <th style={styles.th}>Impacto</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {data.eliteMetrics.map((m, i) => (
+                                <tr
+                                  key={i}
+                                  style={{
+                                    background: i % 2 === 0 ? C.bgCard : C.bgSubtle,
+                                  }}
+                                >
+                                  <td style={styles.td}>{m.metric}</td>
+                                  <td style={{ ...styles.td, textAlign: 'center' }}>
+                                    <span
+                                      style={{
+                                        ...styles.pBadge,
+                                        background:
+                                          m.p >= 95 ? C.green : m.p >= 90 ? C.teal : C.amber,
+                                        color: '#fff',
+                                      }}
+                                    >
+                                      P{m.p}
+                                    </span>
+                                  </td>
+                                  <td style={{ ...styles.td, color: C.textTertiary, fontSize: 11 }}>
+                                    {m.impact}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </>
+                      ) : (
+                        <p style={styles.placeholder}>Nenhuma métrica P85+ encontrada</p>
+                      )}
+                    </div>
+                  </div>
+                </ReportPage>
+              </motion.div>
+
+              {/* ═══════ PAGE 4: WEDGE RADAR + DELTA ═══════ */}
+              <motion.div {...fadeIn(0.15)}>
+                <ReportPage>
+                  <SectionDivider number={5} title="Radar Wedge — Métricas Elite" />
+                  <div style={styles.card}>
+                    {data.eliteMetrics.length ? (
+                      <WedgeRadar data={data.eliteMetrics} size={340} />
+                    ) : (
+                      <p style={styles.placeholder}>
+                        Sem métricas de elite suficientes para o radar wedge
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Delta vs Titular */}
+                  <SectionDivider number={6} title="Delta vs. Titular — Squad Impact" />
+                  <div style={styles.card}>
+                    {!selectedIncumbent ? (
+                      <p style={styles.placeholder}>
+                        Selecione um titular na barra acima para gerar a comparação Delta
+                      </p>
+                    ) : comparisonLoading ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <Skeleton width="100%" height={100} />
+                        <Skeleton width="100%" height={200} />
+                      </div>
+                    ) : data.delta.length ? (
+                      <>
+                        <DeltaChart
+                          data={data.delta}
+                          playerName={data.player.name}
+                          incumbentName={selectedIncumbent}
+                        />
+                        <div style={{ marginTop: 20 }}>
+                          <div
+                            style={styles.quoteBox}
+                            contentEditable
+                            suppressContentEditableWarning
+                          >
+                            Impacto projetado na composição do elenco: adicione sua análise aqui.
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p style={styles.placeholder}>Dados de comparação indisponíveis</p>
+                    )}
+                  </div>
+                </ReportPage>
+              </motion.div>
+
+              {/* ═══════ PAGE 5: SKILLCORNER + SIMILARES ═══════ */}
+              <motion.div {...fadeIn(0.2)}>
+                <ReportPage>
+                  <SectionDivider number={7} title="Dados Físicos — SkillCorner" />
+                  {selectedSC && (
+                    <div style={{ ...styles.scTag, marginBottom: 12 }}>
+                      <Zap size={12} />
+                      SkillCorner: <strong>{selectedSC}</strong>
+                    </div>
+                  )}
+                  {skillCornerLoading ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                      <Skeleton width="100%" height={200} />
+                      <Skeleton width="100%" height={200} />
+                      <Skeleton width="100%" height={200} />
+                    </div>
+                  ) : data.physical ? (
+                    <div style={styles.grid3}>
+                      {/* Velocity */}
+                      <div style={styles.card}>
+                        <h4 style={styles.physTitle}>Velocidade</h4>
+                        <PhysicalBar
+                          label="Vel. Máxima"
+                          data={data.physical.maxSpeed}
+                          unit="km/h"
+                        />
+                        <PhysicalBar
+                          label="Sprints p90"
+                          data={data.physical.sprints}
+                          unit="/90"
+                        />
+                      </div>
+                      {/* Endurance */}
+                      <div style={styles.card}>
+                        <h4 style={styles.physTitle}>Resistência</h4>
+                        <PhysicalBar
+                          label="Distância"
+                          data={data.physical.distance}
+                          unit="km"
+                        />
+                        <PhysicalBar
+                          label="High Runs"
+                          data={data.physical.hiRuns}
+                          unit="/90"
+                        />
+                      </div>
+                      {/* Explosiveness */}
+                      <div style={styles.card}>
+                        <h4 style={styles.physTitle}>Explosividade</h4>
+                        <PhysicalBar
+                          label="Acelerações"
+                          data={data.physical.accelerations}
+                          unit="/90"
+                        />
+                        <PhysicalBar
+                          label="Pressões"
+                          data={data.physical.pressures}
+                          unit="/90"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ ...styles.card, borderLeft: `3px solid ${C.amber}` }}>
+                      <p style={{ ...styles.placeholder, color: C.amber }}>
+                        {selectedSC
+                          ? `Dados SkillCorner não encontrados para "${selectedSC}".`
+                          : 'Selecione um jogador no seletor SkillCorner para carregar dados físicos.'}
+                      </p>
+                      <div style={styles.grid3}>
+                        {['Velocidade', 'Resistência', 'Explosividade'].map((cat) => (
+                          <div key={cat} style={styles.card}>
+                            <h4 style={styles.physTitle}>{cat}</h4>
+                            <div
+                              contentEditable
+                              suppressContentEditableWarning
+                              style={styles.editablePlaceholder}
+                            >
+                              Inserir dados manualmente
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Analysis text */}
-                  <div
-                    style={styles.analysisText}
-                    contentEditable
-                    suppressContentEditableWarning
-                  >
-                    {data.analysis.text || 'Análise descritiva não disponível para este jogador. Clique aqui para inserir manualmente.'}
-                  </div>
-
-                  {/* Financial info */}
-                  {(data.analysis.faixaSalarial || data.analysis.transferLuvas) && (
-                    <div style={styles.financialRow}>
-                      {data.analysis.faixaSalarial && (
-                        <div style={styles.financialTag}>
-                          <span style={{ color: C.textTertiary }}>Salário:</span>{' '}
-                          <span style={{ fontWeight: 600 }}>{data.analysis.faixaSalarial}</span>
-                        </div>
-                      )}
-                      {data.analysis.transferLuvas && (
-                        <div style={styles.financialTag}>
-                          <span style={{ color: C.textTertiary }}>Transfer/Luvas:</span>{' '}
-                          <span style={{ fontWeight: 600 }}>{data.analysis.transferLuvas}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-
-              {/* 3. IDENTIFICAÇÃO + VEREDITO */}
-              <motion.div {...fadeIn(0.1)}>
-                <SectionDivider number={2} title="Identificação & Veredito Preditivo" />
-                <div style={styles.grid2}>
-                  {/* Left: Player ID */}
-                  <div style={styles.card}>
-                    <h3 style={styles.cardTitle}>Dados do Jogador</h3>
-                    <div style={styles.idGrid}>
-                      {[
-                        ['Nome', data.player.name],
-                        ['Idade', data.player.age ? `${data.player.age} anos` : '—'],
-                        ['Posição', data.player.position],
-                        ['Altura', data.player.height],
-                        ['Pé', data.player.foot],
-                        ['Clube', data.player.club],
-                        ['Liga', data.player.league],
-                        ['Contrato', data.player.contract],
-                      ].map(([label, value]) => (
-                        <div key={label} style={styles.idRow}>
-                          <span style={styles.idLabel}>{label}</span>
-                          <span style={styles.idValue}>{value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Right: Verdict */}
-                  <div>
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-                      <StatBox
-                        label="Impact Score"
-                        value={data.predict.impactScore.toFixed(1)}
-                        color={C.green}
-                        subtitle="SSP / 10"
-                      />
-                      <StatBox
-                        label="P(Sucesso)"
-                        value={`${data.predict.pSuccess}%`}
-                        color={C.blue}
-                      />
-                      <StatBox
-                        label="Risco"
-                        value={data.predict.risk}
-                        color={data.predict.riskColor}
-                      />
-                    </div>
-                    {predictionLoading ? (
-                      <Skeleton width="100%" height={80} />
-                    ) : (
-                      <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}` }}>
-                        <div style={styles.verdictLabel}>VEREDITO</div>
-                        <p
-                          style={styles.verdictText}
-                          contentEditable
-                          suppressContentEditableWarning
-                        >
-                          {data.predict.verdict}
-                        </p>
+                        ))}
                       </div>
-                    )}
+                    </div>
+                  )}
+
+                  {/* Contingência — Similares */}
+                  <SectionDivider number={8} title="Contingência — Jogadores Similares" />
+                  <div style={styles.grid2}>
+                    {/* Similar players */}
+                    <div style={styles.card}>
+                      <h3 style={styles.cardTitle}>Top 3 Similares</h3>
+                      {similarityLoading ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          <Skeleton width="100%" height={48} />
+                          <Skeleton width="100%" height={48} />
+                          <Skeleton width="100%" height={48} />
+                        </div>
+                      ) : data.similar.length ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {data.similar.map((s, i) => (
+                            <div key={i} style={styles.similarRow}>
+                              <div style={styles.similarRank}>{i + 1}</div>
+                              <div style={{ flex: 1 }}>
+                                <div style={styles.similarName}>{s.name}</div>
+                                <div style={styles.similarClub}>{s.club}</div>
+                              </div>
+                              <div style={styles.similarPct}>{s.pct}%</div>
+                              <div style={styles.progressTrack}>
+                                <div
+                                  style={{
+                                    ...styles.progressBar,
+                                    width: `${s.pct}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={styles.placeholder}>Sem jogadores similares encontrados</p>
+                      )}
+                    </div>
+
+                    {/* Analytical observation */}
+                    <div style={styles.card}>
+                      <h3 style={styles.cardTitle}>Observação Analítica</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {['Nível Competitivo', 'Valor de Mercado', 'Estratégia'].map((field) => (
+                          <div key={field}>
+                            <div style={styles.obsLabel}>{field}</div>
+                            <div
+                              contentEditable
+                              suppressContentEditableWarning
+                              style={styles.obsField}
+                            >
+                              Inserir observação...
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </ReportPage>
               </motion.div>
 
-              {/* 4. FOUR CORNERS */}
-              <motion.div {...fadeIn(0.15)}>
-                <SectionDivider number={3} title="Matriz Qualitativa — Four Corners" />
-                <div style={styles.grid2x2}>
-                  {(
-                    [
-                      { key: 'tactical' as const, label: 'TÁTICO', color: QUADRANT.tactical },
-                      { key: 'technical' as const, label: 'TÉCNICO', color: QUADRANT.technical },
-                      { key: 'physical' as const, label: 'FÍSICO', color: QUADRANT.physical },
-                      { key: 'mental' as const, label: 'MENTAL', color: QUADRANT.mental },
-                    ] as const
-                  ).map((q) => (
-                    <div
-                      key={q.key}
-                      style={{ ...styles.cardElevated, borderTop: `3px solid ${q.color}` }}
-                    >
-                      <div style={{ ...styles.quadrantLabel, color: q.color }}>{q.label}</div>
+              {/* ═══════ PAGE 6: CONCLUSÃO ═══════ */}
+              <motion.div {...fadeIn(0.25)}>
+                <ReportPage>
+                  <SectionDivider number={9} title="Conclusão & Recomendação" />
+                  <div style={styles.grid3}>
+                    {/* Veredito Final */}
+                    <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}` }}>
+                      <div style={{ ...styles.quadrantLabel, color: C.green }}>
+                        VEREDITO FINAL
+                      </div>
+                      <div
+                        contentEditable
+                        suppressContentEditableWarning
+                        style={styles.conclusionText}
+                      >
+                        Jogador apresenta perfil compatível com as necessidades do elenco. Recomendação de avanço nas tratativas.
+                      </div>
+                    </div>
+
+                    {/* Negociação */}
+                    <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.red}` }}>
+                      <div style={{ ...styles.quadrantLabel, color: C.red }}>NEGOCIAÇÃO</div>
                       <ul style={styles.bulletList}>
-                        {data.qualitative[q.key].map((item, i) => (
+                        {[
+                          'Definir teto salarial',
+                          'Avaliar cláusulas contratuais',
+                          'Consultar agente do jogador',
+                        ].map((item, i) => (
                           <li
                             key={i}
                             style={styles.bulletItem}
@@ -489,344 +923,47 @@ export default function ScoutingReportPage() {
                         ))}
                       </ul>
                     </div>
-                  ))}
-                </div>
-              </motion.div>
 
-              {/* 5. ÍNDICES COMPOSTOS — Radar + Filtro Elite */}
-              <motion.div {...fadeIn(0.2)}>
-                <SectionDivider number={4} title="Índices Compostos & Filtro de Elite" />
-                <div style={styles.grid2}>
-                  {/* Radar */}
-                  <div style={styles.card}>
-                    <h3 style={styles.cardTitle}>Radar de Índices</h3>
-                    {data.composites.length ? (
-                      <ReportRadar data={data.composites} />
-                    ) : (
-                      <Skeleton width="100%" height={300} />
-                    )}
-                  </div>
-
-                  {/* Elite filter table */}
-                  <div style={styles.card}>
-                    <h3 style={styles.cardTitle}>Filtro de Elite (P85+)</h3>
-                    {data.eliteMetrics.length ? (
-                      <>
-                        <div style={styles.eliteSummary}>
-                          <span style={styles.eliteCount}>{data.eliteMetrics.length}</span>
-                          <span style={styles.eliteSummaryText}>
-                            métricas no nível elite
-                          </span>
-                        </div>
-                        <table style={styles.table}>
-                          <thead>
-                            <tr>
-                              <th style={styles.th}>Métrica</th>
-                              <th style={{ ...styles.th, textAlign: 'center' }}>Percentil</th>
-                              <th style={styles.th}>Impacto</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {data.eliteMetrics.map((m, i) => (
-                              <tr
-                                key={i}
-                                style={{
-                                  background: i % 2 === 0 ? C.bgCard : C.bgSubtle,
-                                }}
-                              >
-                                <td style={styles.td}>{m.metric}</td>
-                                <td style={{ ...styles.td, textAlign: 'center' }}>
-                                  <span
-                                    style={{
-                                      ...styles.pBadge,
-                                      background:
-                                        m.p >= 95 ? C.green : m.p >= 90 ? C.teal : C.amber,
-                                      color: m.p >= 90 ? '#fff' : '#fff',
-                                    }}
-                                  >
-                                    P{m.p}
-                                  </span>
-                                </td>
-                                <td style={{ ...styles.td, color: C.textTertiary, fontSize: 11 }}>
-                                  {m.impact}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </>
-                    ) : (
-                      <p style={styles.placeholder}>Nenhuma métrica P85+ encontrada</p>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* 6. WEDGE RADAR */}
-              <motion.div {...fadeIn(0.25)}>
-                <SectionDivider number={5} title="Radar Wedge — Métricas Elite" />
-                <div style={styles.card}>
-                  {data.eliteMetrics.length ? (
-                    <WedgeRadar data={data.eliteMetrics} />
-                  ) : (
-                    <p style={styles.placeholder}>
-                      Sem métricas de elite suficientes para o radar wedge
-                    </p>
-                  )}
-                </div>
-              </motion.div>
-
-              {/* 7. DELTA VS TITULAR */}
-              <motion.div {...fadeIn(0.3)}>
-                <SectionDivider number={6} title="Delta vs. Titular — Squad Impact" />
-                <div style={styles.card}>
-                  {!selectedIncumbent ? (
-                    <p style={styles.placeholder}>
-                      Selecione um titular na barra acima para gerar a comparação Delta
-                    </p>
-                  ) : comparisonLoading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      <Skeleton width="100%" height={100} />
-                      <Skeleton width="100%" height={200} />
-                    </div>
-                  ) : data.delta.length ? (
-                    <>
-                      <DeltaChart
-                        data={data.delta}
-                        playerName={data.player.name}
-                        incumbentName={selectedIncumbent}
-                      />
-                      <div style={{ marginTop: 20 }}>
-                        <div
-                          style={styles.quoteBox}
-                          contentEditable
-                          suppressContentEditableWarning
-                        >
-                          Impacto projetado na composição do elenco: adicione sua análise aqui.
-                        </div>
+                    {/* Desenvolvimento */}
+                    <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.amber}` }}>
+                      <div style={{ ...styles.quadrantLabel, color: C.amber }}>
+                        DESENVOLVIMENTO
                       </div>
-                    </>
-                  ) : (
-                    <p style={styles.placeholder}>Dados de comparação indisponíveis</p>
-                  )}
-                </div>
-              </motion.div>
-
-              {/* 8. DADOS FÍSICOS — SkillCorner */}
-              <motion.div {...fadeIn(0.35)}>
-                <SectionDivider number={7} title="Dados Físicos — SkillCorner" />
-                {skillCornerLoading ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                    <Skeleton width="100%" height={200} />
-                    <Skeleton width="100%" height={200} />
-                    <Skeleton width="100%" height={200} />
-                  </div>
-                ) : data.physical ? (
-                  <div style={styles.grid3}>
-                    {/* Velocity */}
-                    <div style={styles.card}>
-                      <h4 style={styles.physTitle}>Velocidade</h4>
-                      <PhysicalBar
-                        label="Vel. Máxima"
-                        data={data.physical.maxSpeed}
-                        unit="km/h"
-                      />
-                      <PhysicalBar
-                        label="Sprints p90"
-                        data={data.physical.sprints}
-                        unit="/90"
-                      />
-                    </div>
-                    {/* Endurance */}
-                    <div style={styles.card}>
-                      <h4 style={styles.physTitle}>Resistência</h4>
-                      <PhysicalBar
-                        label="Distância"
-                        data={data.physical.distance}
-                        unit="km"
-                      />
-                      <PhysicalBar
-                        label="High Runs"
-                        data={data.physical.hiRuns}
-                        unit="/90"
-                      />
-                    </div>
-                    {/* Explosiveness */}
-                    <div style={styles.card}>
-                      <h4 style={styles.physTitle}>Explosividade</h4>
-                      <PhysicalBar
-                        label="Acelerações"
-                        data={data.physical.accelerations}
-                        unit="/90"
-                      />
-                      <PhysicalBar
-                        label="Pressões"
-                        data={data.physical.pressures}
-                        unit="/90"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ ...styles.card, borderLeft: `3px solid ${C.amber}` }}>
-                    <p style={{ ...styles.placeholder, color: C.amber }}>
-                      Dados SkillCorner não disponíveis para este jogador. Campos editáveis abaixo.
-                    </p>
-                    <div style={styles.grid3}>
-                      {['Velocidade', 'Resistência', 'Explosividade'].map((cat) => (
-                        <div key={cat} style={styles.card}>
-                          <h4 style={styles.physTitle}>{cat}</h4>
-                          <div
+                      <ul style={styles.bulletList}>
+                        {[
+                          'Plano de adaptação tática',
+                          'Acompanhamento físico',
+                          'Integração com elenco',
+                        ].map((item, i) => (
+                          <li
+                            key={i}
+                            style={styles.bulletItem}
                             contentEditable
                             suppressContentEditableWarning
-                            style={styles.editablePlaceholder}
                           >
-                            Inserir dados manualmente
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-
-              {/* 9. CONTINGÊNCIA */}
-              <motion.div {...fadeIn(0.4)}>
-                <SectionDivider number={8} title="Contingência — Jogadores Similares" />
-                <div style={styles.grid2}>
-                  {/* Similar players */}
-                  <div style={styles.card}>
-                    <h3 style={styles.cardTitle}>Top 3 Similares</h3>
-                    {similarityLoading ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <Skeleton width="100%" height={48} />
-                        <Skeleton width="100%" height={48} />
-                        <Skeleton width="100%" height={48} />
-                      </div>
-                    ) : data.similar.length ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {data.similar.map((s, i) => (
-                          <div key={i} style={styles.similarRow}>
-                            <div style={styles.similarRank}>{i + 1}</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={styles.similarName}>{s.name}</div>
-                              <div style={styles.similarClub}>{s.club}</div>
-                            </div>
-                            <div style={styles.similarPct}>{s.pct}%</div>
-                            <div style={styles.progressTrack}>
-                              <div
-                                style={{
-                                  ...styles.progressBar,
-                                  width: `${s.pct}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
+                            {item}
+                          </li>
                         ))}
-                      </div>
-                    ) : (
-                      <p style={styles.placeholder}>Sem jogadores similares encontrados</p>
-                    )}
-                  </div>
-
-                  {/* Analytical observation */}
-                  <div style={styles.card}>
-                    <h3 style={styles.cardTitle}>Observação Analítica</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                      {['Nível Competitivo', 'Valor de Mercado', 'Estratégia'].map((field) => (
-                        <div key={field}>
-                          <div style={styles.obsLabel}>{field}</div>
-                          <div
-                            contentEditable
-                            suppressContentEditableWarning
-                            style={styles.obsField}
-                          >
-                            Inserir observação...
-                          </div>
-                        </div>
-                      ))}
+                      </ul>
                     </div>
                   </div>
-                </div>
-              </motion.div>
 
-              {/* 10. CONCLUSÃO */}
-              <motion.div {...fadeIn(0.45)}>
-                <SectionDivider number={9} title="Conclusão & Recomendação" />
-                <div style={styles.grid3}>
-                  {/* Veredito Final */}
-                  <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}` }}>
-                    <div style={{ ...styles.quadrantLabel, color: C.green }}>
-                      VEREDITO FINAL
-                    </div>
+                  {/* Recommendation banner */}
+                  <div style={styles.recBanner}>
+                    <div style={styles.recTitle}>RECOMENDAÇÃO</div>
                     <div
                       contentEditable
                       suppressContentEditableWarning
-                      style={styles.conclusionText}
+                      style={styles.recText}
                     >
-                      Jogador apresenta perfil compatível com as necessidades do elenco. Recomendação de avanço nas tratativas.
+                      {data.predict.risk.toLowerCase().includes('baix') || data.predict.risk.toLowerCase() === 'low'
+                        ? `AVANÇAR — Jogador com P(Sucesso) de ${data.predict.pSuccess}% e perfil de risco baixo. Recomendamos avanço imediato nas negociações.`
+                        : data.predict.risk.toLowerCase().includes('med')
+                          ? `AVALIAR COM CAUTELA — P(Sucesso) de ${data.predict.pSuccess}% com risco moderado. Recomendamos avaliação presencial antes de avançar.`
+                          : `MONITORAR — P(Sucesso) de ${data.predict.pSuccess}% com risco elevado. Manter em observação e reavaliar em 60 dias.`}
                     </div>
                   </div>
-
-                  {/* Negociação */}
-                  <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.red}` }}>
-                    <div style={{ ...styles.quadrantLabel, color: C.red }}>NEGOCIAÇÃO</div>
-                    <ul style={styles.bulletList}>
-                      {[
-                        'Definir teto salarial',
-                        'Avaliar cláusulas contratuais',
-                        'Consultar agente do jogador',
-                      ].map((item, i) => (
-                        <li
-                          key={i}
-                          style={styles.bulletItem}
-                          contentEditable
-                          suppressContentEditableWarning
-                        >
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Desenvolvimento */}
-                  <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.amber}` }}>
-                    <div style={{ ...styles.quadrantLabel, color: C.amber }}>
-                      DESENVOLVIMENTO
-                    </div>
-                    <ul style={styles.bulletList}>
-                      {[
-                        'Plano de adaptação tática',
-                        'Acompanhamento físico',
-                        'Integração com elenco',
-                      ].map((item, i) => (
-                        <li
-                          key={i}
-                          style={styles.bulletItem}
-                          contentEditable
-                          suppressContentEditableWarning
-                        >
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Recommendation banner */}
-                <div style={styles.recBanner}>
-                  <div style={styles.recTitle}>RECOMENDAÇÃO</div>
-                  <div
-                    contentEditable
-                    suppressContentEditableWarning
-                    style={styles.recText}
-                  >
-                    {data.predict.risk.toLowerCase().includes('baix') || data.predict.risk.toLowerCase() === 'low'
-                      ? `AVANÇAR — Jogador com P(Sucesso) de ${data.predict.pSuccess}% e perfil de risco baixo. Recomendamos avanço imediato nas negociações.`
-                      : data.predict.risk.toLowerCase().includes('med')
-                        ? `AVALIAR COM CAUTELA — P(Sucesso) de ${data.predict.pSuccess}% com risco moderado. Recomendamos avaliação presencial antes de avançar.`
-                        : `MONITORAR — P(Sucesso) de ${data.predict.pSuccess}% com risco elevado. Manter em observação e reavaliar em 60 dias.`}
-                  </div>
-                </div>
+                </ReportPage>
               </motion.div>
             </>
           )}
@@ -903,8 +1040,6 @@ const phStyles: Record<string, React.CSSProperties> = {
   },
 };
 
-const C_red = C.red;
-
 // ── Page Styles ──
 const styles: Record<string, React.CSSProperties> = {
   page: {
@@ -923,18 +1058,18 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 24,
   },
   toolbarInner: {
-    maxWidth: 1100,
+    maxWidth: 1200,
     margin: '0 auto',
     padding: '0 24px',
     display: 'flex',
-    gap: 16,
+    gap: 12,
     alignItems: 'flex-end',
     flexWrap: 'wrap',
   },
   searchGroup: {
     position: 'relative',
     flex: 1,
-    minWidth: 200,
+    minWidth: 160,
   },
   searchLabel: {
     display: 'block',
@@ -1007,7 +1142,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    background: C_red,
+    background: C.red,
     color: '#fff',
     border: 'none',
     borderRadius: 8,
@@ -1021,8 +1156,9 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   report: {
-    maxWidth: 1100,
-    margin: '0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
     padding: '0 24px 60px',
   },
   emptyState: {
@@ -1304,7 +1440,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   recBanner: {
     marginTop: 24,
-    background: `linear-gradient(135deg, ${C_red}, ${C.redDark})`,
+    background: `linear-gradient(135deg, ${C.red}, ${C.redDark})`,
     borderRadius: 12,
     padding: '24px 32px',
     boxShadow: '0 8px 24px rgba(200, 16, 46, 0.25)',
@@ -1427,5 +1563,17 @@ const styles: Record<string, React.CSSProperties> = {
     background: C.bgSubtle,
     borderRadius: 6,
     border: `1px solid ${C.bgMuted}`,
+  },
+  scTag: {
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 11,
+    color: C.textSecondary,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 12px',
+    background: 'rgba(128, 203, 162, 0.1)',
+    border: '1px solid rgba(128, 203, 162, 0.3)',
+    borderRadius: 6,
   },
 };

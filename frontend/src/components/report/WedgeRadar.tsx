@@ -1,3 +1,8 @@
+/**
+ * Elite metrics wedge radar — SkillCorner-inspired pizza chart
+ * showing only P85+ metrics with a clean, professional look.
+ */
+
 interface WedgeRadarProps {
   data: Array<{ metric: string; p: number }>;
   size?: number;
@@ -8,23 +13,17 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
 
   const cx = size / 2;
   const cy = size / 2;
-  const maxR = size / 2 - 60;
-  const innerR = maxR * 0.2;
+  const maxR = size / 2 - 54;
+  const innerR = maxR * 0.22;
   const n = data.length;
   const wedgeAngle = (2 * Math.PI) / n;
   const gap = 0.03;
 
   function getWedgeColor(p: number): string {
-    if (p >= 95) return '#C8102E';
-    if (p >= 85) return '#E8213F';
-    if (p >= 65) return '#D97706';
+    if (p >= 95) return '#1B9E5A';
+    if (p >= 90) return '#80CBA2';
+    if (p >= 85) return '#D97706';
     return '#9CA3AF';
-  }
-
-  function getWedgeOpacity(p: number): number {
-    if (p >= 95) return 0.85;
-    if (p >= 85) return 0.65;
-    return 0.45;
   }
 
   function describeArc(
@@ -57,10 +56,9 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
   return (
     <div style={styles.container}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        {/* Light background */}
         <rect width={size} height={size} rx={12} fill="#FAFAF8" />
 
-        {/* Background rings */}
+        {/* Ring guides */}
         {rings.map((pct) => (
           <circle
             key={pct}
@@ -80,15 +78,16 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
           const endAngle = (i + 1) * wedgeAngle - gap;
           const pNorm = Math.min(d.p, 100) / 100;
           const rOuter = innerR + (maxR - innerR) * pNorm;
+          const color = getWedgeColor(d.p);
 
           return (
             <path
               key={i}
               d={describeArc(startAngle, endAngle, innerR, rOuter)}
-              fill={getWedgeColor(d.p)}
-              opacity={getWedgeOpacity(d.p)}
+              fill={color}
+              opacity={0.75}
               stroke="#FAFAF8"
-              strokeWidth={1}
+              strokeWidth={1.5}
             />
           );
         })}
@@ -99,19 +98,20 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
         {/* Labels */}
         {data.map((d, i) => {
           const midAngle = (i + 0.5) * wedgeAngle;
-          const labelR = maxR + 30;
+          const labelR = maxR + 28;
           const lx = cx + labelR * Math.sin(midAngle);
           const ly = cy - labelR * Math.cos(midAngle);
 
           const deg = ((midAngle * 180) / Math.PI) % 360;
           const anchor = deg > 30 && deg < 150 ? 'start' : deg > 210 && deg < 330 ? 'end' : 'middle';
           const truncated = d.metric.length > 16 ? d.metric.slice(0, 15) + '…' : d.metric;
+          const color = getWedgeColor(d.p);
 
           return (
             <g key={`label-${i}`}>
               <text
                 x={lx}
-                y={ly - 7}
+                y={ly - 6}
                 textAnchor={anchor}
                 dominantBaseline="middle"
                 fill="#4A4A4A"
@@ -126,7 +126,7 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
                 y={ly + 7}
                 textAnchor={anchor}
                 dominantBaseline="middle"
-                fill={getWedgeColor(d.p)}
+                fill={color}
                 fontSize={11}
                 fontFamily="'JetBrains Mono', monospace"
                 fontWeight={700}
@@ -141,10 +141,10 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
         <circle cx={cx} cy={cy} r={innerR} fill="#FAFAF8" stroke="#E5E4E0" strokeWidth={1} />
         <text
           x={cx}
-          y={cy - 5}
+          y={cy - 4}
           textAnchor="middle"
           dominantBaseline="middle"
-          fill="#C8102E"
+          fill="#1B9E5A"
           fontSize={18}
           fontFamily="'JetBrains Mono', monospace"
           fontWeight={700}
@@ -169,16 +169,16 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
       {/* Legend */}
       <div style={styles.legend}>
         <div style={styles.legendItem}>
-          <span style={{ ...styles.legendDot, background: '#C8102E' }} />
+          <span style={{ ...styles.legendDot, background: '#1B9E5A' }} />
           <span style={styles.legendText}>P95+ Elite</span>
         </div>
         <div style={styles.legendItem}>
-          <span style={{ ...styles.legendDot, background: '#E8213F' }} />
-          <span style={styles.legendText}>P85-94 Destaque</span>
+          <span style={{ ...styles.legendDot, background: '#80CBA2' }} />
+          <span style={styles.legendText}>P90-94 Destaque</span>
         </div>
         <div style={styles.legendItem}>
           <span style={{ ...styles.legendDot, background: '#D97706' }} />
-          <span style={styles.legendText}>P65-84 Acima</span>
+          <span style={styles.legendText}>P85-89 Acima</span>
         </div>
       </div>
     </div>
@@ -190,11 +190,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 20,
+    gap: 16,
   },
   legend: {
     display: 'flex',
-    gap: 24,
+    gap: 20,
     justifyContent: 'center',
     flexWrap: 'wrap',
   },
@@ -211,7 +211,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   legendText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 11,
+    fontSize: 10,
     color: '#4A4A4A',
   },
 };

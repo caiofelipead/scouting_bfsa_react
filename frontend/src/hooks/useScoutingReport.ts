@@ -119,20 +119,18 @@ function parseCleanName(displayName: string): string {
   return match ? match[1].trim() : displayName;
 }
 
-function parseQualitative(analysisText: string | null | undefined): {
+function parseQualitative(_analysisText: string | null | undefined): {
   tactical: string[];
   technical: string[];
   physical: string[];
   mental: string[];
 } {
-  const defaults = {
+  return {
     tactical: ['Posicionamento inteligente', 'Leitura de jogo', 'Organização tática'],
     technical: ['Qualidade no passe', 'Controle de bola', 'Finalização precisa'],
     physical: ['Boa velocidade', 'Resistência adequada', 'Explosão muscular'],
     mental: ['Mentalidade competitiva', 'Tomada de decisão', 'Liderança em campo'],
   };
-  if (!analysisText) return defaults;
-  return defaults;
 }
 
 // ── Analyses Players Hook ──
@@ -152,12 +150,37 @@ export function useAnalysesPlayers(search: string) {
   });
 }
 
+// ── SkillCorner Search Hook (for independent selector) ──
+
+export interface SkillCornerSearchResult {
+  player_name: string;
+  short_name: string;
+  team_name: string;
+  position_group: string | null;
+}
+
+export function useSkillCornerSearchReport(query: string) {
+  return useQuery({
+    queryKey: ['scouting-report', 'sc-search', query],
+    queryFn: async () => {
+      const res = await api.get('/skillcorner/search', { params: { q: query, limit: 15 } });
+      return res.data.results as SkillCornerSearchResult[];
+    },
+    enabled: query.length >= 2,
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+    refetchOnWindowFocus: false,
+  });
+}
+
 // ── Main Hook ──
+// Now accepts an optional separate skillCornerName for independent SC selection
 
 export function useScoutingReport(
   playerName: string | null,
   incumbentName: string | null,
   analysesOverride?: AnalysesPlayerData | null,
+  skillCornerName?: string | null,
 ) {
   // 1. Player profile
   const profileQuery = useQuery({
@@ -244,14 +267,15 @@ export function useScoutingReport(
     gcTime: GC_TIME,
   });
 
-  // 7. SkillCorner
+  // 7. SkillCorner — uses independent skillCornerName if provided, else playerName
+  const scName = skillCornerName || playerName;
   const skillCornerQuery = useQuery({
-    queryKey: ['scouting-report', 'skillcorner', playerName],
+    queryKey: ['scouting-report', 'skillcorner', scName],
     queryFn: async () => {
-      const res = await api.get(`/skillcorner/player/${encodeURIComponent(playerName!)}`);
+      const res = await api.get(`/skillcorner/player/${encodeURIComponent(scName!)}`);
       return res.data as SkillCornerPlayerProfile;
     },
-    enabled: !!playerName,
+    enabled: !!scName,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
