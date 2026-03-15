@@ -65,9 +65,7 @@ function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadd
     <SlideScaler>
       <div data-slide style={{
         ...pageStyles.page,
-        padding: noPadding ? 0 : '32px 48px 40px',
-        display: 'flex',
-        flexDirection: 'column',
+        padding: noPadding ? 0 : '28px 48px 32px',
       }}>
         {/* Shield watermark */}
         <img
@@ -77,12 +75,10 @@ function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadd
         />
         {/* Footer */}
         <div style={pageStyles.footer}>
-          <img src={BFSA_SHIELD} alt="" style={{ width: 16, height: 16, objectFit: 'contain', opacity: 0.5 }} />
+          <img src={BFSA_SHIELD} alt="" style={{ width: 14, height: 14, objectFit: 'contain', opacity: 0.5 }} />
           <span style={pageStyles.footerText}>BOTAFOGO FUTEBOL SA — DEPARTAMENTO DE SCOUTING</span>
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {children}
-        </div>
+        {children}
       </div>
     </SlideScaler>
   );
@@ -584,7 +580,7 @@ export default function ScoutingReportPage() {
                 <ReportPage>
 
                   <SectionDivider number={1} title="Análise Descritiva" />
-                  <div style={{ ...styles.card, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <div style={styles.card}>
                     <div style={styles.analysisHeader}>
                       {data.player.clubLogo && (
                         <img src={`/api/image-proxy?url=${encodeURIComponent(data.player.clubLogo)}`} alt={data.player.club} style={{ width: 24, height: 24, objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -611,7 +607,7 @@ export default function ScoutingReportPage() {
                         })}
                       </div>
                     )}
-                    <div style={{ ...styles.analysisText, flex: 1 }} contentEditable suppressContentEditableWarning>
+                    <div style={styles.analysisText} contentEditable suppressContentEditableWarning>
                       {data.analysis.text || 'Análise descritiva não disponível para este jogador. Clique aqui para inserir manualmente.'}
                     </div>
                     {(data.analysis.faixaSalarial || data.analysis.transferLuvas) && (
@@ -1076,8 +1072,7 @@ const styles: Record<string, React.CSSProperties> = {
   grid2: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: 24,
-    flex: 1,
+    gap: 20,
   },
   grid2x2: {
     display: 'grid',
@@ -1092,62 +1087,62 @@ const styles: Record<string, React.CSSProperties> = {
   card: {
     background: C.bgCard,
     border: `1px solid ${C.bgMuted}`,
-    borderRadius: 10,
-    padding: 24,
+    borderRadius: 8,
+    padding: 16,
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
   cardElevated: {
     background: C.bgCard,
     border: `1px solid ${C.bgMuted}`,
-    borderRadius: 10,
-    padding: 24,
+    borderRadius: 8,
+    padding: 16,
     boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
   },
   cardTitle: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: 600,
     color: C.textPrimary,
     marginTop: 0,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   idGrid: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 10,
+    gap: 4,
   },
   idRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '8px 0',
+    padding: '5px 0',
     borderBottom: `1px solid ${C.bgSubtle}`,
   },
   idLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 10,
     color: C.textTertiary,
     fontWeight: 500,
   },
   idValue: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 13,
+    fontSize: 11,
     color: C.textPrimary,
     fontWeight: 600,
   },
   verdictLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: 600,
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
     color: C.textTertiary,
-    marginBottom: 10,
+    marginBottom: 6,
   },
   verdictText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 13,
+    fontSize: 10,
     color: C.textSecondary,
-    lineHeight: 1.6,
+    lineHeight: 1.5,
     margin: 0,
     outline: 'none',
   },
@@ -1459,18 +1454,18 @@ const styles: Record<string, React.CSSProperties> = {
   legendBox: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
-    padding: '12px 18px',
+    gap: 4,
+    padding: '8px 12px',
     background: C.bgSubtle,
-    borderRadius: 10,
+    borderRadius: 8,
     border: `1px solid ${C.bgMuted}`,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   legendEntry: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 9,
     color: C.textTertiary,
-    lineHeight: 1.5,
+    lineHeight: 1.4,
   },
   scTag: {
     fontFamily: "'DM Sans', sans-serif",
