@@ -55,16 +55,16 @@ const QUADRANT = {
   mental: C.blue,
 };
 
-// ── Slide dimensions (16:9 landscape, like PowerPoint) ──
-const PAGE_WIDTH = 1060; // ~13.3in at 80dpi
-const PAGE_HEIGHT = 596; // 16:9 ratio
+// ── Slide dimensions (16:9 landscape, matching reference 1440×809) ──
+const PAGE_WIDTH = 1440;
+const PAGE_HEIGHT = 809;
 
 // ── Page wrapper component with shield watermark ──
 function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
   return (
     <div data-slide style={{
       ...pageStyles.page,
-      padding: noPadding ? 0 : '28px 40px 44px',
+      padding: noPadding ? 0 : '40px 56px 56px',
     }}>
       {/* Shield watermark */}
       <img
@@ -74,7 +74,7 @@ function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadd
       />
       {/* Footer */}
       <div style={pageStyles.footer}>
-        <img src={BFSA_SHIELD} alt="" style={{ width: 16, height: 16, objectFit: 'contain', opacity: 0.5 }} />
+        <img src={BFSA_SHIELD} alt="" style={{ width: 20, height: 20, objectFit: 'contain', opacity: 0.5 }} />
         <span style={pageStyles.footerText}>BOTAFOGO FUTEBOL SA — DEPARTAMENTO DE SCOUTING</span>
       </div>
       {children}
@@ -87,9 +87,9 @@ const pageStyles: Record<string, React.CSSProperties> = {
     width: PAGE_WIDTH,
     height: PAGE_HEIGHT,
     background: '#FFFFFF',
-    borderRadius: 8,
-    boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
-    marginBottom: 28,
+    borderRadius: 10,
+    boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+    marginBottom: 32,
     position: 'relative',
     overflow: 'hidden',
     pageBreakAfter: 'always',
@@ -97,25 +97,25 @@ const pageStyles: Record<string, React.CSSProperties> = {
   },
   watermark: {
     position: 'absolute',
-    bottom: 24,
-    right: 32,
-    width: 60,
-    height: 60,
+    bottom: 32,
+    right: 44,
+    width: 80,
+    height: 80,
     objectFit: 'contain',
     opacity: 0.04,
     pointerEvents: 'none',
   },
   footer: {
     position: 'absolute',
-    bottom: 10,
-    left: 40,
+    bottom: 14,
+    left: 56,
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   footerText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 7,
+    fontSize: 9,
     fontWeight: 600,
     letterSpacing: '0.12em',
     color: '#C0C0C0',
@@ -513,7 +513,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 1: COVER ═══════ */}
               <motion.div {...fadeIn(0)}>
                 <ReportPage noPadding>
-                  <div style={{ padding: '28px 40px 44px' }}>
+                  <div style={{ padding: '40px 56px 56px' }}>
                     {/* Club logo upload */}
                     <input ref={clubLogoInputRef} type="file" accept="image/*" onChange={handleClubLogoUpload} style={{ display: 'none' }} />
                     <ReportHeader
@@ -649,7 +649,7 @@ export default function ScoutingReportPage() {
                   <div style={styles.grid2}>
                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                       {data.composites.length ? (
-                        <ReportRadar data={data.composites} size={320} />
+                        <ReportRadar data={data.composites} size={400} />
                       ) : <Skeleton width="100%" height={300} />}
                     </div>
                     <div style={styles.card}>
@@ -680,14 +680,14 @@ export default function ScoutingReportPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <h3 style={{ ...styles.cardTitle, textAlign: 'center' }}>Todas as Métricas da Posição</h3>
                       {data.allRadarMetrics.length ? (
-                        <WedgeRadar data={data.allRadarMetrics} size={320} />
+                        <WedgeRadar data={data.allRadarMetrics} size={400} />
                       ) : <Skeleton width="100%" height={300} />}
                     </div>
                     {/* Elite wedge */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <h3 style={{ ...styles.cardTitle, textAlign: 'center' }}>Métricas Elite (P85+)</h3>
                       {data.eliteMetrics.length ? (
-                        <WedgeRadar data={data.eliteMetrics} size={320} />
+                        <WedgeRadar data={data.eliteMetrics} size={400} />
                       ) : <p style={styles.placeholder}>Sem métricas de elite suficientes</p>}
                     </div>
                   </div>
@@ -861,30 +861,30 @@ function PhysicalBar({
 const phStyles: Record<string, React.CSSProperties> = {
   label: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 11,
+    fontSize: 14,
     color: C.textSecondary,
   },
   pValue: {
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: 700,
   },
   track: {
-    height: 6,
+    height: 8,
     background: C.bgSubtle,
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   bar: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
     transition: 'width 0.6s ease',
   },
   valueText: {
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 10,
+    fontSize: 12,
     color: C.textTertiary,
-    marginTop: 2,
+    marginTop: 3,
   },
 };
 
@@ -1033,75 +1033,75 @@ const styles: Record<string, React.CSSProperties> = {
   grid2: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: 20,
+    gap: 28,
   },
   grid2x2: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: 16,
+    gap: 24,
   },
   grid3: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr 1fr',
-    gap: 16,
+    gap: 24,
   },
   card: {
     background: C.bgCard,
     border: `1px solid ${C.bgMuted}`,
-    borderRadius: 10,
-    padding: 24,
+    borderRadius: 12,
+    padding: 32,
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
   cardElevated: {
     background: C.bgCard,
     border: `1px solid ${C.bgMuted}`,
-    borderRadius: 10,
-    padding: 24,
+    borderRadius: 12,
+    padding: 32,
     boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
   },
   cardTitle: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 600,
     color: C.textPrimary,
     marginTop: 0,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   idGrid: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    gap: 10,
   },
   idRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '6px 0',
+    padding: '8px 0',
     borderBottom: `1px solid ${C.bgSubtle}`,
   },
   idLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 14,
     color: C.textTertiary,
     fontWeight: 500,
   },
   idValue: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 15,
     color: C.textPrimary,
     fontWeight: 600,
   },
   verdictLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 600,
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
     color: C.textTertiary,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   verdictText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 13,
+    fontSize: 15,
     color: C.textSecondary,
     lineHeight: 1.6,
     margin: 0,
@@ -1109,11 +1109,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   quadrantLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: 700,
     letterSpacing: '0.1em',
     textTransform: 'uppercase',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   bulletList: {
     listStyle: 'none',
@@ -1121,128 +1121,128 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    gap: 10,
   },
   bulletItem: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 15,
     color: C.textSecondary,
     lineHeight: 1.5,
-    paddingLeft: 14,
+    paddingLeft: 16,
     position: 'relative',
     outline: 'none',
   },
   eliteSummary: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-    padding: '10px 14px',
+    gap: 10,
+    marginBottom: 20,
+    padding: '14px 18px',
     background: C.bgSubtle,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   eliteCount: {
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: 700,
     color: C.green,
   },
   eliteSummaryText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 15,
     color: C.textSecondary,
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    fontSize: 12,
+    fontSize: 14,
   },
   th: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
     color: C.textTertiary,
-    padding: '8px 10px',
+    padding: '10px 14px',
     textAlign: 'left',
     borderBottom: `2px solid ${C.bgMuted}`,
   },
   td: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 14,
     color: C.textPrimary,
-    padding: '8px 10px',
+    padding: '10px 14px',
   },
   pBadge: {
     display: 'inline-block',
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 700,
-    padding: '2px 8px',
+    padding: '3px 10px',
     borderRadius: 12,
   },
   placeholder: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 13,
+    fontSize: 15,
     color: C.textTertiary,
     fontStyle: 'italic',
     textAlign: 'center',
-    padding: '20px 0',
+    padding: '24px 0',
   },
   physTitle: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: 600,
     color: C.textPrimary,
     marginTop: 0,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   editablePlaceholder: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 14,
     color: C.textMuted,
-    padding: '12px',
-    borderRadius: 6,
+    padding: '16px',
+    borderRadius: 8,
     border: `1px dashed ${C.bgMuted}`,
     outline: 'none',
-    minHeight: 60,
+    minHeight: 80,
   },
   similarRow: {
     display: 'grid',
-    gridTemplateColumns: '28px 1fr 44px 80px',
+    gridTemplateColumns: '36px 1fr 56px 100px',
     alignItems: 'center',
-    gap: 10,
-    padding: '10px 0',
+    gap: 14,
+    padding: '14px 0',
     borderBottom: `1px solid ${C.bgSubtle}`,
   },
   similarRank: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     background: C.bgSubtle,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: 700,
     color: C.textSecondary,
   },
   similarName: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: 600,
     color: C.textPrimary,
   },
   similarClub: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 11,
+    fontSize: 13,
     color: C.textTertiary,
   },
   similarPct: {
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: 700,
     color: C.green,
     textAlign: 'right',
@@ -1261,50 +1261,50 @@ const styles: Record<string, React.CSSProperties> = {
   },
   obsLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
     color: C.textTertiary,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   obsField: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 14,
     color: C.textSecondary,
-    padding: '10px 12px',
-    borderRadius: 6,
+    padding: '12px 16px',
+    borderRadius: 8,
     border: `1px solid ${C.bgMuted}`,
     outline: 'none',
     lineHeight: 1.5,
-    minHeight: 40,
+    minHeight: 48,
   },
   conclusionText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 13,
+    fontSize: 15,
     color: C.textSecondary,
     lineHeight: 1.6,
     outline: 'none',
   },
   recBanner: {
-    marginTop: 24,
+    marginTop: 28,
     background: `linear-gradient(135deg, ${C.red}, ${C.redDark})`,
-    borderRadius: 12,
-    padding: '24px 32px',
+    borderRadius: 14,
+    padding: '28px 40px',
     boxShadow: '0 8px 24px rgba(200, 16, 46, 0.25)',
   },
   recTitle: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 700,
     letterSpacing: '0.15em',
     textTransform: 'uppercase',
     color: 'rgba(255,255,255,0.6)',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   recText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 14,
+    fontSize: 16,
     color: '#fff',
     lineHeight: 1.6,
     fontWeight: 500,
@@ -1312,13 +1312,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   quoteBox: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 14,
     color: C.textSecondary,
     fontStyle: 'italic',
-    padding: '14px 18px',
-    borderLeft: `3px solid ${C.teal}`,
+    padding: '18px 24px',
+    borderLeft: `4px solid ${C.teal}`,
     background: C.bgSubtle,
-    borderRadius: '0 8px 8px 0',
+    borderRadius: '0 10px 10px 0',
     outline: 'none',
     lineHeight: 1.5,
   },
@@ -1326,14 +1326,14 @@ const styles: Record<string, React.CSSProperties> = {
   analysisHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-    paddingBottom: 16,
+    gap: 16,
+    marginBottom: 24,
+    paddingBottom: 20,
     borderBottom: `2px solid ${C.red}`,
   },
   analysisLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 700,
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
@@ -1341,90 +1341,90 @@ const styles: Record<string, React.CSSProperties> = {
   },
   analysisPlayerName: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: 600,
     lineHeight: 1.15,
     color: C.textPrimary,
   },
   modeloBadge: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 600,
-    padding: '3px 10px',
-    borderRadius: 12,
+    padding: '4px 14px',
+    borderRadius: 14,
     letterSpacing: '0.06em',
     textTransform: 'uppercase',
     marginLeft: 'auto',
   },
   scoresGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))',
-    gap: 10,
-    marginBottom: 20,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+    gap: 14,
+    marginBottom: 24,
   },
   scoreBox: {
     background: C.bgSubtle,
-    borderRadius: 8,
-    padding: '12px 10px',
+    borderRadius: 10,
+    padding: '16px 14px',
     textAlign: 'center' as const,
     border: `1px solid ${C.bgMuted}`,
   },
   scoreLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
     color: C.textTertiary,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   scoreValue: {
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: 700,
     lineHeight: 1.1,
   },
   analysisText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 13,
+    fontSize: 15,
     color: C.textSecondary,
     lineHeight: 1.75,
     textAlign: 'justify' as const,
     outline: 'none',
-    padding: '16px 20px',
+    padding: '20px 24px',
     background: C.bgSubtle,
-    borderRadius: 8,
+    borderRadius: 10,
     border: `1px solid ${C.bgMuted}`,
-    marginBottom: 16,
-    minHeight: 100,
+    marginBottom: 20,
+    minHeight: 120,
   },
   financialRow: {
     display: 'flex',
-    gap: 12,
+    gap: 16,
     flexWrap: 'wrap' as const,
   },
   financialTag: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 11,
+    fontSize: 13,
     color: C.textPrimary,
-    padding: '6px 12px',
+    padding: '8px 16px',
     background: C.bgSubtle,
-    borderRadius: 6,
+    borderRadius: 8,
     border: `1px solid ${C.bgMuted}`,
   },
   legendBox: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
-    padding: '10px 14px',
+    gap: 8,
+    padding: '12px 18px',
     background: C.bgSubtle,
-    borderRadius: 8,
+    borderRadius: 10,
     border: `1px solid ${C.bgMuted}`,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   legendEntry: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 10,
+    fontSize: 12,
     color: C.textTertiary,
     lineHeight: 1.5,
   },
