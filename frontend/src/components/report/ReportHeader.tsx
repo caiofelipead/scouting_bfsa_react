@@ -21,6 +21,12 @@ interface ReportHeaderProps {
   league: string;
   contract: string;
   links: Record<string, string>;
+  stats?: {
+    minutes: number | null;
+    matches: number | null;
+    goals: number | null;
+    assists: number | null;
+  };
 }
 
 export default function ReportHeader({
@@ -38,6 +44,7 @@ export default function ReportHeader({
   league,
   contract,
   links,
+  stats,
 }: ReportHeaderProps) {
   const [fullBodyImage, setFullBodyImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +98,8 @@ export default function ReportHeader({
   const tmUrl = links['TM'] || links['Transfermarkt'] || null;
   const ogolUrl = links['ogol'] || links['Ogol'] || null;
 
+  const fmtNum = (v: number | null | undefined) => v != null ? Math.round(v).toLocaleString('pt-BR') : '—';
+
   return (
     <div style={styles.coverPage}>
       {/* Top section title */}
@@ -141,7 +150,7 @@ export default function ReportHeader({
           </button>
         </div>
 
-        {/* Right: Player info card */}
+        {/* Right: Player info card with glass effect */}
         <div style={styles.infoColumn}>
           {/* Name + Position block */}
           <div style={styles.nameBlock}>
@@ -210,17 +219,39 @@ export default function ReportHeader({
             )}
           </div>
 
-          {/* Badges */}
-          {badges.length > 0 && (
-            <div style={styles.badgeRow}>
-              {badges.map((b, i) => (
-                <span key={i} style={styles.badge}>{b}</span>
-              ))}
-            </div>
-          )}
+          {/* Badges + Cluster */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {badges.map((b, i) => (
+              <span key={i} style={styles.badge}>{b}</span>
+            ))}
+            <span style={styles.clusterDef} contentEditable suppressContentEditableWarning>{clusterDef}</span>
+          </div>
 
-          {/* Cluster */}
-          <div style={styles.clusterDef}>{clusterDef}</div>
+          {/* Stats summary card */}
+          <div style={styles.statsCard}>
+            <div style={styles.statsHeader}>
+              <span style={styles.statsTitle}>DESEMPENHO</span>
+              <span style={styles.statsPeriod}>Último ano civil</span>
+            </div>
+            <div style={styles.statsGrid}>
+              <div style={styles.statItem}>
+                <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.matches)}</div>
+                <div style={styles.statLabel}>Jogos</div>
+              </div>
+              <div style={styles.statItem}>
+                <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.minutes)}</div>
+                <div style={styles.statLabel}>Minutos</div>
+              </div>
+              <div style={styles.statItem}>
+                <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.goals)}</div>
+                <div style={styles.statLabel}>Gols</div>
+              </div>
+              <div style={styles.statItem}>
+                <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.assists)}</div>
+                <div style={styles.statLabel}>Assistências</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -262,7 +293,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#F7F6F3',
     borderRadius: 14,
     border: '1px solid #E5E4E0',
-    padding: '36px 48px 32px',
+    padding: '28px 48px 24px',
     marginBottom: 0,
     boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     position: 'relative',
@@ -274,18 +305,18 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 14,
-    marginBottom: 24,
+    marginBottom: 16,
     flexShrink: 0,
   },
   sectionBadge: {
     width: 5,
-    height: 48,
+    height: 40,
     borderRadius: 2,
     background: '#C8102E',
   },
   sectionLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 700,
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
@@ -294,7 +325,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sectionName: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: 600,
     lineHeight: 1.15,
     color: '#1A1A1A',
@@ -307,8 +338,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   coverBody: {
     display: 'grid',
-    gridTemplateColumns: '400px 1fr',
-    gap: 48,
+    gridTemplateColumns: '360px 1fr',
+    gap: 40,
     flex: 1,
     minHeight: 0,
     alignItems: 'start',
@@ -318,22 +349,22 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     maxHeight: '100%',
     overflow: 'hidden',
   },
   fullBodyImg: {
-    width: 380,
+    width: 340,
     flex: '1 1 0',
     minHeight: 0,
-    maxHeight: 420,
+    maxHeight: 380,
     objectFit: 'contain',
     objectPosition: 'bottom center',
     borderRadius: 8,
   },
   imagePlaceholder: {
-    width: 380,
-    height: 420,
+    width: 340,
+    height: 380,
     background: '#EEEDEA',
     borderRadius: 8,
     border: '2px dashed #D4D4D4',
@@ -352,12 +383,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    padding: '8px 16px',
+    padding: '6px 14px',
     borderRadius: 6,
     border: '1px solid #E5E4E0',
     background: '#FFFFFF',
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 500,
     color: '#4A4A4A',
     cursor: 'pointer',
@@ -366,23 +397,30 @@ const styles: Record<string, React.CSSProperties> = {
   infoColumn: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 14,
+    background: 'rgba(255,255,255,0.45)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255,255,255,0.6)',
+    borderRadius: 14,
+    padding: '20px 24px',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.04)',
   },
   nameBlock: {
     borderLeft: '4px solid #C8102E',
-    paddingLeft: 16,
+    paddingLeft: 14,
   },
   coverName: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 600,
     lineHeight: 1.15,
     color: '#1A1A1A',
     margin: 0,
   },
   dataCard: {
-    background: '#FFFFFF',
-    border: '1px solid #E5E4E0',
+    background: 'rgba(255,255,255,0.6)',
+    border: '1px solid rgba(229,228,224,0.7)',
     borderRadius: 10,
     overflow: 'hidden',
   },
@@ -390,12 +428,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    padding: '12px 20px',
-    borderBottom: '1px solid #EEEDEA',
+    padding: '9px 18px',
+    borderBottom: '1px solid rgba(238,237,234,0.7)',
   },
   dataLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 600,
     letterSpacing: '0.1em',
     textTransform: 'uppercase',
@@ -403,23 +441,24 @@ const styles: Record<string, React.CSSProperties> = {
   },
   dataValue: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 400,
     color: '#1A1A1A',
+    outline: 'none',
   },
   clubSection: {
     display: 'flex',
     alignItems: 'center',
-    gap: 18,
+    gap: 14,
   },
   clubLogo: {
-    width: 64,
-    height: 64,
+    width: 52,
+    height: 52,
     objectFit: 'contain',
   },
   clubLogoPlaceholder: {
-    width: 64,
-    height: 64,
+    width: 52,
+    height: 52,
     borderRadius: 8,
     border: '2px dashed #D4D4D4',
     display: 'flex',
@@ -445,28 +484,23 @@ const styles: Record<string, React.CSSProperties> = {
   },
   clubName: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 600,
     color: '#C8102E',
   },
   clubMeta: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 13,
+    fontSize: 12,
     color: '#4A4A4A',
-    marginTop: 3,
-  },
-  badgeRow: {
-    display: 'flex',
-    gap: 10,
-    flexWrap: 'wrap',
+    marginTop: 2,
   },
   badge: {
     background: 'rgba(200, 16, 46, 0.1)',
     color: '#C8102E',
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
-    padding: '6px 16px',
+    padding: '5px 14px',
     borderRadius: 20,
     letterSpacing: '0.04em',
     textTransform: 'uppercase',
@@ -474,16 +508,72 @@ const styles: Record<string, React.CSSProperties> = {
   },
   clusterDef: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 13,
+    fontSize: 12,
     color: '#8A8A8A',
     fontStyle: 'italic',
+    outline: 'none',
+  },
+  statsCard: {
+    background: 'rgba(255,255,255,0.6)',
+    border: '1px solid rgba(229,228,224,0.7)',
+    borderRadius: 10,
+    padding: '12px 18px 14px',
+  },
+  statsHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 10,
+  },
+  statsTitle: {
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: '#C8102E',
+  },
+  statsPeriod: {
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 10,
+    fontWeight: 500,
+    color: '#B0B0B0',
+    fontStyle: 'italic',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: 8,
+  },
+  statItem: {
+    textAlign: 'center' as const,
+    padding: '6px 0',
+    background: 'rgba(247,246,243,0.6)',
+    borderRadius: 8,
+  },
+  statValue: {
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#1A1A1A',
+    lineHeight: 1.2,
+    outline: 'none',
+  },
+  statLabel: {
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 9,
+    fontWeight: 600,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: '#8A8A8A',
+    marginTop: 2,
   },
   linksRow: {
     display: 'flex',
     justifyContent: 'center',
     gap: 48,
     marginTop: 'auto',
-    paddingTop: 24,
+    paddingTop: 16,
     borderTop: '1px solid #E5E4E0',
     flexShrink: 0,
   },
@@ -491,18 +581,18 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 10,
+    gap: 6,
     textDecoration: 'none',
     transition: 'transform 0.2s',
   },
   linkLogo: {
-    width: 56,
-    height: 56,
+    width: 44,
+    height: 44,
     objectFit: 'contain',
   },
   linkLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 500,
     color: '#4A4A4A',
     textAlign: 'center',
@@ -524,7 +614,7 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase',
     color: '#B0B0B0',
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: 12,
     flexShrink: 0,
   },
 };

@@ -43,6 +43,12 @@ export interface ScoutingReportData {
     clusterDef: string;
     photo: string | null;
     clubLogo: string | null;
+    stats: {
+      minutes: number | null;
+      matches: number | null;
+      goals: number | null;
+      assists: number | null;
+    };
   };
   analysis: {
     text: string | null;
@@ -401,6 +407,12 @@ export function useScoutingReport(
               : 'Cluster não identificado',
             photo: profile.summary.photo_url ?? analysesOverride?.foto ?? null,
             clubLogo: profile.summary.club_logo ?? null,
+            stats: {
+              minutes: profile.metrics?.['Minutos jogados:'] ?? profile.summary.minutes_played ?? null,
+              matches: profile.metrics?.['Partidas jogadas'] ?? null,
+              goals: profile.metrics?.['Golos'] ?? null,
+              assists: profile.metrics?.['Assistências'] ?? null,
+            },
           },
           analysis: mergedAnalysis,
           predict: {

@@ -734,6 +734,7 @@ export default function ScoutingReportPage() {
                       league={data.player.league}
                       contract={data.player.contract}
                       links={data.analysis.links}
+                      stats={data.player.stats}
                     />
                   </div>
                 </ReportPage>
@@ -1684,7 +1685,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   analysisText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 15,
+    fontSize: 17,
     color: C.textSecondary,
     lineHeight: 1.75,
     textAlign: 'justify' as const,
