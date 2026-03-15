@@ -176,6 +176,22 @@ export function useSkillCornerSearchReport(query: string) {
   });
 }
 
+// ── SkillCorner Single Player Hook (for comparison) ──
+
+export function useSkillCornerPlayer(playerName: string | null) {
+  return useQuery({
+    queryKey: ['scouting-report', 'skillcorner', playerName],
+    queryFn: async () => {
+      const res = await api.get(`/skillcorner/player/${encodeURIComponent(playerName!)}`);
+      return res.data as SkillCornerPlayerProfile;
+    },
+    enabled: !!playerName,
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+    refetchOnWindowFocus: false,
+  });
+}
+
 // ── Main Hook ──
 // Now accepts an optional separate skillCornerName for independent SC selection
 

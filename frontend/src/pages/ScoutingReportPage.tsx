@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Search, Download, Loader2, Eye, Zap } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport } from '../hooks/useScoutingReport';
+import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport, useSkillCornerPlayer } from '../hooks/useScoutingReport';
 import { usePlayers } from '../hooks/usePlayers';
 import ReportHeader from '../components/report/ReportHeader';
 import SectionDivider from '../components/report/SectionDivider';
@@ -214,6 +214,11 @@ export default function ScoutingReportPage() {
   const [selectedSC, setSelectedSC] = useState<string | null>(null);
   const [showSCDropdown, setShowSCDropdown] = useState(false);
 
+  // SkillCorner internal comparison (on the slide itself)
+  const [scInternalSearch, setScInternalSearch] = useState('');
+  const [selectedSCInternal, setSelectedSCInternal] = useState<string | null>(null);
+  const [showSCInternalDropdown, setShowSCInternalDropdown] = useState(false);
+
   // Club logo upload
   const [customClubLogo, setCustomClubLogo] = useState<string | null>(null);
   const clubLogoInputRef = useRef<HTMLInputElement>(null);
@@ -224,6 +229,9 @@ export default function ScoutingReportPage() {
   const incumbentQuery = usePlayers({ search: incumbentSearch, limit: 8 });
   const analysesQuery = useAnalysesPlayers(analysesSearch);
   const scSearchQuery = useSkillCornerSearchReport(scSearch);
+
+  const scInternalSearchQuery = useSkillCornerSearchReport(scInternalSearch);
+  const scInternalQuery = useSkillCornerPlayer(selectedSCInternal);
 
   const { data, isLoading, isError, predictionLoading, similarityLoading, skillCornerLoading, comparisonLoading } =
     useScoutingReport(selectedPlayer, selectedIncumbent, selectedAnalysesPlayer, selectedSC);
@@ -752,18 +760,15 @@ export default function ScoutingReportPage() {
                 <ReportPage>
 
                   <SectionDivider number={6} title="Delta vs. Titular — Squad Impact" />
-                  <div style={{ ...styles.card, flex: 1 }}>
+                  <div style={{ ...styles.card, flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {!selectedIncumbent ? (
                       <p style={styles.placeholder}>Selecione um titular na barra acima para gerar a comparação Delta</p>
                     ) : comparisonLoading ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}><Skeleton width="100%" height={100} /><Skeleton width="100%" height={200} /></div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}><Skeleton width="100%" height={100} /><Skeleton width="100%" height={400} /></div>
                     ) : data.delta.length ? (
-                      <>
-                        <DeltaChart data={data.delta} playerName={data.player.name} incumbentName={selectedIncumbent} />
-                        <div style={{ marginTop: 20 }}>
-                          <div style={styles.quoteBox} contentEditable suppressContentEditableWarning>Impacto projetado na composição do elenco: adicione sua análise aqui.</div>
-                        </div>
-                      </>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <DeltaChart data={data.delta} playerName={data.player.name} incumbentName={selectedIncumbent} fill />
+                      </div>
                     ) : <p style={styles.placeholder}>Dados de comparação indisponíveis</p>}
                   </div>
                 </ReportPage>
@@ -775,7 +780,7 @@ export default function ScoutingReportPage() {
 
                   <SectionDivider number={7} title="Dados Físicos — SkillCorner" />
                   {selectedSC && (
-                    <div style={{ ...styles.scTag, marginBottom: 12 }}><Zap size={12} /> SkillCorner: <strong>{selectedSC}</strong></div>
+                    <div style={{ ...styles.scTag, marginBottom: 8 }}><Zap size={12} /> SkillCorner: <strong>{selectedSC}</strong></div>
                   )}
                   {skillCornerLoading ? (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}><Skeleton width="100%" height={200} /><Skeleton width="100%" height={200} /><Skeleton width="100%" height={200} /></div>
@@ -797,6 +802,61 @@ export default function ScoutingReportPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* ── Comparativo com Internos ── */}
+                  <div style={{ marginTop: 16, borderTop: `1px solid ${C.bgMuted}`, paddingTop: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                      <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: C.textSecondary, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Comparativo Interno</span>
+                      <div className="no-print" style={{ position: 'relative', flex: 1, maxWidth: 280 }}>
+                        <div style={{ ...styles.searchWrapper, padding: '5px 10px' }}>
+                          <Search size={12} color={C.textMuted} style={{ flexShrink: 0 }} />
+                          <input
+                            style={{ ...styles.searchInput, fontSize: 12 }}
+                            placeholder="Buscar jogador interno..."
+                            value={scInternalSearch}
+                            onChange={(e) => { setScInternalSearch(e.target.value); setShowSCInternalDropdown(true); }}
+                            onFocus={() => setShowSCInternalDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowSCInternalDropdown(false), 200)}
+                          />
+                        </div>
+                        {showSCInternalDropdown && scInternalSearchQuery.data?.length ? (
+                          <div style={{ ...styles.dropdown, maxHeight: 200 }}>
+                            {scInternalSearchQuery.data.map((p, idx) => (
+                              <button
+                                key={`${p.player_name}-${idx}`}
+                                style={{ ...styles.dropdownItem, padding: '7px 12px' }}
+                                onMouseDown={() => {
+                                  setSelectedSCInternal(p.player_name);
+                                  setScInternalSearch(p.short_name || p.player_name);
+                                  setShowSCInternalDropdown(false);
+                                }}
+                              >
+                                <span style={{ ...styles.dropdownName, fontSize: 12 }}>{p.short_name || p.player_name}</span>
+                                <span style={{ ...styles.dropdownMeta, fontSize: 10 }}>{p.team_name ?? ''}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      {selectedSCInternal && (
+                        <div style={{ ...styles.scTag, padding: '4px 10px', fontSize: 11 }}><Zap size={10} /> <strong>{selectedSCInternal}</strong></div>
+                      )}
+                    </div>
+                    {selectedSCInternal && scInternalQuery.isLoading ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}><Skeleton width="100%" height={100} /><Skeleton width="100%" height={100} /><Skeleton width="100%" height={100} /></div>
+                    ) : selectedSCInternal && scInternalQuery.data?.found && scInternalQuery.data.physical ? (
+                      <PhysicalComparison
+                        mainPhysical={data.physical}
+                        mainName={selectedSC || data.player.name}
+                        internalPhysical={scInternalQuery.data}
+                        internalName={selectedSCInternal}
+                      />
+                    ) : selectedSCInternal && !scInternalQuery.isLoading ? (
+                      <p style={{ ...styles.placeholder, fontSize: 12, padding: '8px 0' }}>Dados SkillCorner não encontrados para &ldquo;{selectedSCInternal}&rdquo;.</p>
+                    ) : (
+                      <p style={{ ...styles.placeholder, fontSize: 11, padding: '4px 0', color: C.textMuted }}>Selecione um jogador interno para comparação física.</p>
+                    )}
+                  </div>
                 </ReportPage>
               </motion.div>
 
@@ -940,6 +1000,99 @@ const phStyles: Record<string, React.CSSProperties> = {
     marginTop: 3,
   },
 };
+
+// ── PhysicalComparison sub-component ──
+function PhysicalComparison({
+  mainPhysical,
+  mainName,
+  internalPhysical,
+  internalName,
+}: {
+  mainPhysical: NonNullable<import('../hooks/useScoutingReport').ScoutingReportData['physical']> | null;
+  mainName: string;
+  internalPhysical: import('../types/api').SkillCornerPlayerProfile;
+  internalName: string;
+}) {
+  const sc = internalPhysical;
+  const intPhys = sc.physical ? {
+    sprints: sc.physical['Sprints/90'] != null ? { value: sc.physical['Sprints/90'], p: sc.physical_percentiles?.['Sprints/90'] ?? 0 } : null,
+    maxSpeed: sc.physical['Max Speed (km/h)'] != null ? { value: sc.physical['Max Speed (km/h)'], p: sc.physical_percentiles?.['Max Speed (km/h)'] ?? 0 } : null,
+    accelerations: sc.physical['Accelerations/90'] != null ? { value: sc.physical['Accelerations/90'], p: sc.physical_percentiles?.['Accelerations/90'] ?? 0 } : null,
+    distance: sc.physical['Distance/90'] != null ? { value: sc.physical['Distance/90'], p: sc.physical_percentiles?.['Distance/90'] ?? 0 } : null,
+    hiRuns: sc.physical['High Intensity Runs/90'] != null ? { value: sc.physical['High Intensity Runs/90'], p: sc.physical_percentiles?.['High Intensity Runs/90'] ?? 0 } : null,
+    pressures: sc.physical['Pressing Index/90'] != null ? { value: sc.physical['Pressing Index/90'], p: sc.physical_percentiles?.['Pressing Index/90'] ?? 0 } : null,
+    psv99: sc.physical['Avg PSV-99'] != null ? { value: sc.physical['Avg PSV-99'], p: sc.physical_percentiles?.['Avg PSV-99'] ?? 0 } : null,
+    topPsv99: sc.physical['Avg Top 5 PSV-99'] != null ? { value: sc.physical['Avg Top 5 PSV-99'], p: sc.physical_percentiles?.['Avg Top 5 PSV-99'] ?? 0 } : null,
+  } : null;
+
+  if (!intPhys) return null;
+
+  type PhysKey = 'sprints' | 'maxSpeed' | 'accelerations' | 'distance' | 'hiRuns' | 'pressures' | 'psv99' | 'topPsv99';
+  const metrics: { key: PhysKey; label: string; unit: string; cat: string }[] = [
+    { key: 'maxSpeed', label: 'Vel. Máxima', unit: 'km/h', cat: 'Velocidade' },
+    { key: 'sprints', label: 'Sprints p90', unit: '/90', cat: 'Velocidade' },
+    { key: 'distance', label: 'Distância', unit: 'km', cat: 'Resistência' },
+    { key: 'hiRuns', label: 'High Runs', unit: '/90', cat: 'Resistência' },
+    { key: 'psv99', label: 'PSV-99', unit: 'km/h', cat: 'Explosividade' },
+    { key: 'topPsv99', label: 'Top 5 PSV-99', unit: 'km/h', cat: 'Explosividade' },
+    { key: 'accelerations', label: 'Acelerações', unit: '/90', cat: 'Explosividade' },
+    { key: 'pressures', label: 'Pressões', unit: '/90', cat: 'Explosividade' },
+  ];
+
+  const categories = ['Velocidade', 'Resistência', 'Explosividade'];
+
+  return (
+    <div>
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: C.red, display: 'inline-block' }} />
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textSecondary }}>{mainName}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: C.navy, display: 'inline-block' }} />
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textSecondary }}>{internalName}</span>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+        {categories.map((cat) => (
+          <div key={cat} style={{ background: C.bgSubtle, borderRadius: 8, padding: '10px 14px' }}>
+            <h5 style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, color: C.textPrimary, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{cat}</h5>
+            {metrics.filter((m) => m.cat === cat).map((m) => {
+              const main = mainPhysical?.[m.key];
+              const int = intPhys[m.key];
+              if (!main && !int) return null;
+              const mainP = main?.p ?? 0;
+              const intP = int?.p ?? 0;
+              return (
+                <div key={m.key} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textSecondary }}>{m.label}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: (mainP - intP) >= 0 ? C.green : C.red, fontWeight: 700 }}>
+                      {main && int ? `${(main.value - int.value) >= 0 ? '+' : ''}${(main.value - int.value).toFixed(1)}` : '—'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div style={{ height: 5, background: '#E5E4E0', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(mainP, 100)}%`, background: C.red, borderRadius: 3, transition: 'width 0.6s ease' }} />
+                    </div>
+                    <div style={{ height: 5, background: '#E5E4E0', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(intP, 100)}%`, background: C.navy, borderRadius: 3, transition: 'width 0.6s ease' }} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: C.textMuted }}>{main ? `${main.value.toFixed(1)} ${m.unit}` : '—'}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: C.textMuted }}>{int ? `${int.value.toFixed(1)} ${m.unit}` : '—'}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ── Page Styles ──
 const styles: Record<string, React.CSSProperties> = {
