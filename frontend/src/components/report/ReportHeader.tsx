@@ -47,8 +47,10 @@ export default function ReportHeader({
   stats,
 }: ReportHeaderProps) {
   const [fullBodyImage, setFullBodyImage] = useState<string | null>(null);
+  const [heatmapImage, setHeatmapImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const clubLogoInputRef = useRef<HTMLInputElement>(null);
+  const heatmapInputRef = useRef<HTMLInputElement>(null);
 
   const now = new Date();
   const monthNames = [
@@ -91,6 +93,13 @@ export default function ReportHeader({
     const file = e.target.files?.[0];
     if (!file) return;
     resizeAndSet(file, 256, (url) => onClubLogoChange?.(url));
+    e.target.value = '';
+  }
+
+  function handleHeatmapUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    resizeAndSet(file, 600, setHeatmapImage);
     e.target.value = '';
   }
 
@@ -227,29 +236,56 @@ export default function ReportHeader({
             <span style={styles.clusterDef} contentEditable suppressContentEditableWarning>{clusterDef}</span>
           </div>
 
-          {/* Stats summary card */}
-          <div style={styles.statsCard}>
-            <div style={styles.statsHeader}>
-              <span style={styles.statsTitle}>DESEMPENHO</span>
-              <span style={styles.statsPeriod}>Último ano civil</span>
+          {/* Stats + Heatmap row */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            {/* Stats summary card */}
+            <div style={{ ...styles.statsCard, flex: 1 }}>
+              <div style={styles.statsHeader}>
+                <span style={styles.statsTitle}>DESEMPENHO</span>
+                <span style={styles.statsPeriod}>Último ano civil</span>
+              </div>
+              <div style={styles.statsGrid}>
+                <div style={styles.statItem}>
+                  <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.matches)}</div>
+                  <div style={styles.statLabel}>Jogos</div>
+                </div>
+                <div style={styles.statItem}>
+                  <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.minutes)}</div>
+                  <div style={styles.statLabel}>Minutos</div>
+                </div>
+                <div style={styles.statItem}>
+                  <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.goals)}</div>
+                  <div style={styles.statLabel}>Gols</div>
+                </div>
+                <div style={styles.statItem}>
+                  <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.assists)}</div>
+                  <div style={styles.statLabel}>Assistências</div>
+                </div>
+              </div>
             </div>
-            <div style={styles.statsGrid}>
-              <div style={styles.statItem}>
-                <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.matches)}</div>
-                <div style={styles.statLabel}>Jogos</div>
-              </div>
-              <div style={styles.statItem}>
-                <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.minutes)}</div>
-                <div style={styles.statLabel}>Minutos</div>
-              </div>
-              <div style={styles.statItem}>
-                <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.goals)}</div>
-                <div style={styles.statLabel}>Gols</div>
-              </div>
-              <div style={styles.statItem}>
-                <div style={styles.statValue} contentEditable suppressContentEditableWarning>{fmtNum(stats?.assists)}</div>
-                <div style={styles.statLabel}>Assistências</div>
-              </div>
+
+            {/* Heatmap */}
+            <div style={styles.heatmapCard}>
+              <div style={styles.heatmapLabel}>MAPA DE CALOR</div>
+              {heatmapImage ? (
+                <img src={heatmapImage} alt="Mapa de calor" style={styles.heatmapImg} />
+              ) : (
+                <div style={styles.heatmapPlaceholder} className="no-print" onClick={() => heatmapInputRef.current?.click()}>
+                  <Upload size={14} color="#B0B0B0" />
+                </div>
+              )}
+              <input
+                ref={heatmapInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleHeatmapUpload}
+                style={{ display: 'none' }}
+              />
+              {heatmapImage && (
+                <button className="no-print" onClick={() => heatmapInputRef.current?.click()} style={styles.heatmapBtn}>
+                  <Upload size={8} /> Trocar
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -567,6 +603,56 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase',
     color: '#8A8A8A',
     marginTop: 2,
+  },
+  heatmapCard: {
+    background: 'rgba(255,255,255,0.6)',
+    border: '1px solid rgba(229,228,224,0.7)',
+    borderRadius: 10,
+    padding: '8px 10px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+    width: 160,
+    flexShrink: 0,
+  },
+  heatmapLabel: {
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 8,
+    fontWeight: 700,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: '#8A8A8A',
+  },
+  heatmapImg: {
+    width: '100%',
+    borderRadius: 6,
+    objectFit: 'contain',
+  },
+  heatmapPlaceholder: {
+    width: '100%',
+    height: 70,
+    background: 'rgba(238,237,234,0.5)',
+    borderRadius: 6,
+    border: '1.5px dashed #D4D4D4',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+  },
+  heatmapBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 3,
+    padding: '3px 8px',
+    borderRadius: 4,
+    border: '1px solid #E5E4E0',
+    background: '#FFFFFF',
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 9,
+    fontWeight: 500,
+    color: '#4A4A4A',
+    cursor: 'pointer',
   },
   linksRow: {
     display: 'flex',
