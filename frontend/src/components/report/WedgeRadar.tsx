@@ -3,22 +3,28 @@ interface WedgeRadarProps {
   size?: number;
 }
 
-export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
+export default function WedgeRadar({ data, size = 400 }: WedgeRadarProps) {
   if (!data.length) return null;
 
   const cx = size / 2;
   const cy = size / 2;
-  const maxR = size / 2 - 60;
-  const innerR = 30;
+  const maxR = size / 2 - 65;
+  const innerR = maxR * 0.22;
   const n = data.length;
   const wedgeAngle = (2 * Math.PI) / n;
-  const gap = 0.02; // small gap between wedges
+  const gap = 0.03;
 
   function getWedgeColor(p: number): string {
     if (p >= 95) return '#1B9E5A';
     if (p >= 85) return '#80CBA2';
     if (p >= 65) return '#D97706';
-    return '#4A4A4A';
+    return '#6B7280';
+  }
+
+  function getWedgeGlow(p: number): string {
+    if (p >= 95) return 'rgba(27, 158, 90, 0.4)';
+    if (p >= 85) return 'rgba(128, 203, 162, 0.3)';
+    return 'rgba(217, 119, 6, 0.25)';
   }
 
   function describeArc(
@@ -46,13 +52,26 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
     ].join(' ');
   }
 
-  // Rings
   const rings = [25, 50, 75, 100];
 
   return (
     <div style={styles.container}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <rect width={size} height={size} rx={12} fill="#0C1B37" />
+        <defs>
+          <radialGradient id="wedgeBg" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#12264a" />
+            <stop offset="100%" stopColor="#0C1B37" />
+          </radialGradient>
+          <filter id="wedgeGlow">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        <rect width={size} height={size} rx={14} fill="url(#wedgeBg)" />
 
         {/* Background rings */}
         {rings.map((pct) => (
@@ -62,10 +81,29 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
             cy={cy}
             r={innerR + ((maxR - innerR) * pct) / 100}
             fill="none"
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={1}
+            stroke="rgba(255,255,255,0.05)"
+            strokeWidth={0.8}
+            strokeDasharray={pct === 100 ? 'none' : '2 4'}
           />
         ))}
+
+        {/* Axis lines (subtle) */}
+        {data.map((_, i) => {
+          const midAngle = (i + 0.5) * wedgeAngle;
+          const x2 = cx + maxR * Math.sin(midAngle);
+          const y2 = cy - maxR * Math.cos(midAngle);
+          return (
+            <line
+              key={`axis-${i}`}
+              x1={cx}
+              y1={cy}
+              x2={x2}
+              y2={y2}
+              stroke="rgba(255,255,255,0.03)"
+              strokeWidth={0.5}
+            />
+          );
+        })}
 
         {/* Wedges */}
         {data.map((d, i) => {
@@ -73,45 +111,78 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
           const endAngle = (i + 1) * wedgeAngle - gap;
           const pNorm = Math.min(d.p, 100) / 100;
           const rOuter = innerR + (maxR - innerR) * pNorm;
+          const color = getWedgeColor(d.p);
 
           return (
-            <path
-              key={i}
-              d={describeArc(startAngle, endAngle, innerR, rOuter)}
-              fill={getWedgeColor(d.p)}
-              opacity={0.85}
-            />
+            <g key={i}>
+              {/* Glow layer */}
+              <path
+                d={describeArc(startAngle, endAngle, innerR, rOuter)}
+                fill={getWedgeGlow(d.p)}
+                filter="url(#wedgeGlow)"
+              />
+              {/* Main wedge */}
+              <path
+                d={describeArc(startAngle, endAngle, innerR, rOuter)}
+                fill={color}
+                opacity={0.8}
+                stroke="rgba(255,255,255,0.1)"
+                strokeWidth={0.5}
+              />
+              {/* Outer cap line for emphasis */}
+              <path
+                d={describeArc(startAngle, endAngle, rOuter - 2, rOuter)}
+                fill={color}
+                opacity={1}
+              />
+            </g>
           );
         })}
+
+        {/* Max ring outline */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={maxR}
+          fill="none"
+          stroke="rgba(255,255,255,0.1)"
+          strokeWidth={1}
+        />
 
         {/* Labels */}
         {data.map((d, i) => {
           const midAngle = (i + 0.5) * wedgeAngle;
-          const labelR = maxR + 32;
+          const labelR = maxR + 28;
           const lx = cx + labelR * Math.sin(midAngle);
           const ly = cy - labelR * Math.cos(midAngle);
+
+          // Smart text anchor
+          const deg = ((midAngle * 180) / Math.PI) % 360;
+          const anchor = deg > 30 && deg < 150 ? 'start' : deg > 210 && deg < 330 ? 'end' : 'middle';
+
+          const truncated = d.metric.length > 16 ? d.metric.slice(0, 15) + '…' : d.metric;
 
           return (
             <g key={`label-${i}`}>
               <text
                 x={lx}
-                y={ly - 6}
-                textAnchor="middle"
+                y={ly - 7}
+                textAnchor={anchor}
                 dominantBaseline="middle"
-                fill="rgba(255,255,255,0.8)"
-                fontSize={8}
+                fill="rgba(255,255,255,0.65)"
+                fontSize={9}
                 fontFamily="'DM Sans', sans-serif"
                 fontWeight={500}
               >
-                {d.metric.length > 14 ? d.metric.slice(0, 14) + '…' : d.metric}
+                {truncated}
               </text>
               <text
                 x={lx}
-                y={ly + 6}
-                textAnchor="middle"
+                y={ly + 7}
+                textAnchor={anchor}
                 dominantBaseline="middle"
                 fill={getWedgeColor(d.p)}
-                fontSize={10}
+                fontSize={11}
                 fontFamily="'JetBrains Mono', monospace"
                 fontWeight={700}
               >
@@ -121,15 +192,15 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
           );
         })}
 
-        {/* Center */}
-        <circle cx={cx} cy={cy} r={innerR} fill="#0C1B37" stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+        {/* Center circle */}
+        <circle cx={cx} cy={cy} r={innerR} fill="#0C1B37" stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
         <text
           x={cx}
-          y={cy - 4}
+          y={cy - 6}
           textAnchor="middle"
           dominantBaseline="middle"
           fill="#80CBA2"
-          fontSize={14}
+          fontSize={20}
           fontFamily="'JetBrains Mono', monospace"
           fontWeight={700}
         >
@@ -140,11 +211,11 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
           y={cy + 10}
           textAnchor="middle"
           dominantBaseline="middle"
-          fill="rgba(255,255,255,0.5)"
+          fill="rgba(255,255,255,0.4)"
           fontSize={7}
           fontFamily="'DM Sans', sans-serif"
-          fontWeight={600}
-          textDecoration="uppercase"
+          fontWeight={700}
+          letterSpacing="0.15em"
         >
           ELITE
         </text>
@@ -154,7 +225,7 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
       <div style={styles.legend}>
         <div style={styles.legendItem}>
           <span style={{ ...styles.legendDot, background: '#1B9E5A' }} />
-          <span style={styles.legendText}>P95+ Elite</span>
+          <span style={styles.legendText}>P95+ Elite absoluta</span>
         </div>
         <div style={styles.legendItem}>
           <span style={{ ...styles.legendDot, background: '#80CBA2' }} />
@@ -162,7 +233,7 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
         </div>
         <div style={styles.legendItem}>
           <span style={{ ...styles.legendDot, background: '#D97706' }} />
-          <span style={styles.legendText}>P65-84 Acima</span>
+          <span style={styles.legendText}>P65-84 Acima da média</span>
         </div>
       </div>
     </div>
@@ -174,11 +245,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 16,
+    gap: 20,
   },
   legend: {
     display: 'flex',
-    gap: 20,
+    gap: 24,
     justifyContent: 'center',
     flexWrap: 'wrap',
   },

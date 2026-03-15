@@ -85,7 +85,7 @@ export default function ScoutingReportPage() {
   const incumbentQuery = usePlayers({ search: incumbentSearch, limit: 8 });
   const analysesQuery = useAnalysesPlayers(analysesSearch);
 
-  const { data, isLoading, predictionLoading, similarityLoading, skillCornerLoading, comparisonLoading } =
+  const { data, isLoading, isError, predictionLoading, similarityLoading, skillCornerLoading, comparisonLoading } =
     useScoutingReport(selectedPlayer, selectedIncumbent);
 
   const fadeIn = (delay = 0) => ({
@@ -178,24 +178,29 @@ export default function ScoutingReportPage() {
               </div>
               {showAnalysesDropdown && analysesQuery.data?.players?.length ? (
                 <div style={styles.dropdown}>
-                  {analysesQuery.data.players.map((p, idx) => (
-                    <button
-                      key={`${p.nome}-${idx}`}
-                      style={styles.dropdownItem}
-                      onMouseDown={() => {
-                        setSelectedPlayer(p.nome);
-                        setPlayerSearch(p.nome);
-                        setAnalysesSearch(p.nome);
-                        setShowAnalysesDropdown(false);
-                      }}
-                    >
-                      <span style={styles.dropdownName}>{p.nome}</span>
-                      <span style={styles.dropdownMeta}>
-                        {p.equipe ?? ''} · {p.posicao ?? ''}
-                        {p.modelo ? ` · ${p.modelo}` : ''}
-                      </span>
-                    </button>
-                  ))}
+                  {analysesQuery.data.players.map((p, idx) => {
+                    // Use wyscout_match (JogadorDisplay format) for API calls,
+                    // fallback to nome if not available
+                    const apiName = p.wyscout_match ?? p.nome;
+                    return (
+                      <button
+                        key={`${p.nome}-${idx}`}
+                        style={styles.dropdownItem}
+                        onMouseDown={() => {
+                          setSelectedPlayer(apiName);
+                          setPlayerSearch(apiName);
+                          setAnalysesSearch(p.nome);
+                          setShowAnalysesDropdown(false);
+                        }}
+                      >
+                        <span style={styles.dropdownName}>{p.nome}</span>
+                        <span style={styles.dropdownMeta}>
+                          {p.equipe ?? ''} · {p.posicao ?? ''}
+                          {p.modelo ? ` · ${p.modelo}` : ''}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
@@ -258,7 +263,7 @@ export default function ScoutingReportPage() {
             </div>
           )}
 
-          {selectedPlayer && isLoading && (
+          {selectedPlayer && isLoading && !isError && (
             <div style={styles.loadingState}>
               <Loader2 size={32} color={C.red} style={{ animation: 'spin 1s linear infinite' }} />
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -271,6 +276,19 @@ export default function ScoutingReportPage() {
                 </div>
                 <Skeleton width="100%" height={300} />
               </div>
+            </div>
+          )}
+
+          {selectedPlayer && !isLoading && isError && !data && (
+            <div style={styles.emptyState}>
+              <div style={{ fontSize: 40 }}>&#9888;</div>
+              <p style={styles.emptyText}>
+                Jogador &ldquo;{selectedPlayer}&rdquo; não encontrado na base de dados.
+              </p>
+              <p style={{ ...styles.emptyText, fontSize: 12, marginTop: 0 }}>
+                Use o seletor &ldquo;Atleta Analisado&rdquo; para buscar jogadores com análise disponível,
+                ou o seletor &ldquo;Jogador&rdquo; para buscar na base Wyscout.
+              </p>
             </div>
           )}
 

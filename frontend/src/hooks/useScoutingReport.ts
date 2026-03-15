@@ -288,8 +288,8 @@ export function useScoutingReport(
     radarQuery.isLoading;
 
   const isError =
-    profileQuery.isError &&
-    indicesQuery.isError;
+    profileQuery.isError ||
+    (profileQuery.isFetched && !profileQuery.data);
 
   const profile = profileQuery.data;
   const indices = indicesQuery.data;
