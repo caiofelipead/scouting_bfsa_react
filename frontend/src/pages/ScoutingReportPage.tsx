@@ -342,12 +342,38 @@ export default function ScoutingReportPage() {
       offscreen.appendChild(clone);
 
       // ── 3. Convert images to base64 in the clone ──
+      // Strategy: try to extract from the already-loaded original <img>
+      // via canvas (avoids re-fetching from image-proxy which may 403).
+      // Falls back to fetch + transparent pixel if canvas extraction fails.
+      const origImgs = slide.querySelectorAll<HTMLImageElement>('img');
       const cloneImgs = clone.querySelectorAll<HTMLImageElement>('img');
       await Promise.all(
-        Array.from(cloneImgs).map(async (img) => {
-          if (img.src.startsWith('data:')) return;
-          img.src = await toDataUrl(img.src);
-          try { await img.decode(); } catch { /* ok */ }
+        Array.from(cloneImgs).map(async (cloneImg, j) => {
+          if (cloneImg.src.startsWith('data:')) return;
+          const origImg = origImgs[j];
+
+          // Try canvas extraction from the original loaded image
+          let dataUrl: string | null = null;
+          if (origImg?.complete && origImg.naturalWidth > 0) {
+            try {
+              const cvs = document.createElement('canvas');
+              cvs.width = origImg.naturalWidth;
+              cvs.height = origImg.naturalHeight;
+              const ctx = cvs.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(origImg, 0, 0);
+                dataUrl = cvs.toDataURL('image/png');
+              }
+            } catch { /* canvas tainted by cross-origin */ }
+          }
+
+          // Fallback to fetch (then transparent pixel)
+          if (!dataUrl) {
+            dataUrl = await toDataUrl(cloneImg.src);
+          }
+
+          cloneImg.src = dataUrl;
+          try { await cloneImg.decode(); } catch { /* ok */ }
         }),
       );
 
