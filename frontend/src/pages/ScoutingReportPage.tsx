@@ -192,6 +192,53 @@ function Skeleton({ width, height }: { width: string | number; height: string | 
   );
 }
 
+// ── Embed Google Fonts as base64 for html2canvas ──
+let _cachedEmbeddedFontCSS: string | null = null;
+
+async function getEmbeddedFontCSS(): Promise<string> {
+  if (_cachedEmbeddedFontCSS) return _cachedEmbeddedFontCSS;
+  try {
+    // Fetch Google Fonts CSS (must use a browser-like User-Agent to get woff2)
+    const cssResp = await fetch(FONTS_HREF, {
+      headers: { 'User-Agent': navigator.userAgent },
+    });
+    if (!cssResp.ok) return '';
+    let css = await cssResp.text();
+
+    // Find all url(...) references and replace with base64 data URIs
+    const urlRegex = /url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g;
+    const urls = new Set<string>();
+    let match: RegExpExecArray | null;
+    while ((match = urlRegex.exec(css)) !== null) urls.add(match[1]);
+
+    const urlMap = new Map<string, string>();
+    await Promise.all(
+      Array.from(urls).map(async (fontUrl) => {
+        try {
+          const resp = await fetch(fontUrl);
+          if (!resp.ok) return;
+          const blob = await resp.blob();
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          urlMap.set(fontUrl, dataUrl);
+        } catch { /* skip */ }
+      }),
+    );
+
+    urlMap.forEach((dataUrl, fontUrl) => {
+      css = css.split(fontUrl).join(dataUrl);
+    });
+
+    _cachedEmbeddedFontCSS = css;
+    return css;
+  } catch {
+    return '';
+  }
+}
+
 // ── Page ──
 export default function ScoutingReportPage() {
   injectFonts();
@@ -265,6 +312,9 @@ export default function ScoutingReportPage() {
       const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
       if (!slides.length) { setExporting(false); return; }
 
+      // ── 0. Pre-load fonts as embedded base64 ──
+      const embeddedFontCSS = await getEmbeddedFontCSS();
+
       // ── 1. Pre-convert proxy images to data URLs ──
       const imgRestoreMap: Array<{ el: HTMLImageElement; original: string }> = [];
       const allImgs = reportRef.current.querySelectorAll<HTMLImageElement>('img[src^="/api/"]');
@@ -331,8 +381,14 @@ export default function ScoutingReportPage() {
           logging: false,
           windowWidth: PAGE_WIDTH,
           windowHeight: PAGE_HEIGHT,
-          // Ensure all cloned slides render without transform interference
+          // Inject embedded fonts + un-scale in cloned document
           onclone: (clonedDoc) => {
+            // Inject base64-embedded font CSS so text renders correctly
+            if (embeddedFontCSS) {
+              const styleEl = clonedDoc.createElement('style');
+              styleEl.textContent = embeddedFontCSS;
+              clonedDoc.head.appendChild(styleEl);
+            }
             clonedDoc.querySelectorAll('[data-slide]').forEach((el) => {
               const parent = (el as HTMLElement).parentElement;
               if (parent) {
@@ -909,11 +965,8 @@ export default function ScoutingReportPage() {
                     {selectedSCInternal && scInternalQuery.isLoading ? (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}><Skeleton width="100%" height={100} /><Skeleton width="100%" height={100} /><Skeleton width="100%" height={100} /></div>
                     ) : selectedSCInternal && scInternalQuery.data?.found && scInternalQuery.data.physical ? (
-                      <PhysicalComparison
-                        mainPhysical={data.physical}
-                        mainName={selectedSC || data.player.name}
+                      <InternalPhysicalData
                         internalPhysical={scInternalQuery.data}
-                        internalName={selectedSCInternal}
                       />
                     ) : selectedSCInternal && !scInternalQuery.isLoading ? (
                       <p style={{ ...styles.placeholder, fontSize: 12, padding: '8px 0' }}>Dados SkillCorner não encontrados para &ldquo;{selectedSCInternal}&rdquo;.</p>
@@ -1066,16 +1119,10 @@ const phStyles: Record<string, React.CSSProperties> = {
 };
 
 // ── PhysicalComparison sub-component ──
-function PhysicalComparison({
-  mainPhysical,
-  mainName,
+function InternalPhysicalData({
   internalPhysical,
-  internalName,
 }: {
-  mainPhysical: NonNullable<import('../hooks/useScoutingReport').ScoutingReportData['physical']> | null;
-  mainName: string;
   internalPhysical: import('../types/api').SkillCornerPlayerProfile;
-  internalName: string;
 }) {
   const sc = internalPhysical;
   const intPhys = sc.physical ? {
@@ -1091,68 +1138,24 @@ function PhysicalComparison({
 
   if (!intPhys) return null;
 
-  type PhysKey = 'sprints' | 'maxSpeed' | 'accelerations' | 'distance' | 'hiRuns' | 'pressures' | 'psv99' | 'topPsv99';
-  const metrics: { key: PhysKey; label: string; unit: string; cat: string }[] = [
-    { key: 'maxSpeed', label: 'Vel. Máxima', unit: 'km/h', cat: 'Velocidade' },
-    { key: 'sprints', label: 'Sprints p90', unit: '/90', cat: 'Velocidade' },
-    { key: 'distance', label: 'Distância', unit: 'km', cat: 'Resistência' },
-    { key: 'hiRuns', label: 'High Runs', unit: '/90', cat: 'Resistência' },
-    { key: 'psv99', label: 'PSV-99', unit: 'km/h', cat: 'Explosividade' },
-    { key: 'topPsv99', label: 'Top 5 PSV-99', unit: 'km/h', cat: 'Explosividade' },
-    { key: 'accelerations', label: 'Acelerações', unit: '/90', cat: 'Explosividade' },
-    { key: 'pressures', label: 'Pressões', unit: '/90', cat: 'Explosividade' },
-  ];
-
-  const categories = ['Velocidade', 'Resistência', 'Explosividade'];
-
   return (
-    <div>
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: C.red, display: 'inline-block' }} />
-          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textSecondary }}>{mainName}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: C.navy, display: 'inline-block' }} />
-          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textSecondary }}>{internalName}</span>
-        </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+      <div style={{ background: C.bgSubtle, borderRadius: 8, padding: '10px 14px' }}>
+        <h5 style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: C.textPrimary, margin: '0 0 8px' }}>Velocidade</h5>
+        <PhysicalBar label="Vel. Máxima" data={intPhys.maxSpeed} unit="km/h" />
+        <PhysicalBar label="Sprints p90" data={intPhys.sprints} unit="/90" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-        {categories.map((cat) => (
-          <div key={cat} style={{ background: C.bgSubtle, borderRadius: 8, padding: '10px 14px' }}>
-            <h5 style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, color: C.textPrimary, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{cat}</h5>
-            {metrics.filter((m) => m.cat === cat).map((m) => {
-              const main = mainPhysical?.[m.key];
-              const int = intPhys[m.key];
-              if (!main && !int) return null;
-              const mainP = main?.p ?? 0;
-              const intP = int?.p ?? 0;
-              return (
-                <div key={m.key} style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textSecondary }}>{m.label}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: (mainP - intP) >= 0 ? C.green : C.red, fontWeight: 700 }}>
-                      {main && int ? `${(main.value - int.value) >= 0 ? '+' : ''}${(main.value - int.value).toFixed(1)}` : '—'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <div style={{ height: 5, background: '#E5E4E0', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.min(mainP, 100)}%`, background: C.red, borderRadius: 3, transition: 'width 0.6s ease' }} />
-                    </div>
-                    <div style={{ height: 5, background: '#E5E4E0', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.min(intP, 100)}%`, background: C.navy, borderRadius: 3, transition: 'width 0.6s ease' }} />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: C.textMuted }}>{main ? `${main.value.toFixed(1)} ${m.unit}` : '—'}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: C.textMuted }}>{int ? `${int.value.toFixed(1)} ${m.unit}` : '—'}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
+      <div style={{ background: C.bgSubtle, borderRadius: 8, padding: '10px 14px' }}>
+        <h5 style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: C.textPrimary, margin: '0 0 8px' }}>Resistência</h5>
+        <PhysicalBar label="Distância" data={intPhys.distance} unit="km" />
+        <PhysicalBar label="High Runs" data={intPhys.hiRuns} unit="/90" />
+      </div>
+      <div style={{ background: C.bgSubtle, borderRadius: 8, padding: '10px 14px' }}>
+        <h5 style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: C.textPrimary, margin: '0 0 8px' }}>Explosividade</h5>
+        <PhysicalBar label="PSV-99" data={intPhys.psv99} unit="km/h" />
+        <PhysicalBar label="Top 5 PSV-99" data={intPhys.topPsv99} unit="km/h" />
+        <PhysicalBar label="Acelerações" data={intPhys.accelerations} unit="/90" />
+        <PhysicalBar label="Pressões" data={intPhys.pressures} unit="/90" />
       </div>
     </div>
   );
