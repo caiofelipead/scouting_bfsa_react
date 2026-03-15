@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Download, ImageDown, Loader2, Eye, Zap } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport, useSkillCornerPlayer } from '../hooks/useScoutingReport';
 import { usePlayers } from '../hooks/usePlayers';
@@ -244,18 +244,22 @@ export default function ScoutingReportPage() {
 
   const [exporting, setExporting] = useState(false);
 
-  /** Convert a URL to a base64 data URL */
-  async function toDataUrl(url: string): Promise<string | null> {
+  /** 1×1 transparent PNG as fallback for images that fail CORS fetch */
+  const TRANSPARENT_PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualzQAAAABJRU5ErkJggg==';
+
+  /** Convert a URL to a base64 data URL. Returns transparent pixel on failure. */
+  async function toDataUrl(url: string): Promise<string> {
     try {
       const resp = await fetch(url, { mode: 'cors', credentials: 'same-origin' });
-      if (!resp.ok) return null;
+      if (!resp.ok) return TRANSPARENT_PIXEL;
       const blob = await resp.blob();
       return await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(TRANSPARENT_PIXEL);
         reader.readAsDataURL(blob);
       });
-    } catch { return null; }
+    } catch { return TRANSPARENT_PIXEL; }
   }
 
   /**
@@ -280,39 +284,10 @@ export default function ScoutingReportPage() {
   }
 
   /**
-   * During capture, walk the DOM and replace all inline fontFamily values
-   * with system-safe equivalents that html2canvas can reliably render.
-   * Returns a cleanup function that restores original values.
-   */
-  function overrideFontsForCapture(): () => void {
-    const restoreMap: Array<{ el: HTMLElement; original: string }> = [];
-    const container = reportRef.current;
-    if (!container) return () => {};
-
-    const allEls = container.querySelectorAll<HTMLElement>('*');
-    allEls.forEach((el) => {
-      const ff = el.style.fontFamily;
-      if (!ff) return;
-      restoreMap.push({ el, original: ff });
-      if (ff.toLowerCase().includes('jetbrains') || ff.toLowerCase().includes('monospace')) {
-        el.style.fontFamily = "'Courier New', Courier, monospace";
-      } else {
-        el.style.fontFamily = "Arial, Helvetica, sans-serif";
-      }
-    });
-
-    return () => {
-      restoreMap.forEach(({ el, original }) => {
-        el.style.fontFamily = original;
-      });
-    };
-  }
-
-  /**
-   * Core capture routine: un-scales slides, converts images to base64,
-   * forces overflow visible on ancestors, resets scroll position,
-   * captures each slide with html2canvas using optimized config,
-   * then restores everything.
+   * Core capture routine: un-scales slides, converts images to base64
+   * (with transparent fallback for CORS failures), forces overflow visible,
+   * captures each slide with html-to-image using skipFonts to avoid
+   * cross-origin stylesheet errors, then restores everything.
    * Returns an array of PNG data URLs (one per slide).
    */
   async function captureSlides(): Promise<string[]> {
@@ -321,18 +296,18 @@ export default function ScoutingReportPage() {
     if (!slides.length) return [];
 
     // ── 1. Convert ALL images to base64 (CORS fix) ──
+    // Images that fail (403, CORS) get a transparent pixel instead of
+    // keeping the cross-origin URL, which would taint the SVG canvas.
     const imgRestoreMap: Array<{ el: HTMLImageElement; original: string }> = [];
     const allImgs = reportRef.current.querySelectorAll<HTMLImageElement>('img');
     await Promise.all(
       Array.from(allImgs).map(async (img) => {
         if (img.src.startsWith('data:')) return;
+        const original = img.src;
         const dataUrl = await toDataUrl(img.src);
-        if (dataUrl) {
-          imgRestoreMap.push({ el: img, original: img.src });
-          img.src = dataUrl;
-          // Wait for the browser to decode the new data URL
-          try { await img.decode(); } catch { /* ok */ }
-        }
+        imgRestoreMap.push({ el: img, original });
+        img.src = dataUrl;
+        try { await img.decode(); } catch { /* ok */ }
       }),
     );
 
@@ -367,47 +342,49 @@ export default function ScoutingReportPage() {
       restoreOverflows.push(forceOverflowVisible(slide));
     });
 
-    // ── 4. Override fonts with system-safe alternatives ──
-    const restoreFonts = overrideFontsForCapture();
-
-    // ── 5. Reset scroll and wait for reflow ──
+    // ── 4. Reset scroll and wait for reflow ──
     const prevScrollX = window.scrollX;
     const prevScrollY = window.scrollY;
     window.scrollTo(0, 0);
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 300));
 
-    // ── 6. Capture each slide with html2canvas ──
+    // ── 5. Capture each slide with html-to-image ──
     const images: string[] = [];
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
       const noPrintEls = slide.querySelectorAll<HTMLElement>('.no-print');
       noPrintEls.forEach((el) => { el.style.display = 'none'; });
 
-      const rect = slide.getBoundingClientRect();
-      const canvas = await html2canvas(slide, {
-        width: PAGE_WIDTH,
-        height: PAGE_HEIGHT,
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#FFFFFF',
-        logging: false,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: PAGE_WIDTH,
-        windowHeight: PAGE_HEIGHT,
-        x: rect.left,
-        y: rect.top,
-        imageTimeout: 30000,
-      });
+      try {
+        // First call primes resource loading; second call captures cleanly
+        // (documented workaround for html-to-image blank captures)
+        await toPng(slide, {
+          pixelRatio: 2,
+          width: PAGE_WIDTH,
+          height: PAGE_HEIGHT,
+          skipFonts: true,
+          cacheBust: true,
+          style: { transform: 'none', margin: '0' },
+        });
+
+        const dataUrl = await toPng(slide, {
+          pixelRatio: 2,
+          width: PAGE_WIDTH,
+          height: PAGE_HEIGHT,
+          skipFonts: true,
+          cacheBust: true,
+          style: { transform: 'none', margin: '0' },
+        });
+        images.push(dataUrl);
+      } catch (err) {
+        console.error(`Slide ${i + 1} capture failed:`, err);
+      }
 
       noPrintEls.forEach((el) => { el.style.display = ''; });
-      images.push(canvas.toDataURL('image/png'));
     }
 
-    // ── 7. Restore ──
+    // ── 6. Restore ──
     window.scrollTo(prevScrollX, prevScrollY);
-    restoreFonts();
     restoreOverflows.forEach((restore) => restore());
     restoreList.forEach(({ scaleDiv, wrapperDiv, sd, wd }) => {
       scaleDiv.style.transform = sd.transform;
