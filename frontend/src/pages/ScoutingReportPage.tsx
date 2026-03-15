@@ -833,7 +833,7 @@ export default function ScoutingReportPage() {
               <motion.div {...fadeIn(0.15)}>
                 <ReportPage>
 
-                  <SectionDivider number={3} title="Matriz Qualitativa — Four Corners" />
+                  <SectionDivider number={3} title="Matriz Qualitativa — Dimensões do Jogo" />
                   <div style={{ ...styles.grid2x2, flex: 1 }}>
                     {([
                       { key: 'tactical' as const, label: 'TÁTICO', color: QUADRANT.tactical },
@@ -911,7 +911,7 @@ export default function ScoutingReportPage() {
               <motion.div {...fadeIn(0.3)}>
                 <ReportPage>
 
-                  <SectionDivider number={6} title="Delta vs. Titular — Squad Impact" />
+                  <SectionDivider number={6} title="Delta vs. Titular — Impacto no Elenco" />
                   <div style={{ ...styles.card, flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {!selectedIncumbent ? (
                       <p style={styles.placeholder}>Selecione um titular na barra acima para gerar a comparação Delta</p>
