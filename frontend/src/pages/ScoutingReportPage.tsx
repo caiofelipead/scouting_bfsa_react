@@ -263,18 +263,58 @@ export default function ScoutingReportPage() {
   }
 
   /**
+   * Fetch Google Fonts CSS, download each .woff2 font file,
+   * convert to base64 data URLs, and return the CSS with all
+   * fonts embedded inline. This is needed because the SVG
+   * foreignObject rendering context is sandboxed and cannot
+   * access external font resources.
+   */
+  let _fontCSSCache: string | null = null;
+  async function getEmbeddedFontCSS(): Promise<string> {
+    if (_fontCSSCache !== null) return _fontCSSCache;
+    try {
+      const resp = await fetch(FONTS_HREF);
+      if (!resp.ok) { _fontCSSCache = ''; return ''; }
+      let css = await resp.text();
+
+      // Find all url() references and replace with base64 data URLs
+      const urlMatches = css.match(/url\(([^)]+)\)/g) || [];
+      const uniqueUrls = [...new Set(urlMatches.map((m) => m.slice(4, -1)))];
+
+      await Promise.all(
+        uniqueUrls.map(async (fontUrl) => {
+          try {
+            const fontResp = await fetch(fontUrl);
+            if (!fontResp.ok) return;
+            const blob = await fontResp.blob();
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            css = css.replaceAll(fontUrl, dataUrl);
+          } catch { /* skip this font file */ }
+        }),
+      );
+
+      _fontCSSCache = css;
+      return css;
+    } catch { _fontCSSCache = ''; return ''; }
+  }
+
+  /**
    * Core capture routine using offscreen clones.
    * For each slide: deep-clone it into an offscreen container,
-   * convert images to base64, capture with toPng, then discard.
-   * cloneNode(true) preserves all inline styles (React style prop)
-   * on every child element. CSS stylesheet rules still apply since
-   * the clone is in the same document.
-   * Returns an array of PNG data URLs (one per slide).
+   * convert images to base64, embed fonts, capture with toPng,
+   * then discard. Returns an array of PNG data URLs (one per slide).
    */
   async function captureSlides(): Promise<string[]> {
     if (!reportRef.current) return [];
     const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
     if (!slides.length) return [];
+
+    // ── 0. Pre-fetch and embed Google Fonts (cached after first call) ──
+    const fontEmbedCSS = await getEmbeddedFontCSS();
 
     const images: string[] = [];
 
@@ -282,9 +322,6 @@ export default function ScoutingReportPage() {
       const slide = slides[i];
 
       // ── 1. Create offscreen container ──
-      // Uses position:fixed at 0,0 with negative z-index to keep it
-      // off-screen visually but still in the rendering tree for
-      // getComputedStyle to work correctly.
       const offscreen = document.createElement('div');
       offscreen.style.cssText = `
         position: fixed; top: 0; left: 0; z-index: -9999;
@@ -294,9 +331,6 @@ export default function ScoutingReportPage() {
       document.body.appendChild(offscreen);
 
       // ── 2. Deep-clone the slide ──
-      // cloneNode(true) preserves all inline styles on every child.
-      // No need to copy computed styles - html-to-image handles that
-      // internally when serializing to SVG.
       const clone = slide.cloneNode(true) as HTMLElement;
       clone.style.width = `${PAGE_WIDTH}px`;
       clone.style.height = `${PAGE_HEIGHT}px`;
@@ -325,25 +359,20 @@ export default function ScoutingReportPage() {
       await new Promise((r) => setTimeout(r, 100));
 
       // ── 6. Capture ──
+      const toPngOptions = {
+        pixelRatio: 2,
+        width: PAGE_WIDTH,
+        height: PAGE_HEIGHT,
+        skipFonts: true,
+        fontEmbedCSS,
+        cacheBust: true,
+        backgroundColor: '#FFFFFF',
+      };
+
       try {
         // First call primes resource loading (documented workaround)
-        await toPng(clone, {
-          pixelRatio: 2,
-          width: PAGE_WIDTH,
-          height: PAGE_HEIGHT,
-          skipFonts: true,
-          cacheBust: true,
-          backgroundColor: '#FFFFFF',
-        });
-
-        const dataUrl = await toPng(clone, {
-          pixelRatio: 2,
-          width: PAGE_WIDTH,
-          height: PAGE_HEIGHT,
-          skipFonts: true,
-          cacheBust: true,
-          backgroundColor: '#FFFFFF',
-        });
+        await toPng(clone, toPngOptions);
+        const dataUrl = await toPng(clone, toPngOptions);
         images.push(dataUrl);
       } catch (err) {
         console.error(`Slide ${i + 1} capture failed:`, err);
