@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Download, Loader2, Eye, Zap } from 'lucide-react';
+import { Search, Download, ImageDown, Loader2, Eye, Zap } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport, useSkillCornerPlayer } from '../hooks/useScoutingReport';
@@ -258,126 +258,177 @@ export default function ScoutingReportPage() {
     } catch { return null; }
   }
 
+  /**
+   * During capture, walk the DOM and replace all inline fontFamily values
+   * with system-safe equivalents that html2canvas can reliably render.
+   * Returns a cleanup function that restores original values.
+   */
+  function overrideFontsForCapture(): () => void {
+    const restoreMap: Array<{ el: HTMLElement; original: string }> = [];
+    const container = reportRef.current;
+    if (!container) return () => {};
+
+    const allEls = container.querySelectorAll<HTMLElement>('*');
+    allEls.forEach((el) => {
+      const ff = el.style.fontFamily;
+      if (!ff) return;
+      restoreMap.push({ el, original: ff });
+      if (ff.toLowerCase().includes('jetbrains') || ff.toLowerCase().includes('monospace')) {
+        el.style.fontFamily = "'Courier New', Courier, monospace";
+      } else {
+        el.style.fontFamily = "Arial, Helvetica, sans-serif";
+      }
+    });
+
+    return () => {
+      restoreMap.forEach(({ el, original }) => {
+        el.style.fontFamily = original;
+      });
+    };
+  }
+
+  /**
+   * Core capture routine: un-scales slides, converts images to base64,
+   * captures each slide with html2canvas, then restores everything.
+   * Returns an array of PNG data URLs (one per slide).
+   */
+  async function captureSlides(): Promise<string[]> {
+    if (!reportRef.current) return [];
+    const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
+    if (!slides.length) return [];
+
+    // ── 1. Convert ALL images to base64 (CORS fix) ──
+    const imgRestoreMap: Array<{ el: HTMLImageElement; original: string }> = [];
+    const allImgs = reportRef.current.querySelectorAll<HTMLImageElement>('img');
+    await Promise.all(
+      Array.from(allImgs).map(async (img) => {
+        if (img.src.startsWith('data:')) return;
+        const dataUrl = await toDataUrl(img.src);
+        if (dataUrl) {
+          imgRestoreMap.push({ el: img, original: img.src });
+          img.src = dataUrl;
+          // Wait for the browser to decode the new data URL
+          try { await img.decode(); } catch { /* ok */ }
+        }
+      }),
+    );
+
+    // ── 2. Remove SlideScaler transforms ──
+    const restoreList: Array<{
+      scaleDiv: HTMLElement; wrapperDiv: HTMLElement;
+      sd: Record<string, string>; wd: Record<string, string>;
+    }> = [];
+
+    slides.forEach((slide) => {
+      const scaleDiv = slide.parentElement;
+      const wrapperDiv = scaleDiv?.parentElement;
+      if (scaleDiv && wrapperDiv) {
+        restoreList.push({
+          scaleDiv, wrapperDiv,
+          sd: { transform: scaleDiv.style.transform, width: scaleDiv.style.width, height: scaleDiv.style.height },
+          wd: { width: wrapperDiv.style.width, height: wrapperDiv.style.height, margin: wrapperDiv.style.margin, overflow: wrapperDiv.style.overflow },
+        });
+        scaleDiv.style.transform = 'none';
+        scaleDiv.style.width = `${PAGE_WIDTH}px`;
+        scaleDiv.style.height = `${PAGE_HEIGHT}px`;
+        wrapperDiv.style.width = `${PAGE_WIDTH}px`;
+        wrapperDiv.style.height = `${PAGE_HEIGHT}px`;
+        wrapperDiv.style.margin = '0';
+        wrapperDiv.style.overflow = 'hidden';
+      }
+    });
+
+    // ── 3. Override fonts with system-safe alternatives for html2canvas ──
+    const restoreFonts = overrideFontsForCapture();
+
+    // ── 4. Wait for reflow ──
+    await new Promise((r) => setTimeout(r, 500));
+
+    // ── 4. Capture each slide ──
+    const images: string[] = [];
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i];
+      const noPrintEls = slide.querySelectorAll<HTMLElement>('.no-print');
+      noPrintEls.forEach((el) => { el.style.display = 'none'; });
+
+      const canvas = await html2canvas(slide, {
+        width: PAGE_WIDTH,
+        height: PAGE_HEIGHT,
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#FFFFFF',
+        logging: false,
+        windowWidth: PAGE_WIDTH,
+        windowHeight: PAGE_HEIGHT,
+        imageTimeout: 30000,
+      });
+
+      noPrintEls.forEach((el) => { el.style.display = ''; });
+      images.push(canvas.toDataURL('image/png'));
+    }
+
+    // ── 5. Restore ──
+    restoreFonts();
+    restoreList.forEach(({ scaleDiv, wrapperDiv, sd, wd }) => {
+      scaleDiv.style.transform = sd.transform;
+      scaleDiv.style.width = sd.width;
+      scaleDiv.style.height = sd.height;
+      wrapperDiv.style.width = wd.width;
+      wrapperDiv.style.height = wd.height;
+      wrapperDiv.style.margin = wd.margin;
+      wrapperDiv.style.overflow = wd.overflow;
+    });
+    imgRestoreMap.forEach(({ el, original }) => { el.src = original; });
+
+    return images;
+  }
+
+  /** Export as PDF (images assembled into jsPDF) */
   const handleExportPDF = useCallback(async () => {
-    if (!reportRef.current || exporting) return;
+    if (exporting) return;
     setExporting(true);
     try {
-      const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
-      if (!slides.length) { setExporting(false); return; }
+      const images = await captureSlides();
+      if (!images.length) return;
 
-      // ── 1. Pre-convert ALL images to base64 data URLs ──
-      // This prevents CORS errors and ensures images render in canvas
-      const imgRestoreMap: Array<{ el: HTMLImageElement; original: string }> = [];
-      const allImgs = reportRef.current.querySelectorAll<HTMLImageElement>('img');
-      await Promise.all(
-        Array.from(allImgs).map(async (img) => {
-          if (img.src.startsWith('data:')) return;
-          const dataUrl = await toDataUrl(img.src);
-          if (dataUrl) {
-            imgRestoreMap.push({ el: img, original: img.src });
-            img.src = dataUrl;
-          }
-        }),
-      );
-
-      // ── 2. Remove SlideScaler transforms on ALL slides ──
-      // Structure: wrapperDiv > scaleDiv(transform) > slideDiv[data-slide]
-      // We capture the ORIGINAL element (not a clone) so all computed
-      // styles, flex/grid layouts, and fonts are exactly as rendered.
-      const restoreList: Array<{
-        scaleDiv: HTMLElement;
-        wrapperDiv: HTMLElement;
-        sd: Record<string, string>;
-        wd: Record<string, string>;
-      }> = [];
-
-      slides.forEach((slide) => {
-        const scaleDiv = slide.parentElement;
-        const wrapperDiv = scaleDiv?.parentElement;
-        if (scaleDiv && wrapperDiv) {
-          restoreList.push({
-            scaleDiv,
-            wrapperDiv,
-            sd: {
-              transform: scaleDiv.style.transform,
-              width: scaleDiv.style.width,
-              height: scaleDiv.style.height,
-            },
-            wd: {
-              width: wrapperDiv.style.width,
-              height: wrapperDiv.style.height,
-              margin: wrapperDiv.style.margin,
-              overflow: wrapperDiv.style.overflow,
-            },
-          });
-          // Reset to native 1440×809 — no scaling
-          scaleDiv.style.transform = 'none';
-          scaleDiv.style.width = `${PAGE_WIDTH}px`;
-          scaleDiv.style.height = `${PAGE_HEIGHT}px`;
-          wrapperDiv.style.width = `${PAGE_WIDTH}px`;
-          wrapperDiv.style.height = `${PAGE_HEIGHT}px`;
-          wrapperDiv.style.margin = '0';
-          wrapperDiv.style.overflow = 'hidden';
-        }
-      });
-
-      // ── 3. Wait for fonts + reflow ──
-      await document.fonts.ready;
-      await new Promise((r) => setTimeout(r, 500));
-
-      // ── 4. Capture each slide (original DOM, full CSS) ──
       const pdfWidthMm = PAGE_WIDTH * 0.2646;
       const pdfHeightMm = PAGE_HEIGHT * 0.2646;
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [pdfWidthMm, pdfHeightMm],
-      });
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [pdfWidthMm, pdfHeightMm] });
 
-      for (let i = 0; i < slides.length; i++) {
-        const slide = slides[i];
-
-        // Hide no-print elements temporarily
-        const noPrintEls = slide.querySelectorAll<HTMLElement>('.no-print');
-        noPrintEls.forEach((el) => { el.style.display = 'none'; });
-
-        const canvas = await html2canvas(slide, {
-          width: PAGE_WIDTH,
-          height: PAGE_HEIGHT,
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#FFFFFF',
-          logging: false,
-          windowWidth: PAGE_WIDTH,
-          windowHeight: PAGE_HEIGHT,
-        });
-
-        noPrintEls.forEach((el) => { el.style.display = ''; });
-
-        const imgData = canvas.toDataURL('image/png');
+      images.forEach((imgData, i) => {
         if (i > 0) pdf.addPage([pdfWidthMm, pdfHeightMm], 'landscape');
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidthMm, pdfHeightMm);
-      }
-
-      // ── 5. Restore all transforms + images ──
-      restoreList.forEach(({ scaleDiv, wrapperDiv, sd, wd }) => {
-        scaleDiv.style.transform = sd.transform;
-        scaleDiv.style.width = sd.width;
-        scaleDiv.style.height = sd.height;
-        wrapperDiv.style.width = wd.width;
-        wrapperDiv.style.height = wd.height;
-        wrapperDiv.style.margin = wd.margin;
-        wrapperDiv.style.overflow = wd.overflow;
       });
-      imgRestoreMap.forEach(({ el, original }) => { el.src = original; });
 
       const playerName = data?.player.name ?? 'relatorio';
       pdf.save(`Scouting_${playerName.replace(/\s+/g, '_')}.pdf`);
-
     } catch (err) {
       console.error('PDF export error:', err);
-      window.print();
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, data]);
+
+  /** Export as individual PNG images (download each slide) */
+  const handleExportImages = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const images = await captureSlides();
+      if (!images.length) return;
+
+      const playerName = (data?.player.name ?? 'relatorio').replace(/\s+/g, '_');
+      for (let i = 0; i < images.length; i++) {
+        const a = document.createElement('a');
+        a.href = images[i];
+        a.download = `Scouting_${playerName}_slide_${String(i + 1).padStart(2, '0')}.png`;
+        a.click();
+        // Small delay between downloads to avoid browser blocking
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    } catch (err) {
+      console.error('Image export error:', err);
     } finally {
       setExporting(false);
     }
@@ -589,10 +640,14 @@ export default function ScoutingReportPage() {
               ) : null}
             </div>
 
-            {/* Export PDF button */}
+            {/* Export buttons */}
             <button style={styles.printBtn} onClick={handleExportPDF} title="Exportar PDF" disabled={exporting}>
               {exporting ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={16} />}
-              {exporting ? 'Gerando PDF...' : 'Exportar PDF'}
+              {exporting ? 'Exportando...' : 'Exportar PDF'}
+            </button>
+            <button style={styles.printBtn} onClick={handleExportImages} title="Exportar Imagens" disabled={exporting}>
+              {exporting ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <ImageDown size={16} />}
+              {exporting ? 'Exportando...' : 'Exportar Imagens'}
             </button>
           </div>
         </div>
