@@ -2,9 +2,10 @@ interface DeltaChartProps {
   data: Array<{ metric: string; player: number; incumbent: number }>;
   playerName: string;
   incumbentName: string;
+  fill?: boolean;
 }
 
-export default function DeltaChart({ data, playerName, incumbentName }: DeltaChartProps) {
+export default function DeltaChart({ data, playerName, incumbentName, fill }: DeltaChartProps) {
   if (!data.length) return null;
 
   const maxVal = Math.max(
@@ -18,40 +19,48 @@ export default function DeltaChart({ data, playerName, incumbentName }: DeltaCha
   const deltaPositive = avgDeltaRounded >= 0;
 
   return (
-    <div>
-      {/* Delta summary card */}
-      <div
-        style={{
-          ...styles.deltaCard,
-          background: deltaPositive
-            ? 'linear-gradient(135deg, #1B9E5A, #15803d)'
-            : 'linear-gradient(135deg, #C8102E, #A00D24)',
-        }}
-      >
-        <div style={styles.deltaLabel}>DELTA MÉDIO</div>
-        <div style={styles.deltaValue}>
-          {deltaPositive ? '+' : ''}
-          {avgDeltaRounded}
+    <div style={fill ? { display: 'flex', flexDirection: 'column', flex: 1 } : undefined}>
+      {/* Delta summary + Legend row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: fill ? 12 : 20 }}>
+        <div
+          style={{
+            ...styles.deltaCard,
+            marginBottom: 0,
+            padding: fill ? '12px 20px' : '20px 24px',
+            background: deltaPositive
+              ? 'linear-gradient(135deg, #1B9E5A, #15803d)'
+              : 'linear-gradient(135deg, #C8102E, #A00D24)',
+          }}
+        >
+          <div style={styles.deltaLabel}>DELTA MÉDIO</div>
+          <div style={{ ...styles.deltaValue, fontSize: fill ? 28 : 36 }}>
+            {deltaPositive ? '+' : ''}
+            {avgDeltaRounded}
+          </div>
+          <div style={styles.deltaSubtext}>
+            vs. {incumbentName}
+          </div>
         </div>
-        <div style={styles.deltaSubtext}>
-          vs. {incumbentName}
-        </div>
-      </div>
 
-      {/* Legend */}
-      <div style={styles.legend}>
-        <div style={styles.legendItem}>
-          <span style={{ ...styles.legendDot, background: '#C8102E' }} />
-          <span style={styles.legendText}>{playerName}</span>
-        </div>
-        <div style={styles.legendItem}>
-          <span style={{ ...styles.legendDot, background: '#B0B0B0' }} />
-          <span style={styles.legendText}>{incumbentName}</span>
+        {/* Legend */}
+        <div style={{ ...styles.legend, marginBottom: 0, flexDirection: 'column', gap: 6 }}>
+          <div style={styles.legendItem}>
+            <span style={{ ...styles.legendDot, background: '#C8102E' }} />
+            <span style={styles.legendText}>{playerName}</span>
+          </div>
+          <div style={styles.legendItem}>
+            <span style={{ ...styles.legendDot, background: '#B0B0B0' }} />
+            <span style={styles.legendText}>{incumbentName}</span>
+          </div>
         </div>
       </div>
 
       {/* Bars */}
-      <div style={styles.barList}>
+      <div style={{
+        ...styles.barList,
+        flex: fill ? 1 : undefined,
+        justifyContent: fill ? 'space-around' : undefined,
+      }}>
         {data.map((d, i) => {
           const playerPct = (d.player / maxVal) * 100;
           const incumbentPct = (d.incumbent / maxVal) * 100;
@@ -61,7 +70,7 @@ export default function DeltaChart({ data, playerName, incumbentName }: DeltaCha
             <div key={i} style={styles.barRow}>
               <div style={styles.metricLabel}>{d.metric}</div>
               <div style={styles.barContainer}>
-                <div style={styles.barTrack}>
+                <div style={{ ...styles.barTrack, height: fill ? 10 : 8 }}>
                   <div
                     style={{
                       ...styles.bar,
@@ -70,7 +79,7 @@ export default function DeltaChart({ data, playerName, incumbentName }: DeltaCha
                     }}
                   />
                 </div>
-                <div style={styles.barTrack}>
+                <div style={{ ...styles.barTrack, height: fill ? 10 : 8 }}>
                   <div
                     style={{
                       ...styles.bar,
