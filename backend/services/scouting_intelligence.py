@@ -1897,16 +1897,17 @@ class ContractImpactAnalyzer:
             score = avg_percentile / 100.0
 
         # League strength bonus — bom desempenho em ligas maiores vale mais
+        # Opta Power está em escala 0-1 (ex: Serie A=0.89, Serie B=0.75, PL=1.0)
         league_bonus = 0.0
         if league:
             target_power = get_opta_league_power('Serie B Brasil')
             source_power = get_opta_league_power(league)
             power_diff = source_power - target_power
-            if power_diff > 20:
-                league_bonus = 0.15  # Liga muito superior (ex: Série A, ligas europeias)
-            elif power_diff > 10:
-                league_bonus = 0.10  # Liga superior
-            elif power_diff > 5:
+            if power_diff > 0.20:
+                league_bonus = 0.15  # Liga muito superior (ex: top europeias)
+            elif power_diff > 0.10:
+                league_bonus = 0.10  # Liga superior (ex: Série A Brasil)
+            elif power_diff > 0.05:
                 league_bonus = 0.05  # Liga ligeiramente superior
 
         score = min(1.0, max(0.0, score + league_bonus))
@@ -2214,17 +2215,18 @@ class ContractImpactAnalyzer:
         risk_score = 0.70  # Start at moderate-low risk (higher = less risky)
 
         # 1. League adaptation gap
+        # Opta Power está em escala 0-1 (Serie B=0.75, Serie A=0.89, PL=1.0)
         target_power = get_opta_league_power('Serie B Brasil')
         source_power = get_opta_league_power(league) if league else DEFAULT_OPTA_POWER
         league_gap = abs(source_power - target_power)
 
-        if league_gap > 25:
+        if league_gap > 0.25:
             risk_score -= 0.20
             risks.append('Grande diferença de nível de liga')
-        elif league_gap > 15:
+        elif league_gap > 0.15:
             risk_score -= 0.10
             risks.append('Diferença moderada de nível de liga')
-        elif league_gap < 5:
+        elif league_gap < 0.05:
             risk_score += 0.05  # Same level — easy adaptation
 
         # 2. Age-related risk
@@ -2269,9 +2271,9 @@ class ContractImpactAnalyzer:
             'score': score,
             'risk_level': risk_level,
             'risks': risks,
-            'league_gap': round(league_gap, 1),
-            'source_league_power': round(source_power, 1),
-            'target_league_power': round(target_power, 1),
+            'league_gap': round(league_gap * 100, 1),
+            'source_league_power': round(source_power * 100, 1),
+            'target_league_power': round(target_power * 100, 1),
         }
 
 
