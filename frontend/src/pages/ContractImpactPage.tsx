@@ -131,6 +131,10 @@ export default function ContractImpactPage() {
     }
   }, []);
 
+  const searchParams = useMemo(() => ({ search: debouncedSearch || undefined, limit: 10 }), [debouncedSearch]);
+  const { data: searchData } = usePlayers(debouncedSearch.length >= 2 && !selectedPlayer ? searchParams : { limit: 0 });
+  const players = searchData?.players ?? [];
+
   const showDropdown = debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0;
 
   useEffect(() => {
@@ -144,10 +148,6 @@ export default function ContractImpactPage() {
       };
     }
   }, [showDropdown, updateDropdownPosition]);
-
-  const searchParams = useMemo(() => ({ search: debouncedSearch || undefined, limit: 10 }), [debouncedSearch]);
-  const { data: searchData } = usePlayers(debouncedSearch.length >= 2 && !selectedPlayer ? searchParams : { limit: 0 });
-  const players = searchData?.players ?? [];
 
   const handleSearchChange = (v: string) => {
     setSearch(v);
