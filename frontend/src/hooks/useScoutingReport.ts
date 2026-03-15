@@ -261,7 +261,7 @@ export function useScoutingReport(
       const res = await api.post('/similarity', {
         player_name: playerName,
         position: position,
-        top_n: 3,
+        top_n: 5,
         min_minutes: 500,
       });
       return res.data as SimilarityResponse;
