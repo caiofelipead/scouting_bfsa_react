@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Download, Loader2, Eye, Zap } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport, useSkillCornerPlayer } from '../hooks/useScoutingReport';
 import { usePlayers } from '../hooks/usePlayers';
 import ReportHeader from '../components/report/ReportHeader';
@@ -190,53 +192,6 @@ function Skeleton({ width, height }: { width: string | number; height: string | 
   );
 }
 
-// ── Embed Google Fonts as base64 for PDF export ──
-let _cachedEmbeddedFontCSS: string | null = null;
-
-async function getEmbeddedFontCSS(): Promise<string> {
-  if (_cachedEmbeddedFontCSS) return _cachedEmbeddedFontCSS;
-  try {
-    // Fetch Google Fonts CSS (must use a browser-like User-Agent to get woff2)
-    const cssResp = await fetch(FONTS_HREF, {
-      headers: { 'User-Agent': navigator.userAgent },
-    });
-    if (!cssResp.ok) return '';
-    let css = await cssResp.text();
-
-    // Find all url(...) references and replace with base64 data URIs
-    const urlRegex = /url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g;
-    const urls = new Set<string>();
-    let match: RegExpExecArray | null;
-    while ((match = urlRegex.exec(css)) !== null) urls.add(match[1]);
-
-    const urlMap = new Map<string, string>();
-    await Promise.all(
-      Array.from(urls).map(async (fontUrl) => {
-        try {
-          const resp = await fetch(fontUrl);
-          if (!resp.ok) return;
-          const blob = await resp.blob();
-          const dataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-          urlMap.set(fontUrl, dataUrl);
-        } catch { /* skip */ }
-      }),
-    );
-
-    urlMap.forEach((dataUrl, fontUrl) => {
-      css = css.split(fontUrl).join(dataUrl);
-    });
-
-    _cachedEmbeddedFontCSS = css;
-    return css;
-  } catch {
-    return '';
-  }
-}
-
 // ── Page ──
 export default function ScoutingReportPage() {
   injectFonts();
@@ -310,89 +265,78 @@ export default function ScoutingReportPage() {
       const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
       if (!slides.length) { setExporting(false); return; }
 
-      // ── 1. Get embedded font CSS ──
-      const embeddedFontCSS = await getEmbeddedFontCSS();
+      // ── 1. Create off-screen container at native 1440×809 ──
+      // This eliminates ALL transform/scale/responsive issues
+      const offscreen = document.createElement('div');
+      offscreen.style.cssText = `
+        position: fixed; top: 0; left: 0;
+        width: ${PAGE_WIDTH}px; height: ${PAGE_HEIGHT}px;
+        z-index: -9999; opacity: 0; pointer-events: none;
+        overflow: hidden;
+      `;
+      document.body.appendChild(offscreen);
 
-      // ── 2. Clone slides and convert images to data URLs ──
-      const slideHtmls: string[] = [];
-      for (const slide of Array.from(slides)) {
-        const clone = slide.cloneNode(true) as HTMLElement;
+      // ── 2. Pre-convert proxy images to data URLs on originals ──
+      const imgRestoreMap: Array<{ el: HTMLImageElement; original: string }> = [];
+      const allImgs = reportRef.current.querySelectorAll<HTMLImageElement>('img');
+      await Promise.all(
+        Array.from(allImgs).map(async (img) => {
+          if (img.src.startsWith('data:')) return;
+          const dataUrl = await toDataUrl(img.src);
+          if (dataUrl) {
+            imgRestoreMap.push({ el: img, original: img.src });
+            img.src = dataUrl;
+          }
+        }),
+      );
+
+      // ── 3. Wait for fonts ──
+      await document.fonts.ready;
+      await new Promise((r) => setTimeout(r, 300));
+
+      // ── 4. Capture each slide as image → PDF ──
+      const pdfWidthMm = PAGE_WIDTH * 0.2646;
+      const pdfHeightMm = PAGE_HEIGHT * 0.2646;
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [pdfWidthMm, pdfHeightMm] });
+
+      for (let i = 0; i < slides.length; i++) {
+        // Clone the slide into the clean off-screen container
+        const clone = slides[i].cloneNode(true) as HTMLElement;
         clone.querySelectorAll('.no-print').forEach((el) => el.remove());
-        // Convert all images to data URLs (proxy + local)
-        const allImgs = clone.querySelectorAll<HTMLImageElement>('img');
-        await Promise.all(
-          Array.from(allImgs).map(async (img) => {
-            if (img.src.startsWith('data:')) return;
-            const dataUrl = await toDataUrl(img.src);
-            if (dataUrl) img.src = dataUrl;
-          }),
-        );
-        slideHtmls.push(clone.outerHTML);
+        // Force exact dimensions, no transform
+        clone.style.cssText = `
+          width: ${PAGE_WIDTH}px; height: ${PAGE_HEIGHT}px;
+          position: relative; overflow: hidden;
+          transform: none !important;
+          border-radius: 0; box-shadow: none;
+        `;
+        offscreen.innerHTML = '';
+        offscreen.appendChild(clone);
+
+        // Small reflow pause
+        await new Promise((r) => setTimeout(r, 50));
+
+        const canvas = await html2canvas(clone, {
+          width: PAGE_WIDTH,
+          height: PAGE_HEIGHT,
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#FFFFFF',
+          logging: false,
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        if (i > 0) pdf.addPage([pdfWidthMm, pdfHeightMm], 'landscape');
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidthMm, pdfHeightMm);
       }
 
-      // ── 3. Build self-contained print HTML ──
-      const fullHTML = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Scouting Report — ${data?.player.name ?? ''}</title>
-<style>${embeddedFontCSS}</style>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: white; width: ${PAGE_WIDTH}px; }
-.slide-page {
-  width: ${PAGE_WIDTH}px;
-  height: ${PAGE_HEIGHT}px;
-  overflow: hidden;
-  position: relative;
-  page-break-after: always;
-  break-after: page;
-}
-.slide-page:last-child {
-  page-break-after: avoid;
-  break-after: avoid;
-}
-@media print {
-  @page {
-    size: ${PAGE_WIDTH}px ${PAGE_HEIGHT}px landscape;
-    margin: 0;
-  }
-  html, body {
-    width: ${PAGE_WIDTH}px;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
-@media screen {
-  body { background: #e5e5e5; padding: 20px 0; }
-  .slide-page {
-    margin: 0 auto 20px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
-    border-radius: 8px;
-  }
-}
-</style>
-</head>
-<body>
-${slideHtmls.map((html) => `<div class="slide-page">${html}</div>`).join('\n')}
-<script>
-  // Auto-print when fonts are loaded
-  document.fonts.ready.then(() => {
-    setTimeout(() => window.print(), 600);
-  });
-</script>
-</body>
-</html>`;
+      // ── 5. Cleanup ──
+      document.body.removeChild(offscreen);
+      imgRestoreMap.forEach(({ el, original }) => { el.src = original; });
 
-      // ── 4. Open print window ──
-      const printWindow = window.open('', '_blank', `width=${PAGE_WIDTH},height=${PAGE_HEIGHT}`);
-      if (!printWindow) {
-        alert('Popup bloqueado. Permita popups para este site e tente novamente.');
-        setExporting(false);
-        return;
-      }
-      printWindow.document.write(fullHTML);
-      printWindow.document.close();
+      const playerName = data?.player.name ?? 'relatorio';
+      pdf.save(`Scouting_${playerName.replace(/\s+/g, '_')}.pdf`);
 
     } catch (err) {
       console.error('PDF export error:', err);
