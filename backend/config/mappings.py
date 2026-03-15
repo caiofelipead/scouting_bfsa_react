@@ -317,7 +317,6 @@ BOTAFOGO_SP_SQUAD = {
     'Márcio Maranhão': ('Extremo', 1999, 'Márcio Carlos Pestana Dutra'),
     'Wesley Pinheiro': ('Extremo', 2000, 'Wesley Pinheiro Santos'),
     'Zé Hugo': ('Extremo', 1999, 'José Hugo Sousa dos Santos'),
-    'Whalacy Ermeliano': ('Extremo', 2006, 'Whalacy Wilhan Gonçalves Ermeliano'),
     'Hygor Cléber': ('Atacante', 1992, 'Hygor Cléber Garcia Silva'),
     'Guilherme Queiróz': ('Atacante', 1990, 'Guilherme de Queiróz Gonçalves'),
     'Luizão': ('Atacante', 2003, 'Luiz Guilherme Vieira da Silva'),

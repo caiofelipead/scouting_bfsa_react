@@ -1517,11 +1517,11 @@ class ContractImpactAnalyzer:
     """
 
     # Pesos do score composto final (soma = 1.0)
-    # quality_uplift com maior peso para priorizar melhora qualitativa
+    # quality_uplift como critério principal — melhora qualitativa é prioridade
     COMPONENT_WEIGHTS = {
         'positional_need': 0.15,
-        'quality_uplift': 0.30,
-        'tactical_complementarity': 0.15,
+        'quality_uplift': 0.35,
+        'tactical_complementarity': 0.10,
         'age_profile_fit': 0.10,
         'financial_efficiency': 0.15,
         'risk_assessment': 0.15,
@@ -1547,7 +1547,7 @@ class ContractImpactAnalyzer:
         'Lateral Esquerdo': 2,
         'Volante': 4,
         'Meia': 4,
-        'Extremo': 4,
+        'Extremo': 5,
         'Atacante': 4,
     }
 
