@@ -70,6 +70,8 @@ export interface ScoutingReportData {
     distance: { value: number; p: number } | null;
     hiRuns: { value: number; p: number } | null;
     pressures: { value: number; p: number } | null;
+    psv99: { value: number; p: number } | null;
+    topPsv99: { value: number; p: number } | null;
   } | null;
   qualitative: {
     tactical: string[];
@@ -446,6 +448,12 @@ export function useScoutingReport(
                   : null,
                 pressures: sc.physical['Pressing Index/90'] != null
                   ? { value: sc.physical['Pressing Index/90'], p: sc.physical_percentiles?.['Pressing Index/90'] ?? 0 }
+                  : null,
+                psv99: sc.physical['Avg PSV-99'] != null
+                  ? { value: sc.physical['Avg PSV-99'], p: sc.physical_percentiles?.['Avg PSV-99'] ?? 0 }
+                  : null,
+                topPsv99: sc.physical['Avg Top 5 PSV-99'] != null
+                  ? { value: sc.physical['Avg Top 5 PSV-99'], p: sc.physical_percentiles?.['Avg Top 5 PSV-99'] ?? 0 }
                   : null,
               }
             : null,

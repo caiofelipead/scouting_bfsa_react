@@ -12,6 +12,7 @@ interface ReportHeaderProps {
   clusterDef: string;
   photo: string | null;
   clubLogo: string | null;
+  customClubLogo?: string | null;
   position: string;
   age: number;
   height: string;
@@ -27,6 +28,7 @@ export default function ReportHeader({
   clusterDef,
   photo,
   clubLogo,
+  customClubLogo,
   position,
   age,
   height,
@@ -142,14 +144,16 @@ export default function ReportHeader({
 
           {/* Club info */}
           <div style={styles.clubSection}>
-            {clubLogo && (
+            {customClubLogo ? (
+              <img src={customClubLogo} alt={club} style={styles.clubLogo} />
+            ) : clubLogo ? (
               <img
                 src={`/api/image-proxy?url=${encodeURIComponent(clubLogo)}`}
                 alt={club}
                 style={styles.clubLogo}
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
-            )}
+            ) : null}
             <div>
               <div style={styles.clubName}>{club}</div>
               <div style={styles.clubMeta}>

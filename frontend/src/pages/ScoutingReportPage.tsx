@@ -1,6 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Printer, Loader2, Eye, Zap, Upload } from 'lucide-react';
+import { Search, Download, Loader2, Eye, Zap, Upload } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport } from '../hooks/useScoutingReport';
 import { usePlayers } from '../hooks/usePlayers';
 import ReportHeader from '../components/report/ReportHeader';
@@ -60,7 +62,7 @@ const PAGE_HEIGHT = 596; // 16:9 ratio
 // ── Page wrapper component with shield watermark ──
 function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
   return (
-    <div style={{
+    <div data-slide style={{
       ...pageStyles.page,
       padding: noPadding ? 0 : '28px 40px 44px',
     }}>
@@ -179,9 +181,53 @@ export default function ScoutingReportPage() {
     transition: { duration: 0.4, delay, ease: [0.22, 1, 0.36, 1] },
   });
 
-  function handlePrint() {
-    window.print();
-  }
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportPDF = useCallback(async () => {
+    if (!reportRef.current || exporting) return;
+    setExporting(true);
+    try {
+      // Collect all slide elements
+      const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
+      if (!slides.length) { setExporting(false); return; }
+
+      // 16:9 landscape PDF dimensions (mm)
+      const pdfWidth = 338;
+      const pdfHeight = 190;
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [pdfWidth, pdfHeight] });
+
+      for (let i = 0; i < slides.length; i++) {
+        const slide = slides[i];
+        // Hide no-print elements
+        const noPrintEls = slide.querySelectorAll<HTMLElement>('.no-print');
+        noPrintEls.forEach((el) => { el.style.display = 'none'; });
+
+        const canvas = await html2canvas(slide, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#FFFFFF',
+          logging: false,
+        });
+
+        // Restore no-print elements
+        noPrintEls.forEach((el) => { el.style.display = ''; });
+
+        const imgData = canvas.toDataURL('image/png');
+        if (i > 0) pdf.addPage([pdfWidth, pdfHeight], 'landscape');
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      }
+
+      const playerName = data?.player.name ?? 'relatorio';
+      pdf.save(`Scouting_${playerName.replace(/\s+/g, '_')}.pdf`);
+    } catch (err) {
+      console.error('PDF export error:', err);
+      // Fallback to print
+      window.print();
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, data]);
 
   function handleClubLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -379,10 +425,10 @@ export default function ScoutingReportPage() {
               ) : null}
             </div>
 
-            {/* Print button */}
-            <button style={styles.printBtn} onClick={handlePrint} title="Exportar PDF">
-              <Printer size={16} />
-              Exportar PDF
+            {/* Export PDF button */}
+            <button style={styles.printBtn} onClick={handleExportPDF} title="Exportar PDF" disabled={exporting}>
+              {exporting ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={16} />}
+              {exporting ? 'Gerando PDF...' : 'Exportar PDF'}
             </button>
           </div>
         </div>
@@ -437,9 +483,6 @@ export default function ScoutingReportPage() {
                   <div style={{ padding: '28px 40px 44px' }}>
                     {/* Club logo upload */}
                     <input ref={clubLogoInputRef} type="file" accept="image/*" onChange={handleClubLogoUpload} style={{ display: 'none' }} />
-                    {customClubLogo && (
-                      <img src={customClubLogo} alt="Escudo" style={{ position: 'absolute', top: 20, right: 48, width: 56, height: 56, objectFit: 'contain' }} />
-                    )}
                     <button className="no-print" onClick={() => clubLogoInputRef.current?.click()} style={styles.uploadShieldBtn}>
                       <Upload size={10} /> {customClubLogo ? 'Trocar escudo' : 'Escudo PNG'}
                     </button>
@@ -449,6 +492,7 @@ export default function ScoutingReportPage() {
                       clusterDef={data.player.clusterDef}
                       photo={data.player.photo}
                       clubLogo={data.player.clubLogo}
+                      customClubLogo={customClubLogo}
                       position={data.player.position}
                       age={data.player.age}
                       height={data.player.height}
@@ -464,7 +508,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 2: ANÁLISE DESCRITIVA ═══════ */}
               <motion.div {...fadeIn(0.05)}>
                 <ReportPage>
-                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+
                   <SectionDivider number={1} title="Análise Descritiva" />
                   <div style={styles.card}>
                     <div style={styles.analysisHeader}>
@@ -509,7 +553,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 3: IDENTIFICAÇÃO & VEREDITO ═══════ */}
               <motion.div {...fadeIn(0.1)}>
                 <ReportPage>
-                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+
                   <SectionDivider number={2} title="Identificação & Veredito Preditivo" />
                   <div style={styles.grid2}>
                     <div style={styles.card}>
@@ -521,10 +565,14 @@ export default function ScoutingReportPage() {
                       </div>
                     </div>
                     <div>
-                      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
                         <StatBox label="Impact Score" value={data.predict.impactScore.toFixed(1)} color={C.green} subtitle="SSP / 10" />
                         <StatBox label="P(Sucesso)" value={`${data.predict.pSuccess}%`} color={C.blue} />
                         <StatBox label="Risco" value={data.predict.risk} color={data.predict.riskColor} />
+                      </div>
+                      <div style={styles.legendBox}>
+                        <div style={styles.legendEntry}><strong>Impact Score (SSP):</strong> Índice composto de desempenho do jogador (0-10), calculado a partir de métricas ponderadas da posição.</div>
+                        <div style={styles.legendEntry}><strong>P(Sucesso):</strong> Probabilidade estimada de sucesso na adaptação ao elenco, baseada em modelo preditivo com variáveis técnicas, táticas e contextuais.</div>
                       </div>
                       {predictionLoading ? <Skeleton width="100%" height={80} /> : (
                         <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}` }}>
@@ -540,7 +588,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 4: FOUR CORNERS ═══════ */}
               <motion.div {...fadeIn(0.15)}>
                 <ReportPage>
-                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+
                   <SectionDivider number={3} title="Matriz Qualitativa — Four Corners" />
                   <div style={styles.grid2x2}>
                     {([
@@ -565,7 +613,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 5: RADAR ÍNDICES ═══════ */}
               <motion.div {...fadeIn(0.2)}>
                 <ReportPage>
-                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+
                   <SectionDivider number={4} title="Índices Compostos & Filtro de Elite" />
                   <div style={styles.grid2}>
                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -594,7 +642,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 6: RADAR COMPLETO DE MÉTRICAS DA POSIÇÃO + WEDGE ELITE ═══════ */}
               <motion.div {...fadeIn(0.25)}>
                 <ReportPage>
-                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+
                   <SectionDivider number={5} title="Radar de Métricas — Visão Completa" />
                   <div style={styles.grid2}>
                     {/* Full position metrics radar */}
@@ -618,7 +666,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 7: DELTA VS TITULAR ═══════ */}
               <motion.div {...fadeIn(0.3)}>
                 <ReportPage>
-                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+
                   <SectionDivider number={6} title="Delta vs. Titular — Squad Impact" />
                   <div style={styles.card}>
                     {!selectedIncumbent ? (
@@ -640,7 +688,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 8: SKILLCORNER ═══════ */}
               <motion.div {...fadeIn(0.35)}>
                 <ReportPage>
-                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+
                   <SectionDivider number={7} title="Dados Físicos — SkillCorner" />
                   {selectedSC && (
                     <div style={{ ...styles.scTag, marginBottom: 12 }}><Zap size={12} /> SkillCorner: <strong>{selectedSC}</strong></div>
@@ -651,7 +699,7 @@ export default function ScoutingReportPage() {
                     <div style={styles.grid3}>
                       <div style={styles.card}><h4 style={styles.physTitle}>Velocidade</h4><PhysicalBar label="Vel. Máxima" data={data.physical.maxSpeed} unit="km/h" /><PhysicalBar label="Sprints p90" data={data.physical.sprints} unit="/90" /></div>
                       <div style={styles.card}><h4 style={styles.physTitle}>Resistência</h4><PhysicalBar label="Distância" data={data.physical.distance} unit="km" /><PhysicalBar label="High Runs" data={data.physical.hiRuns} unit="/90" /></div>
-                      <div style={styles.card}><h4 style={styles.physTitle}>Explosividade</h4><PhysicalBar label="Acelerações" data={data.physical.accelerations} unit="/90" /><PhysicalBar label="Pressões" data={data.physical.pressures} unit="/90" /></div>
+                      <div style={styles.card}><h4 style={styles.physTitle}>Explosividade</h4><PhysicalBar label="PSV-99" data={data.physical.psv99} unit="km/h" /><PhysicalBar label="Top 5 PSV-99" data={data.physical.topPsv99} unit="km/h" /><PhysicalBar label="Acelerações" data={data.physical.accelerations} unit="/90" /><PhysicalBar label="Pressões" data={data.physical.pressures} unit="/90" /></div>
                     </div>
                   ) : (
                     <div style={{ ...styles.card, borderLeft: `3px solid ${C.amber}` }}>
@@ -671,7 +719,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 9: SIMILARES ═══════ */}
               <motion.div {...fadeIn(0.4)}>
                 <ReportPage>
-                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+
                   <SectionDivider number={8} title="Contingência — Jogadores Similares" />
                   <div style={styles.grid2}>
                     <div style={styles.card}>
@@ -706,7 +754,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 10: CONCLUSÃO ═══════ */}
               <motion.div {...fadeIn(0.45)}>
                 <ReportPage>
-                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+
                   <SectionDivider number={9} title="Conclusão & Recomendação" />
                   <div style={styles.grid3}>
                     <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}` }}>
@@ -1350,6 +1398,22 @@ const styles: Record<string, React.CSSProperties> = {
     color: C.textSecondary,
     cursor: 'pointer',
     zIndex: 5,
+  },
+  legendBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    padding: '10px 14px',
+    background: C.bgSubtle,
+    borderRadius: 8,
+    border: `1px solid ${C.bgMuted}`,
+    marginBottom: 16,
+  },
+  legendEntry: {
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 10,
+    color: C.textTertiary,
+    lineHeight: 1.5,
   },
   scTag: {
     fontFamily: "'DM Sans', sans-serif",
