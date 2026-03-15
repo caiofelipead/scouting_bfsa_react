@@ -311,7 +311,7 @@ BOTAFOGO_SP_SQUAD = {
     'Rafael Gava': ('Meia', 1993, 'Rafael Gustavo Meneghel Gava'),
     'Marquinho': ('Meia', None, 'Marquinho'),
     'Felipe Penha': ('Meia', 2006, 'Felipe Penha de Souza'),
-    'Thalles': ('Meia', 2005, 'Thalles Eduardo Gomes Ferreira dos Ramos'),
+    'Thalles': ('Atacante', 2005, 'Thalles Eduardo Gomes Ferreira dos Ramos'),
     'Kelvin Giacobe': ('Extremo', 1997, 'Kelvin Giacobe'),
     'Jéfferson Nem': ('Extremo', 1996, 'Jefferson Vasconcelos Braz da Silva'),
     'Márcio Maranhão': ('Extremo', 1999, 'Márcio Carlos Pestana Dutra'),
