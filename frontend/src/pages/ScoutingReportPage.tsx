@@ -1,9 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Download, Loader2, Eye, Zap } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport, useSkillCornerPlayer } from '../hooks/useScoutingReport';
+import api from '../lib/api';
 import { usePlayers } from '../hooks/usePlayers';
 import ReportHeader from '../components/report/ReportHeader';
 import SectionDivider from '../components/report/SectionDivider';
@@ -192,7 +191,7 @@ function Skeleton({ width, height }: { width: string | number; height: string | 
   );
 }
 
-// ── Embed Google Fonts as base64 for html2canvas ──
+// ── Embed Google Fonts as base64 for PDF export ──
 let _cachedEmbeddedFontCSS: string | null = null;
 
 async function getEmbeddedFontCSS(): Promise<string> {
@@ -291,8 +290,8 @@ export default function ScoutingReportPage() {
 
   const [exporting, setExporting] = useState(false);
 
-  /** Convert a cross-origin image URL to a data URL via fetch */
-  async function imgToDataUrl(url: string): Promise<string | null> {
+  /** Convert a URL to a base64 data URL */
+  async function toDataUrl(url: string): Promise<string | null> {
     try {
       const resp = await fetch(url, { mode: 'cors', credentials: 'same-origin' });
       if (!resp.ok) return null;
@@ -312,121 +311,96 @@ export default function ScoutingReportPage() {
       const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
       if (!slides.length) { setExporting(false); return; }
 
-      // ── 0. Pre-load fonts as embedded base64 ──
+      // ── 1. Get embedded font CSS ──
       const embeddedFontCSS = await getEmbeddedFontCSS();
 
-      // ── 1. Pre-convert proxy images to data URLs ──
-      const imgRestoreMap: Array<{ el: HTMLImageElement; original: string }> = [];
-      const allImgs = reportRef.current.querySelectorAll<HTMLImageElement>('img[src^="/api/"]');
-      await Promise.all(
-        Array.from(allImgs).map(async (img) => {
-          const dataUrl = await imgToDataUrl(img.src);
-          if (dataUrl) {
-            imgRestoreMap.push({ el: img, original: img.src });
-            img.src = dataUrl;
-          }
-        }),
-      );
-
-      // ── 2. Temporarily un-scale all SlideScaler wrappers ──
-      // Structure: wrapperDiv > scaleDiv(transform:scale) > slideDiv[data-slide]
-      const scaleRestoreMap: Array<{
-        scaleDiv: HTMLElement; wrapperDiv: HTMLElement;
-        origTransform: string; origWidth: string; origHeight: string;
-        origWrapperWidth: string; origWrapperHeight: string; origWrapperMargin: string;
-      }> = [];
-      slides.forEach((slide) => {
-        const scaleDiv = slide.parentElement;
-        const wrapperDiv = scaleDiv?.parentElement;
-        if (scaleDiv && wrapperDiv) {
-          scaleRestoreMap.push({
-            scaleDiv, wrapperDiv,
-            origTransform: scaleDiv.style.transform,
-            origWidth: scaleDiv.style.width,
-            origHeight: scaleDiv.style.height,
-            origWrapperWidth: wrapperDiv.style.width,
-            origWrapperHeight: wrapperDiv.style.height,
-            origWrapperMargin: wrapperDiv.style.margin,
-          });
-          // Remove scale transform — render at native 1440×809
-          scaleDiv.style.transform = 'none';
-          scaleDiv.style.width = `${PAGE_WIDTH}px`;
-          scaleDiv.style.height = `${PAGE_HEIGHT}px`;
-          wrapperDiv.style.width = `${PAGE_WIDTH}px`;
-          wrapperDiv.style.height = `${PAGE_HEIGHT}px`;
-          wrapperDiv.style.margin = '0';
-        }
-      });
-
-      // Wait for reflow + font rendering
-      await document.fonts.ready;
-      await new Promise((r) => setTimeout(r, 200));
-
-      // ── 3. Capture each slide at native resolution ──
-      const pdfWidthMm = PAGE_WIDTH * 0.2646;
-      const pdfHeightMm = PAGE_HEIGHT * 0.2646;
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [pdfWidthMm, pdfHeightMm] });
-
-      for (let i = 0; i < slides.length; i++) {
-        const slide = slides[i];
-        const noPrintEls = slide.querySelectorAll<HTMLElement>('.no-print');
-        noPrintEls.forEach((el) => { el.style.display = 'none'; });
-
-        const canvas = await html2canvas(slide, {
-          width: PAGE_WIDTH,
-          height: PAGE_HEIGHT,
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#FFFFFF',
-          logging: false,
-          windowWidth: PAGE_WIDTH,
-          windowHeight: PAGE_HEIGHT,
-          // Inject embedded fonts + un-scale in cloned document
-          onclone: (clonedDoc) => {
-            // Inject base64-embedded font CSS so text renders correctly
-            if (embeddedFontCSS) {
-              const styleEl = clonedDoc.createElement('style');
-              styleEl.textContent = embeddedFontCSS;
-              clonedDoc.head.appendChild(styleEl);
-            }
-            clonedDoc.querySelectorAll('[data-slide]').forEach((el) => {
-              const parent = (el as HTMLElement).parentElement;
-              if (parent) {
-                parent.style.transform = 'none';
-                parent.style.width = `${PAGE_WIDTH}px`;
-                parent.style.height = `${PAGE_HEIGHT}px`;
-              }
-              const wrapper = parent?.parentElement;
-              if (wrapper) {
-                wrapper.style.width = `${PAGE_WIDTH}px`;
-                wrapper.style.height = `${PAGE_HEIGHT}px`;
-              }
-            });
-          },
-        });
-
-        noPrintEls.forEach((el) => { el.style.display = ''; });
-
-        const imgData = canvas.toDataURL('image/png');
-        if (i > 0) pdf.addPage([pdfWidthMm, pdfHeightMm], 'landscape');
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidthMm, pdfHeightMm);
+      // ── 2. Convert proxy images to data URLs in cloned nodes ──
+      const slideHtmls: string[] = [];
+      for (const slide of Array.from(slides)) {
+        const clone = slide.cloneNode(true) as HTMLElement;
+        // Remove no-print elements
+        clone.querySelectorAll('.no-print').forEach((el) => el.remove());
+        // Convert proxy images to data URLs
+        const imgs = clone.querySelectorAll<HTMLImageElement>('img[src^="/api/"]');
+        await Promise.all(
+          Array.from(imgs).map(async (img) => {
+            const dataUrl = await toDataUrl(img.src);
+            if (dataUrl) img.src = dataUrl;
+          }),
+        );
+        // Also convert relative images (like shield)
+        const relImgs = clone.querySelectorAll<HTMLImageElement>('img[src^="/"]');
+        await Promise.all(
+          Array.from(relImgs).map(async (img) => {
+            if (img.src.startsWith('data:')) return;
+            const dataUrl = await toDataUrl(img.src);
+            if (dataUrl) img.src = dataUrl;
+          }),
+        );
+        slideHtmls.push(clone.outerHTML);
       }
 
-      // ── 4. Restore everything ──
-      scaleRestoreMap.forEach(({ scaleDiv, wrapperDiv, origTransform, origWidth, origHeight, origWrapperWidth, origWrapperHeight, origWrapperMargin }) => {
-        scaleDiv.style.transform = origTransform;
-        scaleDiv.style.width = origWidth;
-        scaleDiv.style.height = origHeight;
-        wrapperDiv.style.width = origWrapperWidth;
-        wrapperDiv.style.height = origWrapperHeight;
-        wrapperDiv.style.margin = origWrapperMargin;
-      });
-      imgRestoreMap.forEach(({ el, original }) => { el.src = original; });
+      // ── 3. Build self-contained HTML document ──
+      // Collect all computed styles from <style> tags and stylesheets
+      const styleSheets = Array.from(document.styleSheets);
+      let allCSS = '';
+      for (const sheet of styleSheets) {
+        try {
+          const rules = Array.from(sheet.cssRules);
+          allCSS += rules.map((r) => r.cssText).join('\n') + '\n';
+        } catch {
+          // Cross-origin stylesheet — skip (we embed fonts separately)
+        }
+      }
 
-      const playerName = data?.player.name ?? 'relatorio';
-      pdf.save(`Scouting_${playerName.replace(/\s+/g, '_')}.pdf`);
+      const fullHTML = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>${embeddedFontCSS}</style>
+<style>
+${allCSS}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { margin: 0; padding: 0; background: white; }
+.slide-page {
+  width: ${PAGE_WIDTH}px;
+  height: ${PAGE_HEIGHT}px;
+  page-break-after: always;
+  break-after: page;
+  overflow: hidden;
+  position: relative;
+}
+.slide-page:last-child { page-break-after: avoid; }
+</style>
+</head>
+<body>
+${slideHtmls.map((html) => `<div class="slide-page">${html}</div>`).join('\n')}
+</body>
+</html>`;
+
+      // ── 4. Send to backend Playwright endpoint ──
+      const filename = `Scouting_${(data?.player.name ?? 'Report').replace(/\s+/g, '_')}`;
+      const response = await api.post('/report/export-pdf', {
+        html: fullHTML,
+        filename,
+      }, {
+        responseType: 'blob',
+        timeout: 120_000, // 2min for PDF generation
+      });
+
+      // ── 5. Download the PDF ──
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+
     } catch (err) {
       console.error('PDF export error:', err);
+      // Fallback to browser print
+      alert('Erro ao gerar PDF via servidor. Usando impressão do navegador como fallback.');
       window.print();
     } finally {
       setExporting(false);

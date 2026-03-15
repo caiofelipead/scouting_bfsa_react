@@ -2649,6 +2649,72 @@ async def image_proxy(url: str):
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
+# ══════════════════════════════════════════════════════════════════════
+# PDF EXPORT VIA PLAYWRIGHT (headless browser)
+# ══════════════════════════════════════════════════════════════════════
+
+@app.post("/api/report/export-pdf")
+async def export_report_pdf(
+    req: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Render slides HTML with a headless browser and return a high-quality PDF.
+    Expects: { "html": "<full HTML string with inline styles>", "filename": "optional" }
+    """
+    html_content = req.get("html", "")
+    if not html_content:
+        raise HTTPException(status_code=400, detail="No HTML content provided")
+
+    try:
+        from playwright.async_api import async_playwright
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
+            )
+            page = await browser.new_page()
+
+            # Set viewport to slide dimensions
+            await page.set_viewport_size({"width": 1440, "height": 809})
+
+            # Load the HTML content directly — no navigation needed
+            await page.set_content(html_content, wait_until="networkidle")
+
+            # Wait for fonts to load
+            await page.wait_for_function("document.fonts.ready")
+            await page.wait_for_timeout(500)
+
+            # Generate PDF with exact slide dimensions
+            pdf_bytes = await page.pdf(
+                width="1440px",
+                height="809px",
+                print_background=True,
+                margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+            )
+
+            await browser.close()
+
+        filename = req.get("filename", "Scouting_Report") + ".pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="Playwright not installed. Run: pip install playwright && playwright install chromium",
+        )
+    except Exception as e:
+        logger.error("PDF export error: %s", e)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
+
 # ── Run ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
