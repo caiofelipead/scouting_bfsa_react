@@ -13,7 +13,7 @@ interface ReportHeaderProps {
   photo: string | null;
   clubLogo: string | null;
   customClubLogo?: string | null;
-  onUploadClubLogo?: () => void;
+  onClubLogoChange?: (dataUrl: string) => void;
   position: string;
   age: number;
   height: string;
@@ -30,7 +30,7 @@ export default function ReportHeader({
   photo,
   clubLogo,
   customClubLogo,
-  onUploadClubLogo,
+  onClubLogoChange,
   position,
   age,
   height,
@@ -41,6 +41,7 @@ export default function ReportHeader({
 }: ReportHeaderProps) {
   const [fullBodyImage, setFullBodyImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const clubLogoInputRef = useRef<HTMLInputElement>(null);
 
   const now = new Date();
   const monthNames = [
@@ -52,14 +53,11 @@ export default function ReportHeader({
   const firstName = nameParts[0] ?? '';
   const lastName = nameParts.slice(1).join(' ') ?? '';
 
-  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  function resizeAndSet(file: File, maxSize: number, setter: (url: string) => void) {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        const maxSize = 800;
         const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
@@ -68,11 +66,24 @@ export default function ReportHeader({
         canvas.height = h;
         const ctx = canvas.getContext('2d')!;
         ctx.drawImage(img, 0, 0, w, h);
-        setFullBodyImage(canvas.toDataURL('image/png'));
+        setter(canvas.toDataURL('image/png'));
       };
       img.src = ev.target?.result as string;
     };
     reader.readAsDataURL(file);
+  }
+
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    resizeAndSet(file, 800, setFullBodyImage);
+    e.target.value = '';
+  }
+
+  function handleClubLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    resizeAndSet(file, 256, (url) => onClubLogoChange?.(url));
     e.target.value = '';
   }
 
@@ -171,8 +182,8 @@ export default function ReportHeader({
                 style={styles.clubLogo}
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
-            ) : onUploadClubLogo ? (
-              <div style={styles.clubLogoPlaceholder} onClick={onUploadClubLogo} className="no-print">
+            ) : onClubLogoChange ? (
+              <div style={styles.clubLogoPlaceholder} onClick={() => clubLogoInputRef.current?.click()} className="no-print">
                 <Upload size={16} color="#B0B0B0" />
               </div>
             ) : null}
@@ -183,10 +194,19 @@ export default function ReportHeader({
                 {contract !== '—' ? ` | Contrato até ${contract}` : ''}
               </div>
             </div>
-            {onUploadClubLogo && (
-              <button className="no-print" onClick={onUploadClubLogo} style={styles.clubUploadBtn}>
-                <Upload size={10} /> {customClubLogo ? 'Trocar' : 'Escudo'}
-              </button>
+            {onClubLogoChange && (
+              <>
+                <input
+                  ref={clubLogoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleClubLogoUpload}
+                  style={{ display: 'none' }}
+                />
+                <button className="no-print" onClick={() => clubLogoInputRef.current?.click()} style={styles.clubUploadBtn}>
+                  <Upload size={10} /> {customClubLogo ? 'Trocar' : 'Escudo'}
+                </button>
+              </>
             )}
           </div>
 
@@ -246,12 +266,16 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 0,
     boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
   },
   sectionHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: 14,
     marginBottom: 24,
+    flexShrink: 0,
   },
   sectionBadge: {
     width: 5,
@@ -285,25 +309,31 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: '400px 1fr',
     gap: 48,
-    minHeight: 460,
+    flex: 1,
+    minHeight: 0,
     alignItems: 'start',
+    overflow: 'hidden',
   },
   imageColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: 10,
+    maxHeight: '100%',
+    overflow: 'hidden',
   },
   fullBodyImg: {
     width: 380,
-    maxHeight: 520,
+    flex: '1 1 0',
+    minHeight: 0,
+    maxHeight: 420,
     objectFit: 'contain',
     objectPosition: 'bottom center',
     borderRadius: 8,
   },
   imagePlaceholder: {
     width: 380,
-    height: 460,
+    height: 420,
     background: '#EEEDEA',
     borderRadius: 8,
     border: '2px dashed #D4D4D4',
@@ -331,6 +361,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: '#4A4A4A',
     cursor: 'pointer',
+    flexShrink: 0,
   },
   infoColumn: {
     display: 'flex',
@@ -451,9 +482,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     gap: 48,
-    marginTop: 32,
+    marginTop: 'auto',
     paddingTop: 24,
     borderTop: '1px solid #E5E4E0',
+    flexShrink: 0,
   },
   linkCard: {
     display: 'flex',
@@ -493,5 +525,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#B0B0B0',
     textAlign: 'center',
     marginTop: 20,
+    flexShrink: 0,
   },
 };

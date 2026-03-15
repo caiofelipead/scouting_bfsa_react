@@ -221,7 +221,6 @@ export default function ScoutingReportPage() {
 
   // Club logo upload
   const [customClubLogo, setCustomClubLogo] = useState<string | null>(null);
-  const clubLogoInputRef = useRef<HTMLInputElement>(null);
 
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -461,34 +460,6 @@ export default function ScoutingReportPage() {
     }
   }, [exporting, data]);
 
-  function resizeImage(file: File, maxSize: number): Promise<string> {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const img = new Image();
-        img.onload = () => {
-          const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d')!;
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/png'));
-        };
-        img.src = ev.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function handleClubLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    resizeImage(file, 256).then(setCustomClubLogo);
-    e.target.value = '';
-  }
 
   return (
     <>
@@ -747,9 +718,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ SLIDE 1: COVER ═══════ */}
               <motion.div {...fadeIn(0)}>
                 <ReportPage noPadding>
-                  <div style={{ padding: '40px 56px 56px', flex: 1 }}>
-                    {/* Club logo upload */}
-                    <input ref={clubLogoInputRef} type="file" accept="image/*" onChange={handleClubLogoUpload} style={{ display: 'none' }} />
+                  <div style={{ padding: '40px 56px 56px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <ReportHeader
                       name={data.player.name}
                       badges={data.player.badges}
@@ -757,7 +726,7 @@ export default function ScoutingReportPage() {
                       photo={data.player.photo}
                       clubLogo={data.player.clubLogo}
                       customClubLogo={customClubLogo}
-                      onUploadClubLogo={() => clubLogoInputRef.current?.click()}
+                      onClubLogoChange={setCustomClubLogo}
                       position={data.player.position}
                       age={data.player.age}
                       height={data.player.height}
