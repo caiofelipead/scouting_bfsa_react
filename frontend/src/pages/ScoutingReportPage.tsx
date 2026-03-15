@@ -263,23 +263,12 @@ export default function ScoutingReportPage() {
   }
 
   /**
-   * Copies all computed styles from src to dst so the clone
-   * looks identical outside the original DOM context.
-   */
-  function copyComputedStyles(src: HTMLElement, dst: HTMLElement) {
-    const computed = getComputedStyle(src);
-    for (let i = 0; i < computed.length; i++) {
-      const prop = computed[i];
-      dst.style.setProperty(prop, computed.getPropertyValue(prop));
-    }
-  }
-
-  /**
    * Core capture routine using offscreen clones.
-   * For each slide: deep-clone it into an offscreen container at position
-   * fixed top:0 left:0, convert images to base64, capture with toPng,
-   * then discard the clone. This avoids all in-place DOM mutation,
-   * viewport/scroll offset, and parent overflow/clipping issues.
+   * For each slide: deep-clone it into an offscreen container,
+   * convert images to base64, capture with toPng, then discard.
+   * cloneNode(true) preserves all inline styles (React style prop)
+   * on every child element. CSS stylesheet rules still apply since
+   * the clone is in the same document.
    * Returns an array of PNG data URLs (one per slide).
    */
   async function captureSlides(): Promise<string[]> {
@@ -293,19 +282,22 @@ export default function ScoutingReportPage() {
       const slide = slides[i];
 
       // ── 1. Create offscreen container ──
+      // Uses position:fixed at 0,0 with negative z-index to keep it
+      // off-screen visually but still in the rendering tree for
+      // getComputedStyle to work correctly.
       const offscreen = document.createElement('div');
       offscreen.style.cssText = `
         position: fixed; top: 0; left: 0; z-index: -9999;
         width: ${PAGE_WIDTH}px; height: ${PAGE_HEIGHT}px;
-        overflow: visible; pointer-events: none; opacity: 0;
+        overflow: visible; pointer-events: none;
       `;
       document.body.appendChild(offscreen);
 
       // ── 2. Deep-clone the slide ──
+      // cloneNode(true) preserves all inline styles on every child.
+      // No need to copy computed styles - html-to-image handles that
+      // internally when serializing to SVG.
       const clone = slide.cloneNode(true) as HTMLElement;
-      // Apply computed styles from original to clone root
-      copyComputedStyles(slide, clone);
-      // Force exact dimensions and reset any transforms
       clone.style.width = `${PAGE_WIDTH}px`;
       clone.style.height = `${PAGE_HEIGHT}px`;
       clone.style.transform = 'none';
@@ -313,7 +305,6 @@ export default function ScoutingReportPage() {
       clone.style.position = 'absolute';
       clone.style.top = '0';
       clone.style.left = '0';
-      clone.style.overflow = 'hidden';
       offscreen.appendChild(clone);
 
       // ── 3. Convert images to base64 in the clone ──
@@ -333,9 +324,7 @@ export default function ScoutingReportPage() {
       // ── 5. Wait for reflow ──
       await new Promise((r) => setTimeout(r, 100));
 
-      // ── 6. Make visible for capture then capture ──
-      offscreen.style.opacity = '1';
-
+      // ── 6. Capture ──
       try {
         // First call primes resource loading (documented workaround)
         await toPng(clone, {
@@ -344,6 +333,7 @@ export default function ScoutingReportPage() {
           height: PAGE_HEIGHT,
           skipFonts: true,
           cacheBust: true,
+          backgroundColor: '#FFFFFF',
         });
 
         const dataUrl = await toPng(clone, {
@@ -352,6 +342,7 @@ export default function ScoutingReportPage() {
           height: PAGE_HEIGHT,
           skipFonts: true,
           cacheBust: true,
+          backgroundColor: '#FFFFFF',
         });
         images.push(dataUrl);
       } catch (err) {
