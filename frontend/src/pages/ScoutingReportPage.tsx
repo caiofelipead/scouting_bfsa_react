@@ -770,11 +770,46 @@ export default function ScoutingReportPage() {
                 </ReportPage>
               </motion.div>
 
-              {/* ═══════ SLIDE 2: ANÁLISE DESCRITIVA ═══════ */}
+              {/* ═══════ SLIDE 2: IDENTIFICAÇÃO & VEREDITO ═══════ */}
               <motion.div {...fadeIn(0.05)}>
                 <ReportPage>
 
-                  <SectionDivider number={1} title="Análise Descritiva" />
+                  <SectionDivider number={1} title="Identificação & Veredito Preditivo" />
+                  <div style={{ ...styles.grid2, flex: 1 }}>
+                    <div style={{ ...styles.card, display: 'flex', flexDirection: 'column' as const }}>
+                      <h3 style={styles.cardTitle}>Dados do Jogador</h3>
+                      <div style={styles.idGrid}>
+                        {[['Nome', data.player.name], ['Idade', data.player.age ? `${data.player.age} anos` : '—'], ['Posição', data.player.position], ['Altura', data.player.height], ['Pé', data.player.foot], ['Clube', data.player.club], ['Liga', data.player.league], ['Contrato', data.player.contract]].map(([label, value]) => (
+                          <div key={label} style={styles.idRow}><span style={styles.idLabel}>{label}</span><span style={styles.idValue} contentEditable suppressContentEditableWarning>{value}</span></div>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const }}>
+                      <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                        <StatBox label="Impact Score" value={data.predict.impactScore.toFixed(1)} color={C.green} subtitle="SSP" />
+                        <StatBox label="P(Sucesso)" value={`${data.predict.pSuccess}%`} color={C.blue} />
+                        <StatBox label="Risco" value={data.predict.risk} color={data.predict.riskColor} />
+                      </div>
+                      <div style={styles.legendBox}>
+                        <div style={styles.legendEntry} contentEditable suppressContentEditableWarning><strong>Impact Score (SSP):</strong> Índice composto de desempenho do jogador, calculado a partir de métricas ponderadas da posição. Quanto maior, melhor o desempenho relativo.</div>
+                        <div style={styles.legendEntry} contentEditable suppressContentEditableWarning><strong>P(Sucesso):</strong> Probabilidade estimada de sucesso na adaptação ao elenco, baseada em modelo preditivo com variáveis técnicas, táticas e contextuais.</div>
+                      </div>
+                      {predictionLoading ? <Skeleton width="100%" height={80} /> : (
+                        <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}`, flex: 1, display: 'flex', flexDirection: 'column' as const }}>
+                          <div style={styles.verdictLabel}>VEREDITO</div>
+                          <p style={{ ...styles.verdictText, flex: 1 }} contentEditable suppressContentEditableWarning>{data.predict.verdict}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </ReportPage>
+              </motion.div>
+
+              {/* ═══════ SLIDE 3: ANÁLISE DESCRITIVA ═══════ */}
+              <motion.div {...fadeIn(0.1)}>
+                <ReportPage>
+
+                  <SectionDivider number={2} title="Análise Descritiva" />
                   <div style={{ ...styles.card, flex: 1, display: 'flex', flexDirection: 'column' as const }}>
                     <div style={styles.analysisHeader}>
                       {data.player.clubLogo && (
@@ -811,41 +846,6 @@ export default function ScoutingReportPage() {
                         {data.analysis.transferLuvas && (<div style={styles.financialTag} contentEditable suppressContentEditableWarning><span style={{ color: C.textTertiary }}>Transfer/Luvas:</span> <span style={{ fontWeight: 600 }}>{data.analysis.transferLuvas}</span></div>)}
                       </div>
                     )}
-                  </div>
-                </ReportPage>
-              </motion.div>
-
-              {/* ═══════ SLIDE 3: IDENTIFICAÇÃO & VEREDITO ═══════ */}
-              <motion.div {...fadeIn(0.1)}>
-                <ReportPage>
-
-                  <SectionDivider number={2} title="Identificação & Veredito Preditivo" />
-                  <div style={{ ...styles.grid2, flex: 1 }}>
-                    <div style={{ ...styles.card, display: 'flex', flexDirection: 'column' as const }}>
-                      <h3 style={styles.cardTitle}>Dados do Jogador</h3>
-                      <div style={styles.idGrid}>
-                        {[['Nome', data.player.name], ['Idade', data.player.age ? `${data.player.age} anos` : '—'], ['Posição', data.player.position], ['Altura', data.player.height], ['Pé', data.player.foot], ['Clube', data.player.club], ['Liga', data.player.league], ['Contrato', data.player.contract]].map(([label, value]) => (
-                          <div key={label} style={styles.idRow}><span style={styles.idLabel}>{label}</span><span style={styles.idValue} contentEditable suppressContentEditableWarning>{value}</span></div>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const }}>
-                      <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-                        <StatBox label="Impact Score" value={data.predict.impactScore.toFixed(1)} color={C.green} subtitle="SSP" />
-                        <StatBox label="P(Sucesso)" value={`${data.predict.pSuccess}%`} color={C.blue} />
-                        <StatBox label="Risco" value={data.predict.risk} color={data.predict.riskColor} />
-                      </div>
-                      <div style={styles.legendBox}>
-                        <div style={styles.legendEntry} contentEditable suppressContentEditableWarning><strong>Impact Score (SSP):</strong> Índice composto de desempenho do jogador, calculado a partir de métricas ponderadas da posição. Quanto maior, melhor o desempenho relativo.</div>
-                        <div style={styles.legendEntry} contentEditable suppressContentEditableWarning><strong>P(Sucesso):</strong> Probabilidade estimada de sucesso na adaptação ao elenco, baseada em modelo preditivo com variáveis técnicas, táticas e contextuais.</div>
-                      </div>
-                      {predictionLoading ? <Skeleton width="100%" height={80} /> : (
-                        <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}`, flex: 1, display: 'flex', flexDirection: 'column' as const }}>
-                          <div style={styles.verdictLabel}>VEREDITO</div>
-                          <p style={{ ...styles.verdictText, flex: 1 }} contentEditable suppressContentEditableWarning>{data.predict.verdict}</p>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </ReportPage>
               </motion.div>
