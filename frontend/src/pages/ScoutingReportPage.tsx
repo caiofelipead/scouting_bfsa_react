@@ -53,17 +53,16 @@ const QUADRANT = {
   mental: C.blue,
 };
 
-// ── A4 page dimensions (mm → proportion for screen) ──
-// A4 = 210mm × 297mm → ratio 1:1.414
-const PAGE_WIDTH = 794; // pixels at ~96dpi for A4 width
-const PAGE_HEIGHT = 1123; // pixels at ~96dpi for A4 height
+// ── Slide dimensions (16:9 landscape, like PowerPoint) ──
+const PAGE_WIDTH = 1060; // ~13.3in at 80dpi
+const PAGE_HEIGHT = 596; // 16:9 ratio
 
 // ── Page wrapper component with shield watermark ──
 function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
   return (
     <div style={{
       ...pageStyles.page,
-      padding: noPadding ? 0 : '40px 48px 60px',
+      padding: noPadding ? 0 : '28px 40px 44px',
     }}>
       {/* Shield watermark */}
       <img
@@ -86,9 +85,9 @@ const pageStyles: Record<string, React.CSSProperties> = {
     width: PAGE_WIDTH,
     minHeight: PAGE_HEIGHT,
     background: '#FFFFFF',
-    borderRadius: 4,
-    boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
-    marginBottom: 32,
+    borderRadius: 8,
+    boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
+    marginBottom: 28,
     position: 'relative',
     overflow: 'hidden',
     pageBreakAfter: 'always',
@@ -96,18 +95,18 @@ const pageStyles: Record<string, React.CSSProperties> = {
   },
   watermark: {
     position: 'absolute',
-    bottom: 40,
-    right: 40,
-    width: 80,
-    height: 80,
+    bottom: 24,
+    right: 32,
+    width: 60,
+    height: 60,
     objectFit: 'contain',
     opacity: 0.04,
     pointerEvents: 'none',
   },
   footer: {
     position: 'absolute',
-    bottom: 16,
-    left: 48,
+    bottom: 10,
+    left: 40,
     display: 'flex',
     alignItems: 'center',
     gap: 8,
@@ -190,7 +189,7 @@ export default function ScoutingReportPage() {
         }
         @media print {
           .no-print { display: none !important; }
-          @page { margin: 0; size: A4 portrait; }
+          @page { margin: 0; size: landscape; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
@@ -423,7 +422,7 @@ export default function ScoutingReportPage() {
               {/* ═══════ PAGE 1: COVER ═══════ */}
               <motion.div {...fadeIn(0)}>
                 <ReportPage noPadding>
-                  <div style={{ padding: '40px 48px 60px' }}>
+                  <div style={{ padding: '28px 40px 44px' }}>
                     <ReportHeader
                       name={data.player.name}
                       badges={data.player.badges}
@@ -627,7 +626,7 @@ export default function ScoutingReportPage() {
                     <div style={styles.card}>
                       <h3 style={styles.cardTitle}>Radar de Índices</h3>
                       {data.composites.length ? (
-                        <ReportRadar data={data.composites} size={340} />
+                        <ReportRadar data={data.composites} size={300} />
                       ) : (
                         <Skeleton width="100%" height={300} />
                       )}
@@ -695,7 +694,7 @@ export default function ScoutingReportPage() {
                   <SectionDivider number={5} title="Radar Wedge — Métricas Elite" />
                   <div style={styles.card}>
                     {data.eliteMetrics.length ? (
-                      <WedgeRadar data={data.eliteMetrics} size={340} />
+                      <WedgeRadar data={data.eliteMetrics} size={300} />
                     ) : (
                       <p style={styles.placeholder}>
                         Sem métricas de elite suficientes para o radar wedge
