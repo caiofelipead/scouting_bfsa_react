@@ -238,13 +238,14 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 2,
   },
   sectionName: {
-    fontFamily: "'DM Serif Display', serif",
+    fontFamily: "'DM Sans', sans-serif",
     fontSize: 28,
+    fontWeight: 600,
     lineHeight: 1.15,
     color: '#1A1A1A',
   },
   nameFirst: {
-    fontWeight: 400,
+    fontWeight: 700,
   },
   nameLast: {
     fontWeight: 400,
@@ -310,9 +311,9 @@ const styles: Record<string, React.CSSProperties> = {
     paddingLeft: 16,
   },
   coverName: {
-    fontFamily: "'DM Serif Display', serif",
+    fontFamily: "'DM Sans', sans-serif",
     fontSize: 32,
-    fontWeight: 400,
+    fontWeight: 600,
     lineHeight: 1.15,
     color: '#1A1A1A',
     margin: 0,
@@ -339,7 +340,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#8A8A8A',
   },
   dataValue: {
-    fontFamily: "'DM Serif Display', serif",
+    fontFamily: "'DM Sans', sans-serif",
     fontSize: 18,
     fontWeight: 400,
     color: '#1A1A1A',
@@ -355,9 +356,9 @@ const styles: Record<string, React.CSSProperties> = {
     objectFit: 'contain',
   },
   clubName: {
-    fontFamily: "'DM Serif Display', serif",
+    fontFamily: "'DM Sans', sans-serif",
     fontSize: 20,
-    fontWeight: 400,
+    fontWeight: 600,
     color: '#C8102E',
   },
   clubMeta: {

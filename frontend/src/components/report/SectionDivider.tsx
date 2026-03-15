@@ -35,9 +35,9 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   title: {
-    fontFamily: "'DM Serif Display', serif",
-    fontSize: 18,
-    fontWeight: 400,
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 17,
+    fontWeight: 600,
     color: '#1A1A1A',
     whiteSpace: 'nowrap',
   },
