@@ -1,6 +1,6 @@
 /**
- * Elite metrics wedge radar — SkillCorner-inspired pizza chart
- * showing only P85+ metrics with a clean, professional look.
+ * Elite metrics wedge radar — SkillCorner-inspired pizza chart.
+ * No background rect, transparent SVG, full labels (no truncation).
  */
 
 interface WedgeRadarProps {
@@ -13,7 +13,7 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
 
   const cx = size / 2;
   const cy = size / 2;
-  const maxR = size / 2 - 54;
+  const maxR = size / 2 - 70;
   const innerR = maxR * 0.22;
   const n = data.length;
   const wedgeAngle = (2 * Math.PI) / n;
@@ -56,8 +56,6 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
   return (
     <div style={styles.container}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <rect width={size} height={size} rx={12} fill="#FAFAF8" />
-
         {/* Ring guides */}
         {rings.map((pct) => (
           <circle
@@ -86,7 +84,7 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
               d={describeArc(startAngle, endAngle, innerR, rOuter)}
               fill={color}
               opacity={0.75}
-              stroke="#FAFAF8"
+              stroke="#FFFFFF"
               strokeWidth={1.5}
             />
           );
@@ -98,13 +96,12 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
         {/* Labels */}
         {data.map((d, i) => {
           const midAngle = (i + 0.5) * wedgeAngle;
-          const labelR = maxR + 28;
+          const labelR = maxR + 32;
           const lx = cx + labelR * Math.sin(midAngle);
           const ly = cy - labelR * Math.cos(midAngle);
 
           const deg = ((midAngle * 180) / Math.PI) % 360;
           const anchor = deg > 30 && deg < 150 ? 'start' : deg > 210 && deg < 330 ? 'end' : 'middle';
-          const truncated = d.metric.length > 16 ? d.metric.slice(0, 15) + '…' : d.metric;
           const color = getWedgeColor(d.p);
 
           return (
@@ -115,11 +112,11 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
                 textAnchor={anchor}
                 dominantBaseline="middle"
                 fill="#4A4A4A"
-                fontSize={9}
+                fontSize={8.5}
                 fontFamily="'DM Sans', sans-serif"
                 fontWeight={500}
               >
-                {truncated}
+                {d.metric}
               </text>
               <text
                 x={lx}
@@ -127,7 +124,7 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
                 textAnchor={anchor}
                 dominantBaseline="middle"
                 fill={color}
-                fontSize={11}
+                fontSize={10}
                 fontFamily="'JetBrains Mono', monospace"
                 fontWeight={700}
               >
@@ -138,7 +135,7 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
         })}
 
         {/* Center */}
-        <circle cx={cx} cy={cy} r={innerR} fill="#FAFAF8" stroke="#E5E4E0" strokeWidth={1} />
+        <circle cx={cx} cy={cy} r={innerR} fill="#FFFFFF" stroke="#E5E4E0" strokeWidth={1} />
         <text
           x={cx}
           y={cy - 4}
@@ -190,7 +187,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
   legend: {
     display: 'flex',

@@ -79,6 +79,7 @@ export interface ScoutingReportData {
   };
   radarLabels: string[];
   radarValues: number[];
+  allRadarMetrics: Array<{ metric: string; p: number }>;
 }
 
 // ── Helpers ──
@@ -426,31 +427,37 @@ export function useScoutingReport(
                 pct: Math.round(s.similarity_pct),
               }))
             : [],
-          physical: sc?.found && sc.physical_percentiles
+          physical: sc?.found && sc.physical
             ? {
-                sprints: sc.physical?.['sprints'] != null
-                  ? { value: sc.physical['sprints'], p: sc.physical_percentiles['sprints'] ?? 0 }
+                sprints: sc.physical['Sprints/90'] != null
+                  ? { value: sc.physical['Sprints/90'], p: sc.physical_percentiles?.['Sprints/90'] ?? 0 }
                   : null,
-                maxSpeed: sc.physical?.['max_speed'] != null
-                  ? { value: sc.physical['max_speed'], p: sc.physical_percentiles['max_speed'] ?? 0 }
+                maxSpeed: sc.physical['Max Speed (km/h)'] != null
+                  ? { value: sc.physical['Max Speed (km/h)'], p: sc.physical_percentiles?.['Max Speed (km/h)'] ?? 0 }
                   : null,
-                accelerations: sc.physical?.['accelerations'] != null
-                  ? { value: sc.physical['accelerations'], p: sc.physical_percentiles['accelerations'] ?? 0 }
+                accelerations: sc.physical['Accelerations/90'] != null
+                  ? { value: sc.physical['Accelerations/90'], p: sc.physical_percentiles?.['Accelerations/90'] ?? 0 }
                   : null,
-                distance: sc.physical?.['distance'] != null
-                  ? { value: sc.physical['distance'], p: sc.physical_percentiles['distance'] ?? 0 }
+                distance: sc.physical['Distance/90'] != null
+                  ? { value: sc.physical['Distance/90'], p: sc.physical_percentiles?.['Distance/90'] ?? 0 }
                   : null,
-                hiRuns: sc.physical?.['hi_runs'] != null
-                  ? { value: sc.physical['hi_runs'], p: sc.physical_percentiles['hi_runs'] ?? 0 }
+                hiRuns: sc.physical['High Intensity Runs/90'] != null
+                  ? { value: sc.physical['High Intensity Runs/90'], p: sc.physical_percentiles?.['High Intensity Runs/90'] ?? 0 }
                   : null,
-                pressures: sc.physical?.['pressures_p90'] != null
-                  ? { value: sc.physical['pressures_p90'], p: sc.physical_percentiles['pressures_p90'] ?? 0 }
+                pressures: sc.physical['Pressing Index/90'] != null
+                  ? { value: sc.physical['Pressing Index/90'], p: sc.physical_percentiles?.['Pressing Index/90'] ?? 0 }
                   : null,
               }
             : null,
           qualitative: parseQualitative(profile.analises?.analysis_text),
           radarLabels: radar?.labels ?? [],
           radarValues: radar?.values ?? [],
+          allRadarMetrics: radar
+            ? radar.labels.map((label, i) => ({
+                metric: label,
+                p: Math.round(radar.values[i]),
+              })).sort((a, b) => b.p - a.p)
+            : [],
         }
       : null;
 

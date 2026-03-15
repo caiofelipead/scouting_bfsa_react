@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Printer, Loader2, Eye, Zap } from 'lucide-react';
+import { Search, Printer, Loader2, Eye, Zap, Upload } from 'lucide-react';
 import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport } from '../hooks/useScoutingReport';
 import { usePlayers } from '../hooks/usePlayers';
 import ReportHeader from '../components/report/ReportHeader';
@@ -159,6 +159,10 @@ export default function ScoutingReportPage() {
   const [selectedSC, setSelectedSC] = useState<string | null>(null);
   const [showSCDropdown, setShowSCDropdown] = useState(false);
 
+  // Club logo upload
+  const [customClubLogo, setCustomClubLogo] = useState<string | null>(null);
+  const clubLogoInputRef = useRef<HTMLInputElement>(null);
+
   const reportRef = useRef<HTMLDivElement>(null);
 
   const playersQuery = usePlayers({ search: playerSearch, limit: 8 });
@@ -177,6 +181,14 @@ export default function ScoutingReportPage() {
 
   function handlePrint() {
     window.print();
+  }
+
+  function handleClubLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setCustomClubLogo(ev.target?.result as string);
+    reader.readAsDataURL(file);
   }
 
   return (
@@ -419,10 +431,18 @@ export default function ScoutingReportPage() {
 
           {selectedPlayer && data && (
             <>
-              {/* ═══════ PAGE 1: COVER ═══════ */}
+              {/* ═══════ SLIDE 1: COVER ═══════ */}
               <motion.div {...fadeIn(0)}>
                 <ReportPage noPadding>
                   <div style={{ padding: '28px 40px 44px' }}>
+                    {/* Club logo upload */}
+                    <input ref={clubLogoInputRef} type="file" accept="image/*" onChange={handleClubLogoUpload} style={{ display: 'none' }} />
+                    {customClubLogo && (
+                      <img src={customClubLogo} alt="Escudo" style={{ position: 'absolute', top: 20, right: 48, width: 56, height: 56, objectFit: 'contain' }} />
+                    )}
+                    <button className="no-print" onClick={() => clubLogoInputRef.current?.click()} style={styles.uploadShieldBtn}>
+                      <Upload size={10} /> {customClubLogo ? 'Trocar escudo' : 'Escudo PNG'}
+                    </button>
                     <ReportHeader
                       name={data.player.name}
                       badges={data.player.badges}
@@ -441,20 +461,15 @@ export default function ScoutingReportPage() {
                 </ReportPage>
               </motion.div>
 
-              {/* ═══════ PAGE 2: ANÁLISE DESCRITIVA + IDENTIFICAÇÃO ═══════ */}
+              {/* ═══════ SLIDE 2: ANÁLISE DESCRITIVA ═══════ */}
               <motion.div {...fadeIn(0.05)}>
                 <ReportPage>
+                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
                   <SectionDivider number={1} title="Análise Descritiva" />
                   <div style={styles.card}>
-                    {/* Analysis header */}
                     <div style={styles.analysisHeader}>
                       {data.player.clubLogo && (
-                        <img
-                          src={`/api/image-proxy?url=${encodeURIComponent(data.player.clubLogo)}`}
-                          alt={data.player.club}
-                          style={{ width: 32, height: 32, objectFit: 'contain' }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
+                        <img src={`/api/image-proxy?url=${encodeURIComponent(data.player.clubLogo)}`} alt={data.player.club} style={{ width: 32, height: 32, objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       )}
                       <div>
                         <div style={styles.analysisLabel}>ANÁLISE</div>
@@ -464,120 +479,57 @@ export default function ScoutingReportPage() {
                         </div>
                       </div>
                       {data.analysis.modelo && (
-                        <span style={{
-                          ...styles.modeloBadge,
-                          background: data.analysis.modelo === 'Descartado' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
-                          color: data.analysis.modelo === 'Descartado' ? '#ef4444' : '#3b82f6',
-                          border: `1px solid ${data.analysis.modelo === 'Descartado' ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.2)'}`,
-                        }}>
+                        <span style={{ ...styles.modeloBadge, background: data.analysis.modelo === 'Descartado' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)', color: data.analysis.modelo === 'Descartado' ? '#ef4444' : '#3b82f6', border: `1px solid ${data.analysis.modelo === 'Descartado' ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.2)'}` }}>
                           {data.analysis.modelo}
                         </span>
                       )}
                     </div>
-
-                    {/* Score grades */}
                     {Object.keys(data.analysis.scores).length > 0 && (
                       <div style={styles.scoresGrid}>
                         {Object.entries(data.analysis.scores).map(([key, value]) => {
                           const label = key === 'Nota_Desempenho' ? 'Desempenho' : key === 'Técnica' ? 'Técnica' : key;
                           const scoreColor = value >= 4 ? '#1B9E5A' : value >= 3 ? '#3B82F6' : value >= 2 ? '#D97706' : '#C8102E';
-                          return (
-                            <div key={key} style={styles.scoreBox}>
-                              <div style={styles.scoreLabel}>{label}</div>
-                              <div style={{ ...styles.scoreValue, color: scoreColor }}>
-                                {value.toFixed(1)}
-                              </div>
-                            </div>
-                          );
+                          return (<div key={key} style={styles.scoreBox}><div style={styles.scoreLabel}>{label}</div><div style={{ ...styles.scoreValue, color: scoreColor }}>{value.toFixed(1)}</div></div>);
                         })}
                       </div>
                     )}
-
-                    {/* Analysis text */}
-                    <div
-                      style={styles.analysisText}
-                      contentEditable
-                      suppressContentEditableWarning
-                    >
+                    <div style={styles.analysisText} contentEditable suppressContentEditableWarning>
                       {data.analysis.text || 'Análise descritiva não disponível para este jogador. Clique aqui para inserir manualmente.'}
                     </div>
-
-                    {/* Financial info */}
                     {(data.analysis.faixaSalarial || data.analysis.transferLuvas) && (
                       <div style={styles.financialRow}>
-                        {data.analysis.faixaSalarial && (
-                          <div style={styles.financialTag}>
-                            <span style={{ color: C.textTertiary }}>Salário:</span>{' '}
-                            <span style={{ fontWeight: 600 }}>{data.analysis.faixaSalarial}</span>
-                          </div>
-                        )}
-                        {data.analysis.transferLuvas && (
-                          <div style={styles.financialTag}>
-                            <span style={{ color: C.textTertiary }}>Transfer/Luvas:</span>{' '}
-                            <span style={{ fontWeight: 600 }}>{data.analysis.transferLuvas}</span>
-                          </div>
-                        )}
+                        {data.analysis.faixaSalarial && (<div style={styles.financialTag}><span style={{ color: C.textTertiary }}>Salário:</span> <span style={{ fontWeight: 600 }}>{data.analysis.faixaSalarial}</span></div>)}
+                        {data.analysis.transferLuvas && (<div style={styles.financialTag}><span style={{ color: C.textTertiary }}>Transfer/Luvas:</span> <span style={{ fontWeight: 600 }}>{data.analysis.transferLuvas}</span></div>)}
                       </div>
                     )}
                   </div>
+                </ReportPage>
+              </motion.div>
 
-                  {/* Identificação & Veredito */}
+              {/* ═══════ SLIDE 3: IDENTIFICAÇÃO & VEREDITO ═══════ */}
+              <motion.div {...fadeIn(0.1)}>
+                <ReportPage>
+                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
                   <SectionDivider number={2} title="Identificação & Veredito Preditivo" />
                   <div style={styles.grid2}>
-                    {/* Left: Player ID */}
                     <div style={styles.card}>
                       <h3 style={styles.cardTitle}>Dados do Jogador</h3>
                       <div style={styles.idGrid}>
-                        {[
-                          ['Nome', data.player.name],
-                          ['Idade', data.player.age ? `${data.player.age} anos` : '—'],
-                          ['Posição', data.player.position],
-                          ['Altura', data.player.height],
-                          ['Pé', data.player.foot],
-                          ['Clube', data.player.club],
-                          ['Liga', data.player.league],
-                          ['Contrato', data.player.contract],
-                        ].map(([label, value]) => (
-                          <div key={label} style={styles.idRow}>
-                            <span style={styles.idLabel}>{label}</span>
-                            <span style={styles.idValue}>{value}</span>
-                          </div>
+                        {[['Nome', data.player.name], ['Idade', data.player.age ? `${data.player.age} anos` : '—'], ['Posição', data.player.position], ['Altura', data.player.height], ['Pé', data.player.foot], ['Clube', data.player.club], ['Liga', data.player.league], ['Contrato', data.player.contract]].map(([label, value]) => (
+                          <div key={label} style={styles.idRow}><span style={styles.idLabel}>{label}</span><span style={styles.idValue}>{value}</span></div>
                         ))}
                       </div>
                     </div>
-
-                    {/* Right: Verdict */}
                     <div>
                       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-                        <StatBox
-                          label="Impact Score"
-                          value={data.predict.impactScore.toFixed(1)}
-                          color={C.green}
-                          subtitle="SSP / 10"
-                        />
-                        <StatBox
-                          label="P(Sucesso)"
-                          value={`${data.predict.pSuccess}%`}
-                          color={C.blue}
-                        />
-                        <StatBox
-                          label="Risco"
-                          value={data.predict.risk}
-                          color={data.predict.riskColor}
-                        />
+                        <StatBox label="Impact Score" value={data.predict.impactScore.toFixed(1)} color={C.green} subtitle="SSP / 10" />
+                        <StatBox label="P(Sucesso)" value={`${data.predict.pSuccess}%`} color={C.blue} />
+                        <StatBox label="Risco" value={data.predict.risk} color={data.predict.riskColor} />
                       </div>
-                      {predictionLoading ? (
-                        <Skeleton width="100%" height={80} />
-                      ) : (
+                      {predictionLoading ? <Skeleton width="100%" height={80} /> : (
                         <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}` }}>
                           <div style={styles.verdictLabel}>VEREDITO</div>
-                          <p
-                            style={styles.verdictText}
-                            contentEditable
-                            suppressContentEditableWarning
-                          >
-                            {data.predict.verdict}
-                          </p>
+                          <p style={styles.verdictText} contentEditable suppressContentEditableWarning>{data.predict.verdict}</p>
                         </div>
                       )}
                     </div>
@@ -585,297 +537,165 @@ export default function ScoutingReportPage() {
                 </ReportPage>
               </motion.div>
 
-              {/* ═══════ PAGE 3: FOUR CORNERS + RADAR ═══════ */}
-              <motion.div {...fadeIn(0.1)}>
+              {/* ═══════ SLIDE 4: FOUR CORNERS ═══════ */}
+              <motion.div {...fadeIn(0.15)}>
                 <ReportPage>
+                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
                   <SectionDivider number={3} title="Matriz Qualitativa — Four Corners" />
                   <div style={styles.grid2x2}>
-                    {(
-                      [
-                        { key: 'tactical' as const, label: 'TÁTICO', color: QUADRANT.tactical },
-                        { key: 'technical' as const, label: 'TÉCNICO', color: QUADRANT.technical },
-                        { key: 'physical' as const, label: 'FÍSICO', color: QUADRANT.physical },
-                        { key: 'mental' as const, label: 'MENTAL', color: QUADRANT.mental },
-                      ] as const
-                    ).map((q) => (
-                      <div
-                        key={q.key}
-                        style={{ ...styles.cardElevated, borderTop: `3px solid ${q.color}` }}
-                      >
+                    {([
+                      { key: 'tactical' as const, label: 'TÁTICO', color: QUADRANT.tactical },
+                      { key: 'technical' as const, label: 'TÉCNICO', color: QUADRANT.technical },
+                      { key: 'physical' as const, label: 'FÍSICO', color: QUADRANT.physical },
+                      { key: 'mental' as const, label: 'MENTAL', color: QUADRANT.mental },
+                    ] as const).map((q) => (
+                      <div key={q.key} style={{ ...styles.cardElevated, borderTop: `3px solid ${q.color}` }}>
                         <div style={{ ...styles.quadrantLabel, color: q.color }}>{q.label}</div>
                         <ul style={styles.bulletList}>
                           {data.qualitative[q.key].map((item, i) => (
-                            <li
-                              key={i}
-                              style={styles.bulletItem}
-                              contentEditable
-                              suppressContentEditableWarning
-                            >
-                              {item}
-                            </li>
+                            <li key={i} style={styles.bulletItem} contentEditable suppressContentEditableWarning>{item}</li>
                           ))}
                         </ul>
                       </div>
                     ))}
                   </div>
+                </ReportPage>
+              </motion.div>
 
-                  {/* Índices Compostos */}
+              {/* ═══════ SLIDE 5: RADAR ÍNDICES ═══════ */}
+              <motion.div {...fadeIn(0.2)}>
+                <ReportPage>
+                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
                   <SectionDivider number={4} title="Índices Compostos & Filtro de Elite" />
                   <div style={styles.grid2}>
-                    {/* Radar */}
-                    <div style={styles.card}>
-                      <h3 style={styles.cardTitle}>Radar de Índices</h3>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                       {data.composites.length ? (
-                        <ReportRadar data={data.composites} size={300} />
-                      ) : (
-                        <Skeleton width="100%" height={300} />
-                      )}
+                        <ReportRadar data={data.composites} size={420} />
+                      ) : <Skeleton width="100%" height={300} />}
                     </div>
-
-                    {/* Elite filter table */}
                     <div style={styles.card}>
                       <h3 style={styles.cardTitle}>Filtro de Elite (P85+)</h3>
                       {data.eliteMetrics.length ? (
                         <>
                           <div style={styles.eliteSummary}>
                             <span style={styles.eliteCount}>{data.eliteMetrics.length}</span>
-                            <span style={styles.eliteSummaryText}>
-                              métricas no nível elite
-                            </span>
+                            <span style={styles.eliteSummaryText}>métricas no nível elite</span>
                           </div>
-                          <table style={styles.table}>
-                            <thead>
-                              <tr>
-                                <th style={styles.th}>Métrica</th>
-                                <th style={{ ...styles.th, textAlign: 'center' }}>Percentil</th>
-                                <th style={styles.th}>Impacto</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {data.eliteMetrics.map((m, i) => (
-                                <tr
-                                  key={i}
-                                  style={{
-                                    background: i % 2 === 0 ? C.bgCard : C.bgSubtle,
-                                  }}
-                                >
-                                  <td style={styles.td}>{m.metric}</td>
-                                  <td style={{ ...styles.td, textAlign: 'center' }}>
-                                    <span
-                                      style={{
-                                        ...styles.pBadge,
-                                        background:
-                                          m.p >= 95 ? C.green : m.p >= 90 ? C.teal : C.amber,
-                                        color: '#fff',
-                                      }}
-                                    >
-                                      P{m.p}
-                                    </span>
-                                  </td>
-                                  <td style={{ ...styles.td, color: C.textTertiary, fontSize: 11 }}>
-                                    {m.impact}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
+                          <table style={styles.table}><thead><tr><th style={styles.th}>Métrica</th><th style={{ ...styles.th, textAlign: 'center' }}>Percentil</th><th style={styles.th}>Impacto</th></tr></thead>
+                            <tbody>{data.eliteMetrics.map((m, i) => (<tr key={i} style={{ background: i % 2 === 0 ? C.bgCard : C.bgSubtle }}><td style={styles.td}>{m.metric}</td><td style={{ ...styles.td, textAlign: 'center' }}><span style={{ ...styles.pBadge, background: m.p >= 95 ? C.green : m.p >= 90 ? C.teal : C.amber, color: '#fff' }}>P{m.p}</span></td><td style={{ ...styles.td, color: C.textTertiary, fontSize: 11 }}>{m.impact}</td></tr>))}</tbody>
                           </table>
                         </>
-                      ) : (
-                        <p style={styles.placeholder}>Nenhuma métrica P85+ encontrada</p>
-                      )}
+                      ) : <p style={styles.placeholder}>Nenhuma métrica P85+ encontrada</p>}
                     </div>
                   </div>
                 </ReportPage>
               </motion.div>
 
-              {/* ═══════ PAGE 4: WEDGE RADAR + DELTA ═══════ */}
-              <motion.div {...fadeIn(0.15)}>
+              {/* ═══════ SLIDE 6: RADAR COMPLETO DE MÉTRICAS DA POSIÇÃO + WEDGE ELITE ═══════ */}
+              <motion.div {...fadeIn(0.25)}>
                 <ReportPage>
-                  <SectionDivider number={5} title="Radar Wedge — Métricas Elite" />
-                  <div style={styles.card}>
-                    {data.eliteMetrics.length ? (
-                      <WedgeRadar data={data.eliteMetrics} size={300} />
-                    ) : (
-                      <p style={styles.placeholder}>
-                        Sem métricas de elite suficientes para o radar wedge
-                      </p>
-                    )}
+                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
+                  <SectionDivider number={5} title="Radar de Métricas — Visão Completa" />
+                  <div style={styles.grid2}>
+                    {/* Full position metrics radar */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <h3 style={{ ...styles.cardTitle, textAlign: 'center' }}>Todas as Métricas da Posição</h3>
+                      {data.allRadarMetrics.length ? (
+                        <WedgeRadar data={data.allRadarMetrics} size={420} />
+                      ) : <Skeleton width="100%" height={300} />}
+                    </div>
+                    {/* Elite wedge */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <h3 style={{ ...styles.cardTitle, textAlign: 'center' }}>Métricas Elite (P85+)</h3>
+                      {data.eliteMetrics.length ? (
+                        <WedgeRadar data={data.eliteMetrics} size={420} />
+                      ) : <p style={styles.placeholder}>Sem métricas de elite suficientes</p>}
+                    </div>
                   </div>
+                </ReportPage>
+              </motion.div>
 
-                  {/* Delta vs Titular */}
+              {/* ═══════ SLIDE 7: DELTA VS TITULAR ═══════ */}
+              <motion.div {...fadeIn(0.3)}>
+                <ReportPage>
+                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
                   <SectionDivider number={6} title="Delta vs. Titular — Squad Impact" />
                   <div style={styles.card}>
                     {!selectedIncumbent ? (
-                      <p style={styles.placeholder}>
-                        Selecione um titular na barra acima para gerar a comparação Delta
-                      </p>
+                      <p style={styles.placeholder}>Selecione um titular na barra acima para gerar a comparação Delta</p>
                     ) : comparisonLoading ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <Skeleton width="100%" height={100} />
-                        <Skeleton width="100%" height={200} />
-                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}><Skeleton width="100%" height={100} /><Skeleton width="100%" height={200} /></div>
                     ) : data.delta.length ? (
                       <>
-                        <DeltaChart
-                          data={data.delta}
-                          playerName={data.player.name}
-                          incumbentName={selectedIncumbent}
-                        />
+                        <DeltaChart data={data.delta} playerName={data.player.name} incumbentName={selectedIncumbent} />
                         <div style={{ marginTop: 20 }}>
-                          <div
-                            style={styles.quoteBox}
-                            contentEditable
-                            suppressContentEditableWarning
-                          >
-                            Impacto projetado na composição do elenco: adicione sua análise aqui.
-                          </div>
+                          <div style={styles.quoteBox} contentEditable suppressContentEditableWarning>Impacto projetado na composição do elenco: adicione sua análise aqui.</div>
                         </div>
                       </>
-                    ) : (
-                      <p style={styles.placeholder}>Dados de comparação indisponíveis</p>
-                    )}
+                    ) : <p style={styles.placeholder}>Dados de comparação indisponíveis</p>}
                   </div>
                 </ReportPage>
               </motion.div>
 
-              {/* ═══════ PAGE 5: SKILLCORNER + SIMILARES ═══════ */}
-              <motion.div {...fadeIn(0.2)}>
+              {/* ═══════ SLIDE 8: SKILLCORNER ═══════ */}
+              <motion.div {...fadeIn(0.35)}>
                 <ReportPage>
+                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
                   <SectionDivider number={7} title="Dados Físicos — SkillCorner" />
                   {selectedSC && (
-                    <div style={{ ...styles.scTag, marginBottom: 12 }}>
-                      <Zap size={12} />
-                      SkillCorner: <strong>{selectedSC}</strong>
-                    </div>
+                    <div style={{ ...styles.scTag, marginBottom: 12 }}><Zap size={12} /> SkillCorner: <strong>{selectedSC}</strong></div>
                   )}
                   {skillCornerLoading ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                      <Skeleton width="100%" height={200} />
-                      <Skeleton width="100%" height={200} />
-                      <Skeleton width="100%" height={200} />
-                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}><Skeleton width="100%" height={200} /><Skeleton width="100%" height={200} /><Skeleton width="100%" height={200} /></div>
                   ) : data.physical ? (
                     <div style={styles.grid3}>
-                      {/* Velocity */}
-                      <div style={styles.card}>
-                        <h4 style={styles.physTitle}>Velocidade</h4>
-                        <PhysicalBar
-                          label="Vel. Máxima"
-                          data={data.physical.maxSpeed}
-                          unit="km/h"
-                        />
-                        <PhysicalBar
-                          label="Sprints p90"
-                          data={data.physical.sprints}
-                          unit="/90"
-                        />
-                      </div>
-                      {/* Endurance */}
-                      <div style={styles.card}>
-                        <h4 style={styles.physTitle}>Resistência</h4>
-                        <PhysicalBar
-                          label="Distância"
-                          data={data.physical.distance}
-                          unit="km"
-                        />
-                        <PhysicalBar
-                          label="High Runs"
-                          data={data.physical.hiRuns}
-                          unit="/90"
-                        />
-                      </div>
-                      {/* Explosiveness */}
-                      <div style={styles.card}>
-                        <h4 style={styles.physTitle}>Explosividade</h4>
-                        <PhysicalBar
-                          label="Acelerações"
-                          data={data.physical.accelerations}
-                          unit="/90"
-                        />
-                        <PhysicalBar
-                          label="Pressões"
-                          data={data.physical.pressures}
-                          unit="/90"
-                        />
-                      </div>
+                      <div style={styles.card}><h4 style={styles.physTitle}>Velocidade</h4><PhysicalBar label="Vel. Máxima" data={data.physical.maxSpeed} unit="km/h" /><PhysicalBar label="Sprints p90" data={data.physical.sprints} unit="/90" /></div>
+                      <div style={styles.card}><h4 style={styles.physTitle}>Resistência</h4><PhysicalBar label="Distância" data={data.physical.distance} unit="km" /><PhysicalBar label="High Runs" data={data.physical.hiRuns} unit="/90" /></div>
+                      <div style={styles.card}><h4 style={styles.physTitle}>Explosividade</h4><PhysicalBar label="Acelerações" data={data.physical.accelerations} unit="/90" /><PhysicalBar label="Pressões" data={data.physical.pressures} unit="/90" /></div>
                     </div>
                   ) : (
                     <div style={{ ...styles.card, borderLeft: `3px solid ${C.amber}` }}>
                       <p style={{ ...styles.placeholder, color: C.amber }}>
-                        {selectedSC
-                          ? `Dados SkillCorner não encontrados para "${selectedSC}".`
-                          : 'Selecione um jogador no seletor SkillCorner para carregar dados físicos.'}
+                        {selectedSC ? `Dados SkillCorner não encontrados para "${selectedSC}".` : 'Selecione um jogador no seletor SkillCorner para carregar dados físicos.'}
                       </p>
                       <div style={styles.grid3}>
                         {['Velocidade', 'Resistência', 'Explosividade'].map((cat) => (
-                          <div key={cat} style={styles.card}>
-                            <h4 style={styles.physTitle}>{cat}</h4>
-                            <div
-                              contentEditable
-                              suppressContentEditableWarning
-                              style={styles.editablePlaceholder}
-                            >
-                              Inserir dados manualmente
-                            </div>
-                          </div>
+                          <div key={cat} style={styles.card}><h4 style={styles.physTitle}>{cat}</h4><div contentEditable suppressContentEditableWarning style={styles.editablePlaceholder}>Inserir dados manualmente</div></div>
                         ))}
                       </div>
                     </div>
                   )}
+                </ReportPage>
+              </motion.div>
 
-                  {/* Contingência — Similares */}
+              {/* ═══════ SLIDE 9: SIMILARES ═══════ */}
+              <motion.div {...fadeIn(0.4)}>
+                <ReportPage>
+                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
                   <SectionDivider number={8} title="Contingência — Jogadores Similares" />
                   <div style={styles.grid2}>
-                    {/* Similar players */}
                     <div style={styles.card}>
                       <h3 style={styles.cardTitle}>Top 3 Similares</h3>
                       {similarityLoading ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                          <Skeleton width="100%" height={48} />
-                          <Skeleton width="100%" height={48} />
-                          <Skeleton width="100%" height={48} />
-                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}><Skeleton width="100%" height={48} /><Skeleton width="100%" height={48} /><Skeleton width="100%" height={48} /></div>
                       ) : data.similar.length ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                           {data.similar.map((s, i) => (
                             <div key={i} style={styles.similarRow}>
                               <div style={styles.similarRank}>{i + 1}</div>
-                              <div style={{ flex: 1 }}>
-                                <div style={styles.similarName}>{s.name}</div>
-                                <div style={styles.similarClub}>{s.club}</div>
-                              </div>
+                              <div style={{ flex: 1 }}><div style={styles.similarName}>{s.name}</div><div style={styles.similarClub}>{s.club}</div></div>
                               <div style={styles.similarPct}>{s.pct}%</div>
-                              <div style={styles.progressTrack}>
-                                <div
-                                  style={{
-                                    ...styles.progressBar,
-                                    width: `${s.pct}%`,
-                                  }}
-                                />
-                              </div>
+                              <div style={styles.progressTrack}><div style={{ ...styles.progressBar, width: `${s.pct}%` }} /></div>
                             </div>
                           ))}
                         </div>
-                      ) : (
-                        <p style={styles.placeholder}>Sem jogadores similares encontrados</p>
-                      )}
+                      ) : <p style={styles.placeholder}>Sem jogadores similares encontrados</p>}
                     </div>
-
-                    {/* Analytical observation */}
                     <div style={styles.card}>
                       <h3 style={styles.cardTitle}>Observação Analítica</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         {['Nível Competitivo', 'Valor de Mercado', 'Estratégia'].map((field) => (
-                          <div key={field}>
-                            <div style={styles.obsLabel}>{field}</div>
-                            <div
-                              contentEditable
-                              suppressContentEditableWarning
-                              style={styles.obsField}
-                            >
-                              Inserir observação...
-                            </div>
-                          </div>
+                          <div key={field}><div style={styles.obsLabel}>{field}</div><div contentEditable suppressContentEditableWarning style={styles.obsField}>Inserir observação...</div></div>
                         ))}
                       </div>
                     </div>
@@ -883,78 +703,28 @@ export default function ScoutingReportPage() {
                 </ReportPage>
               </motion.div>
 
-              {/* ═══════ PAGE 6: CONCLUSÃO ═══════ */}
-              <motion.div {...fadeIn(0.25)}>
+              {/* ═══════ SLIDE 10: CONCLUSÃO ═══════ */}
+              <motion.div {...fadeIn(0.45)}>
                 <ReportPage>
+                  {customClubLogo && <img src={customClubLogo} alt="" style={{ position: 'absolute', top: 20, right: 48, width: 44, height: 44, objectFit: 'contain' }} />}
                   <SectionDivider number={9} title="Conclusão & Recomendação" />
                   <div style={styles.grid3}>
-                    {/* Veredito Final */}
                     <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}` }}>
-                      <div style={{ ...styles.quadrantLabel, color: C.green }}>
-                        VEREDITO FINAL
-                      </div>
-                      <div
-                        contentEditable
-                        suppressContentEditableWarning
-                        style={styles.conclusionText}
-                      >
-                        Jogador apresenta perfil compatível com as necessidades do elenco. Recomendação de avanço nas tratativas.
-                      </div>
+                      <div style={{ ...styles.quadrantLabel, color: C.green }}>VEREDITO FINAL</div>
+                      <div contentEditable suppressContentEditableWarning style={styles.conclusionText}>Jogador apresenta perfil compatível com as necessidades do elenco. Recomendação de avanço nas tratativas.</div>
                     </div>
-
-                    {/* Negociação */}
                     <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.red}` }}>
                       <div style={{ ...styles.quadrantLabel, color: C.red }}>NEGOCIAÇÃO</div>
-                      <ul style={styles.bulletList}>
-                        {[
-                          'Definir teto salarial',
-                          'Avaliar cláusulas contratuais',
-                          'Consultar agente do jogador',
-                        ].map((item, i) => (
-                          <li
-                            key={i}
-                            style={styles.bulletItem}
-                            contentEditable
-                            suppressContentEditableWarning
-                          >
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
+                      <ul style={styles.bulletList}>{['Definir teto salarial', 'Avaliar cláusulas contratuais', 'Consultar agente do jogador'].map((item, i) => (<li key={i} style={styles.bulletItem} contentEditable suppressContentEditableWarning>{item}</li>))}</ul>
                     </div>
-
-                    {/* Desenvolvimento */}
                     <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.amber}` }}>
-                      <div style={{ ...styles.quadrantLabel, color: C.amber }}>
-                        DESENVOLVIMENTO
-                      </div>
-                      <ul style={styles.bulletList}>
-                        {[
-                          'Plano de adaptação tática',
-                          'Acompanhamento físico',
-                          'Integração com elenco',
-                        ].map((item, i) => (
-                          <li
-                            key={i}
-                            style={styles.bulletItem}
-                            contentEditable
-                            suppressContentEditableWarning
-                          >
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
+                      <div style={{ ...styles.quadrantLabel, color: C.amber }}>DESENVOLVIMENTO</div>
+                      <ul style={styles.bulletList}>{['Plano de adaptação tática', 'Acompanhamento físico', 'Integração com elenco'].map((item, i) => (<li key={i} style={styles.bulletItem} contentEditable suppressContentEditableWarning>{item}</li>))}</ul>
                     </div>
                   </div>
-
-                  {/* Recommendation banner */}
                   <div style={styles.recBanner}>
                     <div style={styles.recTitle}>RECOMENDAÇÃO</div>
-                    <div
-                      contentEditable
-                      suppressContentEditableWarning
-                      style={styles.recText}
-                    >
+                    <div contentEditable suppressContentEditableWarning style={styles.recText}>
                       {data.predict.risk.toLowerCase().includes('baix') || data.predict.risk.toLowerCase() === 'low'
                         ? `AVANÇAR — Jogador com P(Sucesso) de ${data.predict.pSuccess}% e perfil de risco baixo. Recomendamos avanço imediato nas negociações.`
                         : data.predict.risk.toLowerCase().includes('med')
@@ -1562,6 +1332,24 @@ const styles: Record<string, React.CSSProperties> = {
     background: C.bgSubtle,
     borderRadius: 6,
     border: `1px solid ${C.bgMuted}`,
+  },
+  uploadShieldBtn: {
+    position: 'absolute',
+    top: 22,
+    right: 120,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '4px 10px',
+    borderRadius: 6,
+    border: `1px solid ${C.bgMuted}`,
+    background: C.bgCard,
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 10,
+    fontWeight: 500,
+    color: C.textSecondary,
+    cursor: 'pointer',
+    zIndex: 5,
   },
   scTag: {
     fontFamily: "'DM Sans', sans-serif",

@@ -1,7 +1,6 @@
 /**
  * Pizza / Wedge radar chart inspired by SkillCorner's radar tool.
  * Each metric gets a wedge (slice) whose radius encodes the percentile value.
- * Color-coded by percentile tier with a clean, light aesthetic.
  */
 
 interface ReportRadarProps {
@@ -14,11 +13,11 @@ export default function ReportRadar({ data, size = 400 }: ReportRadarProps) {
 
   const cx = size / 2;
   const cy = size / 2;
-  const maxR = size / 2 - 56;
+  const maxR = size / 2 - 70;
   const innerR = maxR * 0.15;
   const n = data.length;
   const wedgeAngle = (2 * Math.PI) / n;
-  const gap = 0.025; // gap between wedges in radians
+  const gap = 0.025;
 
   function getColor(v: number): string {
     if (v >= 90) return '#1B9E5A';
@@ -59,9 +58,6 @@ export default function ReportRadar({ data, size = 400 }: ReportRadarProps) {
   return (
     <div style={styles.container}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        {/* Background */}
-        <rect width={size} height={size} rx={12} fill="#FAFAF8" />
-
         {/* Ring guides */}
         {rings.map((pct) => (
           <circle
@@ -80,29 +76,17 @@ export default function ReportRadar({ data, size = 400 }: ReportRadarProps) {
         {rings.map((pct) => {
           const r = innerR + ((maxR - innerR) * pct) / 100;
           return (
-            <g key={`lbl-${pct}`}>
-              <rect
-                x={cx + 2}
-                y={cy - r - 6}
-                width={pct === 100 ? 22 : 16}
-                height={12}
-                rx={3}
-                fill="#FAFAF8"
-                stroke="#E5E4E0"
-                strokeWidth={0.5}
-              />
-              <text
-                x={cx + (pct === 100 ? 13 : 10)}
-                y={cy - r + 1}
-                textAnchor="middle"
-                fill="#B0B0B0"
-                fontSize={7}
-                fontFamily="'JetBrains Mono', monospace"
-                fontWeight={500}
-              >
-                {pct}
-              </text>
-            </g>
+            <text
+              key={`lbl-${pct}`}
+              x={cx + 4}
+              y={cy - r + 3}
+              fill="#B0B0B0"
+              fontSize={7}
+              fontFamily="'JetBrains Mono', monospace"
+              fontWeight={500}
+            >
+              {pct}
+            </text>
           );
         })}
 
@@ -138,7 +122,7 @@ export default function ReportRadar({ data, size = 400 }: ReportRadarProps) {
               d={describeArc(startAngle, endAngle, innerR, rOuter)}
               fill={color}
               opacity={0.75}
-              stroke="#FAFAF8"
+              stroke="#FFFFFF"
               strokeWidth={1.5}
             />
           );
@@ -150,13 +134,12 @@ export default function ReportRadar({ data, size = 400 }: ReportRadarProps) {
         {/* Labels */}
         {data.map((d, i) => {
           const midAngle = (i + 0.5) * wedgeAngle;
-          const labelR = maxR + 28;
+          const labelR = maxR + 32;
           const lx = cx + labelR * Math.sin(midAngle);
           const ly = cy - labelR * Math.cos(midAngle);
 
           const deg = ((midAngle * 180) / Math.PI) % 360;
           const anchor = deg > 30 && deg < 150 ? 'start' : deg > 210 && deg < 330 ? 'end' : 'middle';
-          const truncated = d.name.length > 14 ? d.name.slice(0, 13) + '…' : d.name;
           const color = getColor(d.value);
 
           return (
@@ -167,11 +150,11 @@ export default function ReportRadar({ data, size = 400 }: ReportRadarProps) {
                 textAnchor={anchor}
                 dominantBaseline="middle"
                 fill="#4A4A4A"
-                fontSize={9}
+                fontSize={8.5}
                 fontFamily="'DM Sans', sans-serif"
                 fontWeight={500}
               >
-                {truncated}
+                {d.name}
               </text>
               <text
                 x={lx}
@@ -179,7 +162,7 @@ export default function ReportRadar({ data, size = 400 }: ReportRadarProps) {
                 textAnchor={anchor}
                 dominantBaseline="middle"
                 fill={color}
-                fontSize={11}
+                fontSize={10}
                 fontFamily="'JetBrains Mono', monospace"
                 fontWeight={700}
               >
@@ -190,7 +173,7 @@ export default function ReportRadar({ data, size = 400 }: ReportRadarProps) {
         })}
 
         {/* Center circle */}
-        <circle cx={cx} cy={cy} r={innerR} fill="#FAFAF8" stroke="#E5E4E0" strokeWidth={1} />
+        <circle cx={cx} cy={cy} r={innerR} fill="#FFFFFF" stroke="#E5E4E0" strokeWidth={1} />
         <text
           x={cx}
           y={cy - 4}
@@ -246,7 +229,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
   legend: {
     display: 'flex',
