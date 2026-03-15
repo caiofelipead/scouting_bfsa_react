@@ -130,12 +130,22 @@ const pageStyles: Record<string, React.CSSProperties> = {
 // ── Slide scaler: scales 1440px slides to fit viewport ──
 function SlideScaler({ children }: { children: React.ReactNode }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(0.7); // Start small to prevent flash of oversized content
 
   useEffect(() => {
     function updateScale() {
-      if (!wrapperRef.current?.parentElement) return;
-      const availableWidth = wrapperRef.current.parentElement.clientWidth;
+      if (!wrapperRef.current) return;
+      // Walk up to find the report container (the element with constrained width)
+      // Skip motion.div wrappers that shrink-to-fit their content
+      let container = wrapperRef.current.parentElement;
+      while (container && container.clientWidth >= PAGE_WIDTH) {
+        if (container.parentElement) {
+          container = container.parentElement;
+        } else {
+          break;
+        }
+      }
+      const availableWidth = container ? container.clientWidth - 48 : window.innerWidth - 260;
       const s = Math.min(1, availableWidth / PAGE_WIDTH);
       setScale(s);
     }
@@ -151,6 +161,7 @@ function SlideScaler({ children }: { children: React.ReactNode }) {
         width: PAGE_WIDTH * scale,
         height: PAGE_HEIGHT * scale,
         marginBottom: 24,
+        margin: '0 auto 24px',
       }}
     >
       <div style={{
@@ -1049,11 +1060,10 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   report: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
     padding: '0 24px 60px',
     flexGrow: 1,
+    overflowX: 'hidden',
+    boxSizing: 'border-box',
   },
   emptyState: {
     display: 'flex',
