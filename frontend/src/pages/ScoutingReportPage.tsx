@@ -761,7 +761,7 @@ export default function ScoutingReportPage() {
                       )}
                       <div>
                         <div style={styles.analysisLabel}>ANÁLISE</div>
-                        <div style={styles.analysisPlayerName}>
+                        <div style={styles.analysisPlayerName} contentEditable suppressContentEditableWarning>
                           <span style={{ fontWeight: 700 }}>{data.player.name.split(' ')[0]?.toUpperCase()}</span>{' '}
                           {data.player.name.split(' ').slice(1).join(' ').toUpperCase()}
                         </div>
@@ -777,7 +777,7 @@ export default function ScoutingReportPage() {
                         {Object.entries(data.analysis.scores).map(([key, value]) => {
                           const label = key === 'Nota_Desempenho' ? 'Desempenho' : key === 'Técnica' ? 'Técnica' : key;
                           const scoreColor = value >= 4 ? '#1B9E5A' : value >= 3 ? '#3B82F6' : value >= 2 ? '#D97706' : '#C8102E';
-                          return (<div key={key} style={styles.scoreBox}><div style={styles.scoreLabel}>{label}</div><div style={{ ...styles.scoreValue, color: scoreColor }}>{value.toFixed(1)}</div></div>);
+                          return (<div key={key} style={styles.scoreBox}><div style={styles.scoreLabel}>{label}</div><div style={{ ...styles.scoreValue, color: scoreColor }} contentEditable suppressContentEditableWarning>{value.toFixed(1)}</div></div>);
                         })}
                       </div>
                     )}
@@ -786,8 +786,8 @@ export default function ScoutingReportPage() {
                     </div>
                     {(data.analysis.faixaSalarial || data.analysis.transferLuvas) && (
                       <div style={styles.financialRow}>
-                        {data.analysis.faixaSalarial && (<div style={styles.financialTag}><span style={{ color: C.textTertiary }}>Salário:</span> <span style={{ fontWeight: 600 }}>{data.analysis.faixaSalarial}</span></div>)}
-                        {data.analysis.transferLuvas && (<div style={styles.financialTag}><span style={{ color: C.textTertiary }}>Transfer/Luvas:</span> <span style={{ fontWeight: 600 }}>{data.analysis.transferLuvas}</span></div>)}
+                        {data.analysis.faixaSalarial && (<div style={styles.financialTag} contentEditable suppressContentEditableWarning><span style={{ color: C.textTertiary }}>Salário:</span> <span style={{ fontWeight: 600 }}>{data.analysis.faixaSalarial}</span></div>)}
+                        {data.analysis.transferLuvas && (<div style={styles.financialTag} contentEditable suppressContentEditableWarning><span style={{ color: C.textTertiary }}>Transfer/Luvas:</span> <span style={{ fontWeight: 600 }}>{data.analysis.transferLuvas}</span></div>)}
                       </div>
                     )}
                   </div>
@@ -804,19 +804,19 @@ export default function ScoutingReportPage() {
                       <h3 style={styles.cardTitle}>Dados do Jogador</h3>
                       <div style={styles.idGrid}>
                         {[['Nome', data.player.name], ['Idade', data.player.age ? `${data.player.age} anos` : '—'], ['Posição', data.player.position], ['Altura', data.player.height], ['Pé', data.player.foot], ['Clube', data.player.club], ['Liga', data.player.league], ['Contrato', data.player.contract]].map(([label, value]) => (
-                          <div key={label} style={styles.idRow}><span style={styles.idLabel}>{label}</span><span style={styles.idValue}>{value}</span></div>
+                          <div key={label} style={styles.idRow}><span style={styles.idLabel}>{label}</span><span style={styles.idValue} contentEditable suppressContentEditableWarning>{value}</span></div>
                         ))}
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' as const }}>
                       <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-                        <StatBox label="Impact Score" value={data.predict.impactScore.toFixed(1)} color={C.green} subtitle="SSP / 10" />
+                        <StatBox label="Impact Score" value={data.predict.impactScore.toFixed(1)} color={C.green} subtitle="SSP" />
                         <StatBox label="P(Sucesso)" value={`${data.predict.pSuccess}%`} color={C.blue} />
                         <StatBox label="Risco" value={data.predict.risk} color={data.predict.riskColor} />
                       </div>
                       <div style={styles.legendBox}>
-                        <div style={styles.legendEntry}><strong>Impact Score (SSP):</strong> Índice composto de desempenho do jogador (0-10), calculado a partir de métricas ponderadas da posição.</div>
-                        <div style={styles.legendEntry}><strong>P(Sucesso):</strong> Probabilidade estimada de sucesso na adaptação ao elenco, baseada em modelo preditivo com variáveis técnicas, táticas e contextuais.</div>
+                        <div style={styles.legendEntry} contentEditable suppressContentEditableWarning><strong>Impact Score (SSP):</strong> Índice composto de desempenho do jogador, calculado a partir de métricas ponderadas da posição. Quanto maior, melhor o desempenho relativo.</div>
+                        <div style={styles.legendEntry} contentEditable suppressContentEditableWarning><strong>P(Sucesso):</strong> Probabilidade estimada de sucesso na adaptação ao elenco, baseada em modelo preditivo com variáveis técnicas, táticas e contextuais.</div>
                       </div>
                       {predictionLoading ? <Skeleton width="100%" height={80} /> : (
                         <div style={{ ...styles.cardElevated, borderTop: `3px solid ${C.green}`, flex: 1, display: 'flex', flexDirection: 'column' as const }}>
@@ -833,7 +833,7 @@ export default function ScoutingReportPage() {
               <motion.div {...fadeIn(0.15)}>
                 <ReportPage>
 
-                  <SectionDivider number={3} title="Matriz Qualitativa — Four Corners" />
+                  <SectionDivider number={3} title="Matriz Qualitativa — Dimensões do Jogo" />
                   <div style={{ ...styles.grid2x2, flex: 1 }}>
                     {([
                       { key: 'tactical' as const, label: 'TÁTICO', color: QUADRANT.tactical },
@@ -911,7 +911,7 @@ export default function ScoutingReportPage() {
               <motion.div {...fadeIn(0.3)}>
                 <ReportPage>
 
-                  <SectionDivider number={6} title="Delta vs. Titular — Squad Impact" />
+                  <SectionDivider number={6} title="Delta vs. Titular — Impacto no Elenco" />
                   <div style={{ ...styles.card, flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {!selectedIncumbent ? (
                       <p style={styles.placeholder}>Selecione um titular na barra acima para gerar a comparação Delta</p>
@@ -1016,7 +1016,7 @@ export default function ScoutingReportPage() {
                   <SectionDivider number={8} title="Contingência — Jogadores Similares" />
                   <div style={{ ...styles.grid2, flex: 1 }}>
                     <div style={styles.card}>
-                      <h3 style={styles.cardTitle}>Top 3 Similares</h3>
+                      <h3 style={styles.cardTitle}>Top 5 Similares</h3>
                       {similarityLoading ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}><Skeleton width="100%" height={48} /><Skeleton width="100%" height={48} /><Skeleton width="100%" height={48} /></div>
                       ) : data.similar.length ? (
@@ -1024,7 +1024,7 @@ export default function ScoutingReportPage() {
                           {data.similar.map((s, i) => (
                             <div key={i} style={styles.similarRow}>
                               <div style={styles.similarRank}>{i + 1}</div>
-                              <div style={{ flex: 1 }}><div style={styles.similarName}>{s.name}</div><div style={styles.similarClub}>{s.club}</div></div>
+                              <div style={{ flex: 1 }}><div style={styles.similarName} contentEditable suppressContentEditableWarning>{s.name}</div><div style={styles.similarClub} contentEditable suppressContentEditableWarning>{s.club}</div></div>
                               <div style={styles.similarPct}>{s.pct}%</div>
                               <div style={styles.progressTrack}><div style={{ ...styles.progressBar, width: `${s.pct}%` }} /></div>
                             </div>
@@ -1694,9 +1694,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   analysisText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 14,
+    fontSize: 15,
     color: C.textSecondary,
-    lineHeight: 1.7,
+    lineHeight: 1.75,
     textAlign: 'justify' as const,
     outline: 'none',
     padding: '20px 24px',

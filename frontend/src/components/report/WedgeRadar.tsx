@@ -115,7 +115,7 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
                 textAnchor={anchor}
                 dominantBaseline="middle"
                 fill="#4A4A4A"
-                fontSize={8.5}
+                fontSize={10}
                 fontFamily="'DM Sans', sans-serif"
                 fontWeight={500}
               >
@@ -123,11 +123,11 @@ export default function WedgeRadar({ data, size = 380 }: WedgeRadarProps) {
               </text>
               <text
                 x={lx}
-                y={ly + 7}
+                y={ly + 8}
                 textAnchor={anchor}
                 dominantBaseline="middle"
                 fill={color}
-                fontSize={10}
+                fontSize={12}
                 fontFamily="'JetBrains Mono', monospace"
                 fontWeight={700}
               >

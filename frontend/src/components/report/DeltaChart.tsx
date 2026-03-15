@@ -153,7 +153,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   legendText: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 11,
+    fontSize: 12,
     color: '#4A4A4A',
   },
   barList: {
@@ -169,7 +169,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   metricLabel: {
     fontFamily: "'DM Sans', sans-serif",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 500,
     color: '#4A4A4A',
     textAlign: 'right',

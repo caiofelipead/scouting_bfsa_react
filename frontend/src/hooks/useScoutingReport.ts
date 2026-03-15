@@ -439,7 +439,7 @@ export function useScoutingReport(
               }))
             : [],
           similar: similarity
-            ? similarity.similar_players.slice(0, 3).map((s) => ({
+            ? similarity.similar_players.slice(0, 5).map((s) => ({
                 name: s.display_name ?? s.name,
                 club: s.team ?? '—',
                 pct: Math.round(s.similarity_pct),
