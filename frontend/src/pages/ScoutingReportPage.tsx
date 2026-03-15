@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Download, Loader2, Eye, Zap } from 'lucide-react';
 import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport, useSkillCornerPlayer } from '../hooks/useScoutingReport';
-import api from '../lib/api';
 import { usePlayers } from '../hooks/usePlayers';
 import ReportHeader from '../components/report/ReportHeader';
 import SectionDivider from '../components/report/SectionDivider';
@@ -314,24 +313,15 @@ export default function ScoutingReportPage() {
       // ── 1. Get embedded font CSS ──
       const embeddedFontCSS = await getEmbeddedFontCSS();
 
-      // ── 2. Convert proxy images to data URLs in cloned nodes ──
+      // ── 2. Clone slides and convert images to data URLs ──
       const slideHtmls: string[] = [];
       for (const slide of Array.from(slides)) {
         const clone = slide.cloneNode(true) as HTMLElement;
-        // Remove no-print elements
         clone.querySelectorAll('.no-print').forEach((el) => el.remove());
-        // Convert proxy images to data URLs
-        const imgs = clone.querySelectorAll<HTMLImageElement>('img[src^="/api/"]');
+        // Convert all images to data URLs (proxy + local)
+        const allImgs = clone.querySelectorAll<HTMLImageElement>('img');
         await Promise.all(
-          Array.from(imgs).map(async (img) => {
-            const dataUrl = await toDataUrl(img.src);
-            if (dataUrl) img.src = dataUrl;
-          }),
-        );
-        // Also convert relative images (like shield)
-        const relImgs = clone.querySelectorAll<HTMLImageElement>('img[src^="/"]');
-        await Promise.all(
-          Array.from(relImgs).map(async (img) => {
+          Array.from(allImgs).map(async (img) => {
             if (img.src.startsWith('data:')) return;
             const dataUrl = await toDataUrl(img.src);
             if (dataUrl) img.src = dataUrl;
@@ -340,67 +330,72 @@ export default function ScoutingReportPage() {
         slideHtmls.push(clone.outerHTML);
       }
 
-      // ── 3. Build self-contained HTML document ──
-      // Collect all computed styles from <style> tags and stylesheets
-      const styleSheets = Array.from(document.styleSheets);
-      let allCSS = '';
-      for (const sheet of styleSheets) {
-        try {
-          const rules = Array.from(sheet.cssRules);
-          allCSS += rules.map((r) => r.cssText).join('\n') + '\n';
-        } catch {
-          // Cross-origin stylesheet — skip (we embed fonts separately)
-        }
-      }
-
+      // ── 3. Build self-contained print HTML ──
       const fullHTML = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+<title>Scouting Report — ${data?.player.name ?? ''}</title>
 <style>${embeddedFontCSS}</style>
 <style>
-${allCSS}
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { margin: 0; padding: 0; background: white; }
+html, body { margin: 0; padding: 0; background: white; width: ${PAGE_WIDTH}px; }
 .slide-page {
   width: ${PAGE_WIDTH}px;
   height: ${PAGE_HEIGHT}px;
-  page-break-after: always;
-  break-after: page;
   overflow: hidden;
   position: relative;
+  page-break-after: always;
+  break-after: page;
 }
-.slide-page:last-child { page-break-after: avoid; }
+.slide-page:last-child {
+  page-break-after: avoid;
+  break-after: avoid;
+}
+@media print {
+  @page {
+    size: ${PAGE_WIDTH}px ${PAGE_HEIGHT}px landscape;
+    margin: 0;
+  }
+  html, body {
+    width: ${PAGE_WIDTH}px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+@media screen {
+  body { background: #e5e5e5; padding: 20px 0; }
+  .slide-page {
+    margin: 0 auto 20px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    border-radius: 8px;
+  }
+}
 </style>
 </head>
 <body>
 ${slideHtmls.map((html) => `<div class="slide-page">${html}</div>`).join('\n')}
+<script>
+  // Auto-print when fonts are loaded
+  document.fonts.ready.then(() => {
+    setTimeout(() => window.print(), 600);
+  });
+</script>
 </body>
 </html>`;
 
-      // ── 4. Send to backend Playwright endpoint ──
-      const filename = `Scouting_${(data?.player.name ?? 'Report').replace(/\s+/g, '_')}`;
-      const response = await api.post('/report/export-pdf', {
-        html: fullHTML,
-        filename,
-      }, {
-        responseType: 'blob',
-        timeout: 120_000, // 2min for PDF generation
-      });
-
-      // ── 5. Download the PDF ──
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${filename}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // ── 4. Open print window ──
+      const printWindow = window.open('', '_blank', `width=${PAGE_WIDTH},height=${PAGE_HEIGHT}`);
+      if (!printWindow) {
+        alert('Popup bloqueado. Permita popups para este site e tente novamente.');
+        setExporting(false);
+        return;
+      }
+      printWindow.document.write(fullHTML);
+      printWindow.document.close();
 
     } catch (err) {
       console.error('PDF export error:', err);
-      // Fallback to browser print
-      alert('Erro ao gerar PDF via servidor. Usando impressão do navegador como fallback.');
       window.print();
     } finally {
       setExporting(false);
