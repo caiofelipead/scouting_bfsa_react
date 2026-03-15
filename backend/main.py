@@ -47,8 +47,6 @@ from schemas.models import (
     PositionConfig,
     TrajectoryRequest,
     TrajectoryResponse,
-    MarketValueRequest,
-    MarketValueResponse,
     MarketOpportunitiesRequest,
     MarketOpportunitiesResponse,
     MarketOpportunityEntry,
@@ -78,7 +76,6 @@ from services.predictive_engine import ContractSuccessPredictor
 from services.scouting_intelligence import (
     ScoutingIntelligenceEngine,
     PlayerTrajectoryModel,
-    MarketValueModel,
     MarketOpportunityDetector,
     PlayerReplacementEngine,
     TemporalPerformanceTrend,
@@ -2393,53 +2390,6 @@ async def predict_trajectory(
     )
 
 
-@app.post("/api/market_value", response_model=MarketValueResponse)
-async def predict_market_value(
-    req: MarketValueRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Predict player market value using XGBoost model.
-
-    Scientific basis: Khalife et al. (MDPI 2025), R² > 0.90.
-    Segmented by position × age range.
-    """
-    df = _get_wyscout()
-    player_name = req.player_name
-
-    mask = df["JogadorDisplay"] == player_name
-    if mask.sum() == 0:
-        mask = df["JogadorDisplay"].str.lower() == player_name.lower()
-    if mask.sum() == 0:
-        raise HTTPException(status_code=404, detail="Jogador não encontrado")
-
-    row_data = df.loc[mask.idxmax()]
-    pos_raw = str(row_data.get("Posição", "")) if pd.notna(row_data.get("Posição")) else "Meia"
-    pos = get_posicao_categoria(pos_raw)
-
-    league = req.league
-    if not league:
-        liga_tier = str(row_data.get("liga_tier", "")) if pd.notna(row_data.get("liga_tier")) else None
-        league = resolve_actual_league(row_data.get("Equipa"), fallback_liga_tier=liga_tier)
-
-    engine = _get_scouting_engine()
-    mv = engine.market_model.predict_market_value(row_data, league, req.current_value)
-
-    team = str(row_data.get("Equipa", "")) if pd.notna(row_data.get("Equipa")) else None
-    age_val = pd.to_numeric(row_data.get("Idade"), errors="coerce")
-
-    return MarketValueResponse(
-        player=str(row_data.get("Jogador", "")),
-        display_name=player_name,
-        position=pos,
-        team=team,
-        league=league,
-        age=float(age_val) if pd.notna(age_val) else None,
-        estimated_market_value=mv.get("estimated_market_value"),
-        market_value_gap=mv.get("market_value_gap"),
-        market_value_gap_pct=mv.get("market_value_gap_pct"),
-        value_category=mv.get("value_category"),
-        is_undervalued=mv.get("is_undervalued"),
-    )
 
 
 @app.post("/api/market_opportunities", response_model=MarketOpportunitiesResponse)

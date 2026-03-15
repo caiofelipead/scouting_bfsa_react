@@ -19,7 +19,6 @@ import {
   Sun,
   Moon,
   TrendingUp,
-  DollarSign,
   Gem,
   Users,
   UserPlus,
@@ -40,7 +39,6 @@ export type TabId =
   | 'clusters'
   | 'analyses'
   | 'trajectory'
-  | 'market_value'
   | 'opportunities'
   | 'replacements'
   | 'contract_impact';
@@ -69,7 +67,6 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
       { id: 'rankings', label: 'Ranking', icon: <Trophy size={18} strokeWidth={1.5} /> },
       { id: 'prediction', label: 'Predicao', icon: <Target size={18} strokeWidth={1.5} /> },
       { id: 'trajectory', label: 'Trajetoria', icon: <TrendingUp size={18} strokeWidth={1.5} /> },
-      { id: 'market_value', label: 'Valor de Mercado', icon: <DollarSign size={18} strokeWidth={1.5} /> },
       { id: 'opportunities', label: 'Oportunidades', icon: <Gem size={18} strokeWidth={1.5} /> },
       { id: 'contract_impact', label: 'Impacto Contratação', icon: <UserPlus size={18} strokeWidth={1.5} /> },
     ],

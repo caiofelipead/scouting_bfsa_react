@@ -17,7 +17,6 @@ import ClustersPage from './pages/ClustersPage';
 import AnalysesPage from './pages/AnalysesPage';
 import SkillCornerPage from './pages/SkillCornerPage';
 import TrajectoryPage from './pages/TrajectoryPage';
-import MarketValuePage from './pages/MarketValuePage';
 import OpportunitiesPage from './pages/OpportunitiesPage';
 import ReplacementsPage from './pages/ReplacementsPage';
 import ContractImpactPage from './pages/ContractImpactPage';
@@ -56,8 +55,6 @@ function App() {
         return <AnalysesPage />;
       case 'trajectory':
         return <TrajectoryPage />;
-      case 'market_value':
-        return <MarketValuePage />;
       case 'opportunities':
         return <OpportunitiesPage />;
       case 'replacements':
