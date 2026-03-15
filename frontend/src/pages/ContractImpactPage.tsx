@@ -157,7 +157,7 @@ export default function ContractImpactPage() {
       )}
 
       {/* Input form */}
-      <div className="card-glass rounded-lg p-5 space-y-4" style={{ overflow: 'visible' }}>
+      <div className="card-glass rounded-lg p-5 space-y-4" style={{ overflow: 'visible', position: 'relative', zIndex: 10 }}>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end" style={{ overflow: 'visible' }}>
           <div>
             <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR CANDIDATO</label>
