@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Download, Loader2, Eye, Zap } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -59,26 +59,28 @@ const QUADRANT = {
 const PAGE_WIDTH = 1440;
 const PAGE_HEIGHT = 809;
 
-// ── Page wrapper component with shield watermark ──
+// ── Page wrapper component with shield watermark + auto-scaling ──
 function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
   return (
-    <div data-slide style={{
-      ...pageStyles.page,
-      padding: noPadding ? 0 : '40px 56px 56px',
-    }}>
-      {/* Shield watermark */}
-      <img
-        src={BFSA_SHIELD}
-        alt=""
-        style={pageStyles.watermark}
-      />
-      {/* Footer */}
-      <div style={pageStyles.footer}>
-        <img src={BFSA_SHIELD} alt="" style={{ width: 20, height: 20, objectFit: 'contain', opacity: 0.5 }} />
-        <span style={pageStyles.footerText}>BOTAFOGO FUTEBOL SA — DEPARTAMENTO DE SCOUTING</span>
+    <SlideScaler>
+      <div data-slide style={{
+        ...pageStyles.page,
+        padding: noPadding ? 0 : '40px 56px 56px',
+      }}>
+        {/* Shield watermark */}
+        <img
+          src={BFSA_SHIELD}
+          alt=""
+          style={pageStyles.watermark}
+        />
+        {/* Footer */}
+        <div style={pageStyles.footer}>
+          <img src={BFSA_SHIELD} alt="" style={{ width: 20, height: 20, objectFit: 'contain', opacity: 0.5 }} />
+          <span style={pageStyles.footerText}>BOTAFOGO FUTEBOL SA — DEPARTAMENTO DE SCOUTING</span>
+        </div>
+        {children}
       </div>
-      {children}
-    </div>
+    </SlideScaler>
   );
 }
 
@@ -89,7 +91,6 @@ const pageStyles: Record<string, React.CSSProperties> = {
     background: '#FFFFFF',
     borderRadius: 10,
     boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
-    marginBottom: 32,
     position: 'relative',
     overflow: 'hidden',
     pageBreakAfter: 'always',
@@ -122,6 +123,44 @@ const pageStyles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase',
   },
 };
+
+// ── Slide scaler: scales 1440px slides to fit viewport ──
+function SlideScaler({ children }: { children: React.ReactNode }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    function updateScale() {
+      if (!wrapperRef.current?.parentElement) return;
+      const availableWidth = wrapperRef.current.parentElement.clientWidth;
+      const s = Math.min(1, availableWidth / PAGE_WIDTH);
+      setScale(s);
+    }
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
+
+  return (
+    <div
+      ref={wrapperRef}
+      style={{
+        width: PAGE_WIDTH * scale,
+        height: PAGE_HEIGHT * scale,
+        marginBottom: 24,
+      }}
+    >
+      <div style={{
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left',
+        width: PAGE_WIDTH,
+        height: PAGE_HEIGHT,
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 // ── Skeleton ──
 function Skeleton({ width, height }: { width: string | number; height: string | number }) {
