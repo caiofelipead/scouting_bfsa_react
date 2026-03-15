@@ -78,6 +78,7 @@ export default function ScoutingReportPage() {
   const [showIncumbentDropdown, setShowIncumbentDropdown] = useState(false);
   const [showAnalysesDropdown, setShowAnalysesDropdown] = useState(false);
   const [analysesSearch, setAnalysesSearch] = useState('');
+  const [selectedAnalysesPlayer, setSelectedAnalysesPlayer] = useState<import('../hooks/useScoutingReport').AnalysesPlayerData | null>(null);
 
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +87,7 @@ export default function ScoutingReportPage() {
   const analysesQuery = useAnalysesPlayers(analysesSearch);
 
   const { data, isLoading, isError, predictionLoading, similarityLoading, skillCornerLoading, comparisonLoading } =
-    useScoutingReport(selectedPlayer, selectedIncumbent);
+    useScoutingReport(selectedPlayer, selectedIncumbent, selectedAnalysesPlayer);
 
   const fadeIn = (delay = 0) => ({
     initial: { opacity: 0, y: 16 },
@@ -143,6 +144,7 @@ export default function ScoutingReportPage() {
                       onMouseDown={() => {
                         setSelectedPlayer(p.display_name ?? p.name);
                         setPlayerSearch(p.display_name ?? p.name);
+                        setSelectedAnalysesPlayer(null);
                         setShowPlayerDropdown(false);
                       }}
                     >
@@ -190,6 +192,7 @@ export default function ScoutingReportPage() {
                           setSelectedPlayer(apiName);
                           setPlayerSearch(apiName);
                           setAnalysesSearch(p.nome);
+                          setSelectedAnalysesPlayer(p);
                           setShowAnalysesDropdown(false);
                         }}
                       >

@@ -113,6 +113,12 @@ function extractImpactText(p: number): string {
   return 'Acima da média';
 }
 
+/** Parse "D. Barrea (Godoy Cruz)" into clean "D. Barrea" */
+function parseCleanName(displayName: string): string {
+  const match = displayName.match(/^(.+?)\s*\(.*\)$/);
+  return match ? match[1].trim() : displayName;
+}
+
 function parseQualitative(analysisText: string | null | undefined): {
   tactical: string[];
   technical: string[];
@@ -151,6 +157,7 @@ export function useAnalysesPlayers(search: string) {
 export function useScoutingReport(
   playerName: string | null,
   incumbentName: string | null,
+  analysesOverride?: AnalysesPlayerData | null,
 ) {
   // 1. Player profile
   const profileQuery = useQuery({
@@ -310,15 +317,34 @@ export function useScoutingReport(
 
   const ssp = profile?.scout_score ?? null;
 
+  // Merge analysis: prefer profile.analises, fallback to analysesOverride
+  const profileAnalises = profile?.analises;
+  const mergedAnalysis = {
+    text: profileAnalises?.analysis_text ?? analysesOverride?.analysis_text ?? null,
+    scores: (profileAnalises?.scores && Object.keys(profileAnalises.scores).length > 0)
+      ? profileAnalises.scores
+      : analysesOverride?.scores ?? {},
+    links: (profileAnalises?.links && Object.keys(profileAnalises.links).length > 0)
+      ? profileAnalises.links
+      : analysesOverride?.links ?? {},
+    modelo: profileAnalises?.modelo ?? analysesOverride?.modelo ?? null,
+    faixaSalarial: profileAnalises?.faixa_salarial ?? analysesOverride?.faixa_salarial ?? null,
+    transferLuvas: profileAnalises?.transfer_luvas ?? analysesOverride?.transfer_luvas ?? null,
+  };
+
+  // Clean player name: "D. Barrea (Godoy Cruz)" → "D. Barrea"
+  const rawName = profile?.summary.display_name ?? profile?.summary.name ?? '';
+  const cleanName = analysesOverride?.nome ?? parseCleanName(rawName);
+
   const data: ScoutingReportData | null =
     profile
       ? {
           player: {
-            name: profile.summary.display_name ?? profile.summary.name,
-            position: profile.summary.position ?? '—',
-            club: profile.summary.team ?? '—',
-            league: profile.summary.league ?? '—',
-            age: profile.summary.age ?? 0,
+            name: cleanName,
+            position: profile.summary.position ?? analysesOverride?.posicao ?? '—',
+            club: profile.summary.team ?? analysesOverride?.equipe ?? '—',
+            league: profile.summary.league ?? analysesOverride?.liga ?? '—',
+            age: profile.summary.age ?? analysesOverride?.idade ?? 0,
             height: '—',
             foot: '—',
             contract: '—',
@@ -330,17 +356,10 @@ export function useScoutingReport(
             clusterDef: playerCluster?.name
               ? `Cluster: ${playerCluster.name}`
               : 'Cluster não identificado',
-            photo: profile.summary.photo_url ?? null,
+            photo: profile.summary.photo_url ?? analysesOverride?.foto ?? null,
             clubLogo: profile.summary.club_logo ?? null,
           },
-          analysis: {
-            text: profile.analises?.analysis_text ?? null,
-            scores: profile.analises?.scores ?? {},
-            links: profile.analises?.links ?? {},
-            modelo: profile.analises?.modelo ?? null,
-            faixaSalarial: profile.analises?.faixa_salarial ?? null,
-            transferLuvas: profile.analises?.transfer_luvas ?? null,
-          },
+          analysis: mergedAnalysis,
           predict: {
             impactScore: ssp != null ? Math.round(ssp * 10) / 10 : 0,
             pSuccess: prediction
