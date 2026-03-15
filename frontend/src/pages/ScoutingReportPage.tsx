@@ -265,18 +265,8 @@ export default function ScoutingReportPage() {
       const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
       if (!slides.length) { setExporting(false); return; }
 
-      // ── 1. Create off-screen container at native 1440×809 ──
-      // This eliminates ALL transform/scale/responsive issues
-      const offscreen = document.createElement('div');
-      offscreen.style.cssText = `
-        position: fixed; top: 0; left: 0;
-        width: ${PAGE_WIDTH}px; height: ${PAGE_HEIGHT}px;
-        z-index: -9999; opacity: 0; pointer-events: none;
-        overflow: hidden;
-      `;
-      document.body.appendChild(offscreen);
-
-      // ── 2. Pre-convert proxy images to data URLs on originals ──
+      // ── 1. Pre-convert ALL images to base64 data URLs ──
+      // This prevents CORS errors and ensures images render in canvas
       const imgRestoreMap: Array<{ el: HTMLImageElement; original: string }> = [];
       const allImgs = reportRef.current.querySelectorAll<HTMLImageElement>('img');
       await Promise.all(
@@ -290,33 +280,68 @@ export default function ScoutingReportPage() {
         }),
       );
 
-      // ── 3. Wait for fonts ──
-      await document.fonts.ready;
-      await new Promise((r) => setTimeout(r, 300));
+      // ── 2. Remove SlideScaler transforms on ALL slides ──
+      // Structure: wrapperDiv > scaleDiv(transform) > slideDiv[data-slide]
+      // We capture the ORIGINAL element (not a clone) so all computed
+      // styles, flex/grid layouts, and fonts are exactly as rendered.
+      const restoreList: Array<{
+        scaleDiv: HTMLElement;
+        wrapperDiv: HTMLElement;
+        sd: Record<string, string>;
+        wd: Record<string, string>;
+      }> = [];
 
-      // ── 4. Capture each slide as image → PDF ──
+      slides.forEach((slide) => {
+        const scaleDiv = slide.parentElement;
+        const wrapperDiv = scaleDiv?.parentElement;
+        if (scaleDiv && wrapperDiv) {
+          restoreList.push({
+            scaleDiv,
+            wrapperDiv,
+            sd: {
+              transform: scaleDiv.style.transform,
+              width: scaleDiv.style.width,
+              height: scaleDiv.style.height,
+            },
+            wd: {
+              width: wrapperDiv.style.width,
+              height: wrapperDiv.style.height,
+              margin: wrapperDiv.style.margin,
+              overflow: wrapperDiv.style.overflow,
+            },
+          });
+          // Reset to native 1440×809 — no scaling
+          scaleDiv.style.transform = 'none';
+          scaleDiv.style.width = `${PAGE_WIDTH}px`;
+          scaleDiv.style.height = `${PAGE_HEIGHT}px`;
+          wrapperDiv.style.width = `${PAGE_WIDTH}px`;
+          wrapperDiv.style.height = `${PAGE_HEIGHT}px`;
+          wrapperDiv.style.margin = '0';
+          wrapperDiv.style.overflow = 'hidden';
+        }
+      });
+
+      // ── 3. Wait for fonts + reflow ──
+      await document.fonts.ready;
+      await new Promise((r) => setTimeout(r, 500));
+
+      // ── 4. Capture each slide (original DOM, full CSS) ──
       const pdfWidthMm = PAGE_WIDTH * 0.2646;
       const pdfHeightMm = PAGE_HEIGHT * 0.2646;
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [pdfWidthMm, pdfHeightMm] });
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: [pdfWidthMm, pdfHeightMm],
+      });
 
       for (let i = 0; i < slides.length; i++) {
-        // Clone the slide into the clean off-screen container
-        const clone = slides[i].cloneNode(true) as HTMLElement;
-        clone.querySelectorAll('.no-print').forEach((el) => el.remove());
-        // Force exact dimensions, no transform
-        clone.style.cssText = `
-          width: ${PAGE_WIDTH}px; height: ${PAGE_HEIGHT}px;
-          position: relative; overflow: hidden;
-          transform: none !important;
-          border-radius: 0; box-shadow: none;
-        `;
-        offscreen.innerHTML = '';
-        offscreen.appendChild(clone);
+        const slide = slides[i];
 
-        // Small reflow pause
-        await new Promise((r) => setTimeout(r, 50));
+        // Hide no-print elements temporarily
+        const noPrintEls = slide.querySelectorAll<HTMLElement>('.no-print');
+        noPrintEls.forEach((el) => { el.style.display = 'none'; });
 
-        const canvas = await html2canvas(clone, {
+        const canvas = await html2canvas(slide, {
           width: PAGE_WIDTH,
           height: PAGE_HEIGHT,
           scale: 2,
@@ -324,15 +349,27 @@ export default function ScoutingReportPage() {
           allowTaint: true,
           backgroundColor: '#FFFFFF',
           logging: false,
+          windowWidth: PAGE_WIDTH,
+          windowHeight: PAGE_HEIGHT,
         });
+
+        noPrintEls.forEach((el) => { el.style.display = ''; });
 
         const imgData = canvas.toDataURL('image/png');
         if (i > 0) pdf.addPage([pdfWidthMm, pdfHeightMm], 'landscape');
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidthMm, pdfHeightMm);
       }
 
-      // ── 5. Cleanup ──
-      document.body.removeChild(offscreen);
+      // ── 5. Restore all transforms + images ──
+      restoreList.forEach(({ scaleDiv, wrapperDiv, sd, wd }) => {
+        scaleDiv.style.transform = sd.transform;
+        scaleDiv.style.width = sd.width;
+        scaleDiv.style.height = sd.height;
+        wrapperDiv.style.width = wd.width;
+        wrapperDiv.style.height = wd.height;
+        wrapperDiv.style.margin = wd.margin;
+        wrapperDiv.style.overflow = wd.overflow;
+      });
       imgRestoreMap.forEach(({ el, original }) => { el.src = original; });
 
       const playerName = data?.player.name ?? 'relatorio';
