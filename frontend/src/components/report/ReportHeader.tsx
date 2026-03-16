@@ -47,6 +47,7 @@ export default function ReportHeader({
   stats,
 }: ReportHeaderProps) {
   const [fullBodyImage, setFullBodyImage] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState(false);
   const [heatmapImage, setHeatmapImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const clubLogoInputRef = useRef<HTMLInputElement>(null);
@@ -129,17 +130,28 @@ export default function ReportHeader({
         <div style={styles.imageColumn}>
           {fullBodyImage ? (
             <img src={fullBodyImage} alt={name} style={styles.fullBodyImg} />
-          ) : photo ? (
+          ) : photo && !photoError ? (
             <img
               src={`/api/image-proxy?url=${encodeURIComponent(photo)}`}
               alt={name}
               style={styles.fullBodyImg}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              crossOrigin="anonymous"
+              onError={(e) => {
+                const img = e.target as HTMLImageElement;
+                // If proxy failed, try direct URL as fallback
+                if (img.src.includes('/api/image-proxy')) {
+                  img.src = photo;
+                } else {
+                  setPhotoError(true);
+                }
+              }}
             />
           ) : (
             <div style={styles.imagePlaceholder}>
-              <Upload size={32} color="#B0B0B0" />
-              <span style={styles.placeholderText}>Foto do atleta</span>
+              <div style={styles.initialsCircle}>
+                {name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+              <span className="no-print" style={styles.placeholderText}>Carregar foto abaixo</span>
             </div>
           )}
           <input
@@ -198,7 +210,15 @@ export default function ReportHeader({
                 src={`/api/image-proxy?url=${encodeURIComponent(clubLogo)}`}
                 alt={club}
                 style={styles.clubLogo}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                crossOrigin="anonymous"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  if (img.src.includes('/api/image-proxy')) {
+                    img.src = clubLogo;
+                  } else {
+                    img.style.display = 'none';
+                  }
+                }}
               />
             ) : onClubLogoChange ? (
               <div style={styles.clubLogoPlaceholder} onClick={() => clubLogoInputRef.current?.click()} className="no-print">
@@ -294,21 +314,24 @@ export default function ReportHeader({
       {/* External links with logos */}
       <div style={styles.linksRow}>
         {videoUrl && (
-          <a href={videoUrl} target="_blank" rel="noopener noreferrer" style={styles.linkCard}>
+          <a href={videoUrl} target="_blank" rel="noopener noreferrer" style={styles.linkCard} data-link-url={videoUrl}>
             <img src={YOUTUBE_LOGO} alt="YouTube" style={styles.linkLogo} />
-            <span style={styles.linkLabel}>Clicar no ícone<br />para acessar vídeo</span>
+            <span style={styles.linkLabel}>Vídeo</span>
+            <span style={styles.linkUrl}>{videoUrl.length > 50 ? videoUrl.slice(0, 50) + '…' : videoUrl}</span>
           </a>
         )}
         {tmUrl && (
-          <a href={tmUrl} target="_blank" rel="noopener noreferrer" style={styles.linkCard}>
+          <a href={tmUrl} target="_blank" rel="noopener noreferrer" style={styles.linkCard} data-link-url={tmUrl}>
             <img src={TRANSFERMARKT_LOGO} alt="Transfermarkt" style={styles.linkLogo} />
-            <span style={styles.linkLabel}>Perfil<br />Transfermarkt</span>
+            <span style={styles.linkLabel}>Transfermarkt</span>
+            <span style={styles.linkUrl}>{tmUrl.length > 50 ? tmUrl.slice(0, 50) + '…' : tmUrl}</span>
           </a>
         )}
         {ogolUrl && (
-          <a href={ogolUrl} target="_blank" rel="noopener noreferrer" style={styles.linkCard}>
+          <a href={ogolUrl} target="_blank" rel="noopener noreferrer" style={styles.linkCard} data-link-url={ogolUrl}>
             <img src={OGOL_LOGO} alt="oGol" style={{ ...styles.linkLogo, borderRadius: '50%' }} />
-            <span style={styles.linkLabel}>Perfil<br />oGol</span>
+            <span style={styles.linkLabel}>oGol</span>
+            <span style={styles.linkUrl}>{ogolUrl.length > 50 ? ogolUrl.slice(0, 50) + '…' : ogolUrl}</span>
           </a>
         )}
         {!videoUrl && !tmUrl && !ogolUrl && (
@@ -410,6 +433,20 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: 16,
   },
+  initialsCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #C8102E 0%, #8B0A1E 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 48,
+    fontWeight: 700,
+    color: '#FFFFFF',
+    letterSpacing: '0.02em',
+  },
   placeholderText: {
     fontFamily: "'DM Sans', sans-serif",
     fontSize: 14,
@@ -434,10 +471,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 14,
-    background: 'rgba(255,255,255,0.45)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.6)',
+    background: '#FFFFFF',
+    border: '1px solid #E5E4E0',
     borderRadius: 14,
     padding: '20px 24px',
     boxShadow: '0 4px 24px rgba(0,0,0,0.04)',
@@ -455,8 +490,8 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
   },
   dataCard: {
-    background: 'rgba(255,255,255,0.6)',
-    border: '1px solid rgba(229,228,224,0.7)',
+    background: '#FAFAF9',
+    border: '1px solid #E5E4E0',
     borderRadius: 10,
     overflow: 'hidden',
   },
@@ -465,7 +500,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'baseline',
     padding: '9px 18px',
-    borderBottom: '1px solid rgba(238,237,234,0.7)',
+    borderBottom: '1px solid #EEEDEA',
   },
   dataLabel: {
     fontFamily: "'DM Sans', sans-serif",
@@ -550,8 +585,8 @@ const styles: Record<string, React.CSSProperties> = {
     outline: 'none',
   },
   statsCard: {
-    background: 'rgba(255,255,255,0.6)',
-    border: '1px solid rgba(229,228,224,0.7)',
+    background: '#FAFAF9',
+    border: '1px solid #E5E4E0',
     borderRadius: 10,
     padding: '12px 18px 14px',
   },
@@ -584,7 +619,7 @@ const styles: Record<string, React.CSSProperties> = {
   statItem: {
     textAlign: 'center' as const,
     padding: '6px 0',
-    background: 'rgba(247,246,243,0.6)',
+    background: '#F7F6F3',
     borderRadius: 8,
   },
   statValue: {
@@ -605,8 +640,8 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 2,
   },
   heatmapCard: {
-    background: 'rgba(255,255,255,0.6)',
-    border: '1px solid rgba(229,228,224,0.7)',
+    background: '#FAFAF9',
+    border: '1px solid #E5E4E0',
     borderRadius: 10,
     padding: '8px 10px',
     display: 'flex',
@@ -632,7 +667,7 @@ const styles: Record<string, React.CSSProperties> = {
   heatmapPlaceholder: {
     width: '100%',
     height: 70,
-    background: 'rgba(238,237,234,0.5)',
+    background: '#EEEDEA',
     borderRadius: 6,
     border: '1.5px dashed #D4D4D4',
     display: 'flex',
@@ -683,6 +718,17 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#4A4A4A',
     textAlign: 'center',
     lineHeight: 1.3,
+  },
+  linkUrl: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 7,
+    color: '#3B82F6',
+    textAlign: 'center',
+    lineHeight: 1.2,
+    maxWidth: 200,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    wordBreak: 'break-all',
   },
   noLinks: {
     fontFamily: "'DM Sans', sans-serif",

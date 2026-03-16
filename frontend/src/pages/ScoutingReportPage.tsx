@@ -410,11 +410,40 @@ export default function ScoutingReportPage() {
     return images;
   }
 
+  /** Collect link positions from a slide for PDF annotation */
+  function collectLinkPositions(slide: HTMLElement): { url: string; x: number; y: number; w: number; h: number }[] {
+    const links: { url: string; x: number; y: number; w: number; h: number }[] = [];
+    const slideRect = slide.getBoundingClientRect();
+    const anchorEls = slide.querySelectorAll<HTMLAnchorElement>('a[data-link-url]');
+    anchorEls.forEach((a) => {
+      const url = a.getAttribute('data-link-url');
+      if (!url) return;
+      const rect = a.getBoundingClientRect();
+      links.push({
+        url,
+        x: rect.left - slideRect.left,
+        y: rect.top - slideRect.top,
+        w: rect.width,
+        h: rect.height,
+      });
+    });
+    return links;
+  }
+
   /** Export as PDF (images assembled into jsPDF) */
   const handleExportPDF = useCallback(async () => {
     if (exporting) return;
     setExporting(true);
     try {
+      // Collect link positions BEFORE capture (from live DOM)
+      const slideLinks: { url: string; x: number; y: number; w: number; h: number }[][] = [];
+      if (reportRef.current) {
+        const slides = reportRef.current.querySelectorAll<HTMLElement>('[data-slide]');
+        slides.forEach((slide) => {
+          slideLinks.push(collectLinkPositions(slide));
+        });
+      }
+
       const images = await captureSlides();
       if (!images.length) return;
 
@@ -425,6 +454,17 @@ export default function ScoutingReportPage() {
       images.forEach((imgData, i) => {
         if (i > 0) pdf.addPage([pdfWidthMm, pdfHeightMm], 'landscape');
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidthMm, pdfHeightMm);
+
+        // Add clickable link annotations for this slide
+        const linksForSlide = slideLinks[i] || [];
+        linksForSlide.forEach((link) => {
+          // Convert pixel positions to mm (relative to slide dimensions)
+          const xMm = (link.x / PAGE_WIDTH) * pdfWidthMm;
+          const yMm = (link.y / PAGE_HEIGHT) * pdfHeightMm;
+          const wMm = (link.w / PAGE_WIDTH) * pdfWidthMm;
+          const hMm = (link.h / PAGE_HEIGHT) * pdfHeightMm;
+          pdf.link(xMm, yMm, wMm, hMm, { url: link.url });
+        });
       });
 
       const playerName = data?.player.name ?? 'relatorio';
@@ -783,7 +823,7 @@ export default function ScoutingReportPage() {
                   <div style={{ ...styles.card, flex: 1, display: 'flex', flexDirection: 'column' as const }}>
                     <div style={styles.analysisHeader}>
                       {data.player.clubLogo && (
-                        <img src={`/api/image-proxy?url=${encodeURIComponent(data.player.clubLogo)}`} alt={data.player.club} style={{ width: 36, height: 36, objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <img src={`/api/image-proxy?url=${encodeURIComponent(data.player.clubLogo)}`} alt={data.player.club} style={{ width: 36, height: 36, objectFit: 'contain' }} crossOrigin="anonymous" onError={(e) => { const img = e.target as HTMLImageElement; if (img.src.includes('/api/image-proxy')) { img.src = data.player.clubLogo!; } else { img.style.display = 'none'; } }} />
                       )}
                       <div>
                         <div style={styles.analysisLabel}>ANÁLISE</div>

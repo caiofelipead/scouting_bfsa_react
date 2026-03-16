@@ -714,10 +714,10 @@ async def list_players(
                     photo_url = str(val).strip()
                     break
 
-        # Fallback: hardcoded CLUB_LOGOS for club_logo
-        club_logo = assets.get("club_logo")
-        if not club_logo and team_name:
-            club_logo = CLUB_LOGOS.get(team_name)
+        # Prefer hardcoded CLUB_LOGOS (logodetimes.com) — more reliable than SofaScore
+        club_logo = CLUB_LOGOS.get(team_name) if team_name else None
+        if not club_logo:
+            club_logo = assets.get("club_logo")
 
         players.append({
             "id": int(idx) if isinstance(idx, (int, np.integer)) else hash(str(idx)) % 10**8,
@@ -986,7 +986,10 @@ async def get_player_profile(
     # Get photo, club logo, and league logo from asset service (CSV with SofaScore data)
     assets = get_player_assets(jogador_name, team_name_sc)
     photo_url = assets.get("photo_url")
-    club_logo_url = assets.get("club_logo")
+    # Prefer hardcoded CLUB_LOGOS (logodetimes.com) over SofaScore
+    club_logo_url = CLUB_LOGOS.get(team_name_sc) if team_name_sc else None
+    if not club_logo_url:
+        club_logo_url = assets.get("club_logo")
 
     # Fallback: try WyScout DataFrame columns for photo_url
     if not photo_url:
@@ -1007,7 +1010,7 @@ async def get_player_profile(
             "name": str(row.get("Jogador", "")),
             "display_name": str(row.get("JogadorDisplay", "")),
             "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
-            "club_logo": club_logo_url or (CLUB_LOGOS.get(str(row.get("Equipa", ""))) if pd.notna(row.get("Equipa")) else None),
+            "club_logo": club_logo_url,
             "position": position,
             "age": age,
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
@@ -1084,6 +1087,11 @@ async def get_rankings(
         team_name = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
         assets = get_player_assets(player_name, team_name)
 
+        # Prefer hardcoded logos (logodetimes.com) over SofaScore
+        rank_club_logo = (CLUB_LOGOS.get(team_name) if team_name else None) or assets.get("club_logo")
+        rank_league_name = assets.get("league_name") or ""
+        rank_league_logo = LEAGUE_LOGOS.get(rank_league_name) or assets.get("league_logo")
+
         entries.append(RankingEntry(
             rank=rank,
             name=player_name,
@@ -1098,8 +1106,8 @@ async def get_rankings(
             score=round(float(row.get("Score", 0)), 1),
             indices=idx_values,
             photo_url=assets.get("photo_url"),
-            club_logo=assets.get("club_logo"),
-            league_logo=assets.get("league_logo"),
+            club_logo=rank_club_logo,
+            league_logo=rank_league_logo,
         ))
 
     result = RankingResponse(position=position, total=len(entries), players=entries)
@@ -1188,7 +1196,7 @@ async def get_prediction_rankings(
             "tier_origin": pred["tier_origin"],
             "tier_target": pred["tier_target"],
             "photo_url": pred_assets.get("photo_url"),
-            "club_logo": pred_assets.get("club_logo"),
+            "club_logo": (CLUB_LOGOS.get(pred_team_name) if pred_team_name else None) or pred_assets.get("club_logo"),
             "league_logo": pred_assets.get("league_logo"),
         })
 
@@ -2606,47 +2614,95 @@ async def image_proxy(url: str):
     if not parsed.hostname or not parsed.scheme.startswith("http"):
         raise HTTPException(status_code=400, detail="Invalid URL")
 
-    # Allow any image host — the proxy exists to avoid CORS/hotlink issues
-    # (restrict to http/https only for safety)
-
     # Check cache
     if url in _image_cache:
         content_type, data = _image_cache[url]
         return Response(content=data, media_type=content_type,
-                        headers={"Cache-Control": "public, max-age=86400"})
+                        headers={"Cache-Control": "public, max-age=86400",
+                                 "Access-Control-Allow-Origin": "*"})
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                url,
-                timeout=aiohttp.ClientTimeout(total=10),
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                    "Accept-Language": "en-US,en;q=0.9",
-                    "Referer": f"{parsed.scheme}://{parsed.hostname}/",
-                    "Origin": f"{parsed.scheme}://{parsed.hostname}",
-                    "Sec-Fetch-Dest": "image",
-                    "Sec-Fetch-Mode": "no-cors",
-                    "Sec-Fetch-Site": "same-origin",
-                    "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131"',
-                    "Sec-Ch-Ua-Platform": '"Windows"',
-                },
-                allow_redirects=True,
-            ) as resp:
-                if resp.status != 200:
-                    raise HTTPException(status_code=resp.status, detail="Upstream image fetch failed")
-                data = await resp.read()
-                content_type = resp.content_type or "image/png"
-    except aiohttp.ClientError:
-        raise HTTPException(status_code=502, detail="Failed to fetch image")
+    # Build domain-specific header strategies
+    is_sofascore = "sofascore" in (parsed.hostname or "")
 
-    # Cache the result
-    if len(_image_cache) < _IMAGE_CACHE_MAX:
-        _image_cache[url] = (content_type, data)
+    if is_sofascore:
+        # SofaScore requires Referer from their own domain
+        header_strategies = [
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
+                "Referer": "https://www.sofascore.com/",
+                "Origin": "https://www.sofascore.com",
+                "Sec-Fetch-Dest": "image",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-site",
+                "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131"',
+                "Sec-Ch-Ua-Platform": '"Windows"',
+            },
+            {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+                "Accept": "image/*,*/*;q=0.8",
+                "Referer": "https://www.sofascore.com/",
+            },
+            {
+                "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+                "Accept": "*/*",
+            },
+        ]
+    else:
+        header_strategies = [
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": f"{parsed.scheme}://{parsed.hostname}/",
+                "Sec-Fetch-Dest": "image",
+                "Sec-Fetch-Mode": "no-cors",
+                "Sec-Fetch-Site": "cross-site",
+                "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131"',
+                "Sec-Ch-Ua-Platform": '"Windows"',
+            },
+            {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+                "Accept": "image/*,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
+                "Referer": f"{parsed.scheme}://{parsed.hostname}/",
+            },
+            {
+                "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+                "Accept": "*/*",
+            },
+        ]
 
-    return Response(content=data, media_type=content_type,
-                    headers={"Cache-Control": "public, max-age=86400"})
+    last_status = 502
+    for headers in header_strategies:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    timeout=aiohttp.ClientTimeout(total=15),
+                    headers=headers,
+                    allow_redirects=True,
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        content_type = resp.content_type or "image/png"
+                        # Cache the result
+                        if len(_image_cache) < _IMAGE_CACHE_MAX:
+                            _image_cache[url] = (content_type, data)
+                        return Response(
+                            content=data,
+                            media_type=content_type,
+                            headers={
+                                "Cache-Control": "public, max-age=86400",
+                                "Access-Control-Allow-Origin": "*",
+                            },
+                        )
+                    last_status = resp.status
+        except aiohttp.ClientError:
+            continue
+
+    raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
 
 
 
