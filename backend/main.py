@@ -2606,47 +2606,67 @@ async def image_proxy(url: str):
     if not parsed.hostname or not parsed.scheme.startswith("http"):
         raise HTTPException(status_code=400, detail="Invalid URL")
 
-    # Allow any image host — the proxy exists to avoid CORS/hotlink issues
-    # (restrict to http/https only for safety)
-
     # Check cache
     if url in _image_cache:
         content_type, data = _image_cache[url]
         return Response(content=data, media_type=content_type,
-                        headers={"Cache-Control": "public, max-age=86400"})
+                        headers={"Cache-Control": "public, max-age=86400",
+                                 "Access-Control-Allow-Origin": "*"})
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                url,
-                timeout=aiohttp.ClientTimeout(total=10),
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                    "Accept-Language": "en-US,en;q=0.9",
-                    "Referer": f"{parsed.scheme}://{parsed.hostname}/",
-                    "Origin": f"{parsed.scheme}://{parsed.hostname}",
-                    "Sec-Fetch-Dest": "image",
-                    "Sec-Fetch-Mode": "no-cors",
-                    "Sec-Fetch-Site": "same-origin",
-                    "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131"',
-                    "Sec-Ch-Ua-Platform": '"Windows"',
-                },
-                allow_redirects=True,
-            ) as resp:
-                if resp.status != 200:
-                    raise HTTPException(status_code=resp.status, detail="Upstream image fetch failed")
-                data = await resp.read()
-                content_type = resp.content_type or "image/png"
-    except aiohttp.ClientError:
-        raise HTTPException(status_code=502, detail="Failed to fetch image")
+    # Try multiple header strategies — some CDNs block cross-site fetches
+    header_strategies = [
+        {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": f"{parsed.scheme}://{parsed.hostname}/",
+            "Sec-Fetch-Dest": "image",
+            "Sec-Fetch-Mode": "no-cors",
+            "Sec-Fetch-Site": "cross-site",
+            "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131"',
+            "Sec-Ch-Ua-Platform": '"Windows"',
+        },
+        {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+            "Accept": "image/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
+            "Referer": f"{parsed.scheme}://{parsed.hostname}/",
+        },
+        {
+            "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+            "Accept": "*/*",
+        },
+    ]
 
-    # Cache the result
-    if len(_image_cache) < _IMAGE_CACHE_MAX:
-        _image_cache[url] = (content_type, data)
+    last_status = 502
+    for headers in header_strategies:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    timeout=aiohttp.ClientTimeout(total=15),
+                    headers=headers,
+                    allow_redirects=True,
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        content_type = resp.content_type or "image/png"
+                        # Cache the result
+                        if len(_image_cache) < _IMAGE_CACHE_MAX:
+                            _image_cache[url] = (content_type, data)
+                        return Response(
+                            content=data,
+                            media_type=content_type,
+                            headers={
+                                "Cache-Control": "public, max-age=86400",
+                                "Access-Control-Allow-Origin": "*",
+                            },
+                        )
+                    last_status = resp.status
+        except aiohttp.ClientError:
+            continue
 
-    return Response(content=data, media_type=content_type,
-                    headers={"Cache-Control": "public, max-age=86400"})
+    raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
 
 
 
