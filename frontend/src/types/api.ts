@@ -254,3 +254,114 @@ export interface SkillCornerCoverage {
   covered_leagues: string[];
   description: string;
 }
+
+// ── StatsBomb Open Data types ──
+
+export interface StatsBombSeason {
+  season_id: number;
+  season_name: string;
+}
+
+export interface StatsBombCompetition {
+  competition_id: number;
+  competition_name: string;
+  country_name: string;
+  seasons: StatsBombSeason[];
+}
+
+export interface StatsBombMatch {
+  match_id: number;
+  match_date: string | null;
+  kick_off: string | null;
+  home_team: string;
+  away_team: string;
+  home_score: number | null;
+  away_score: number | null;
+  competition_stage: string | null;
+  stadium: string | null;
+  referee: string | null;
+}
+
+export interface StatsBombTeamStats {
+  team: string;
+  goals: number;
+  shots: number;
+  shots_on_target: number;
+  passes: number;
+  passes_completed: number;
+  pass_accuracy: number;
+  tackles: number;
+  interceptions: number;
+  fouls: number;
+  yellow_cards: number;
+  red_cards: number;
+  corners: number;
+  dribbles: number;
+  dribbles_completed: number;
+  xg_total: number;
+}
+
+export interface StatsBombMatchSummary {
+  match_id: number;
+  teams: StatsBombTeamStats[];
+}
+
+export interface StatsBombLineupPlayer {
+  player_id: number | null;
+  player_name: string;
+  player_nickname: string | null;
+  jersey_number: number | null;
+  position: string | null;
+  country: string | null;
+}
+
+export interface StatsBombLineup {
+  team: string;
+  players: StatsBombLineupPlayer[];
+}
+
+export interface StatsBombShot {
+  player: string;
+  team: string;
+  minute: number;
+  second: number;
+  location_x: number | null;
+  location_y: number | null;
+  end_x: number | null;
+  end_y: number | null;
+  xg: number;
+  outcome: string;
+  technique: string | null;
+  body_part: string | null;
+  shot_type: string | null;
+}
+
+export interface StatsBombPlayerStats {
+  player: string;
+  team: string;
+  match_id: number;
+  passes: number;
+  passes_completed: number;
+  pass_accuracy: number;
+  shots: number;
+  shots_on_target: number;
+  goals: number;
+  assists: number;
+  xg: number;
+  xa: number;
+  tackles: number;
+  interceptions: number;
+  dribbles: number;
+  dribbles_completed: number;
+  dribble_success: number;
+  fouls_committed: number;
+  fouls_won: number;
+  ball_recoveries: number;
+  duels_won: number;
+  aerial_won: number;
+  touches: number;
+  key_passes: number;
+  crosses: number;
+  long_balls: number;
+  through_balls: number;
+}
