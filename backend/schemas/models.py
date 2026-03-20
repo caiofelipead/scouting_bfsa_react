@@ -294,5 +294,138 @@ class ContractImpactResponse(BaseModel):
     squad_context: Dict[str, Any] = {}
 
 
+# ── StatsBomb Open Data ──────────────────────────────────────────────
+
+class StatsBombCompetitionSeason(BaseModel):
+    season_id: int
+    season_name: str
+
+
+class StatsBombCompetition(BaseModel):
+    competition_id: int
+    competition_name: str
+    country_name: str
+    seasons: List[StatsBombCompetitionSeason]
+
+
+class StatsBombMatch(BaseModel):
+    match_id: int
+    match_date: Optional[str] = None
+    kick_off: Optional[str] = None
+    home_team: str
+    away_team: str
+    home_score: Optional[int] = None
+    away_score: Optional[int] = None
+    competition_stage: Optional[str] = None
+    stadium: Optional[str] = None
+    referee: Optional[str] = None
+
+
+class StatsBombTeamStats(BaseModel):
+    team: str
+    goals: int = 0
+    shots: int = 0
+    shots_on_target: int = 0
+    passes: int = 0
+    passes_completed: int = 0
+    pass_accuracy: float = 0.0
+    tackles: int = 0
+    interceptions: int = 0
+    fouls: int = 0
+    yellow_cards: int = 0
+    red_cards: int = 0
+    corners: int = 0
+    dribbles: int = 0
+    dribbles_completed: int = 0
+    xg_total: float = 0.0
+
+
+class StatsBombMatchSummary(BaseModel):
+    match_id: int
+    teams: List[StatsBombTeamStats]
+
+
+class StatsBombLineupPlayer(BaseModel):
+    player_id: Optional[int] = None
+    player_name: str
+    player_nickname: Optional[str] = None
+    jersey_number: Optional[int] = None
+    position: Optional[str] = None
+    country: Optional[str] = None
+
+
+class StatsBombLineup(BaseModel):
+    team: str
+    players: List[StatsBombLineupPlayer]
+
+
+class StatsBombPlayerStats(BaseModel):
+    player: str
+    team: str
+    match_id: int
+    passes: int = 0
+    passes_completed: int = 0
+    pass_accuracy: float = 0.0
+    shots: int = 0
+    shots_on_target: int = 0
+    goals: int = 0
+    assists: int = 0
+    xg: float = 0.0
+    xa: float = 0.0
+    tackles: int = 0
+    interceptions: int = 0
+    dribbles: int = 0
+    dribbles_completed: int = 0
+    dribble_success: float = 0.0
+    fouls_committed: int = 0
+    fouls_won: int = 0
+    ball_recoveries: int = 0
+    duels_won: int = 0
+    aerial_won: int = 0
+    touches: int = 0
+    key_passes: int = 0
+    crosses: int = 0
+    long_balls: int = 0
+    through_balls: int = 0
+
+
+class StatsBombShot(BaseModel):
+    player: str
+    team: str
+    minute: int = 0
+    second: int = 0
+    location_x: Optional[float] = None
+    location_y: Optional[float] = None
+    end_x: Optional[float] = None
+    end_y: Optional[float] = None
+    xg: float = 0.0
+    outcome: str = ""
+    technique: Optional[str] = None
+    body_part: Optional[str] = None
+    shot_type: Optional[str] = None
+
+
+class StatsBombPassNode(BaseModel):
+    player: str
+    avg_x: float
+    avg_y: float
+    total_passes: int
+
+
+class StatsBombPassEdge(BaseModel):
+    from_player: str = Field(alias="from")
+    to_player: str = Field(alias="to")
+    passes: int
+
+    model_config = {"populate_by_name": True}
+
+
+class StatsBombPassNetwork(BaseModel):
+    team: str
+    match_id: int
+    nodes: List[StatsBombPassNode]
+    edges: List[StatsBombPassEdge]
+
+
 # Fix forward reference
 TokenResponse.model_rebuild()
