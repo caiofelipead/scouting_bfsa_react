@@ -94,6 +94,7 @@ from services.statsbomb_open import (
     get_player_match_stats as sb_get_player_stats,
     get_shot_map as sb_get_shot_map,
     get_pass_network as sb_get_pass_network,
+    get_season_insights as sb_get_season_insights,
 )
 from config.mappings import (
     CLUB_LEAGUE_MAP,
@@ -2770,6 +2771,19 @@ async def statsbomb_player_stats(
     if "error" in stats:
         raise HTTPException(status_code=404, detail=stats["error"])
     return stats
+
+
+@app.get("/api/statsbomb/season/{competition_id}/{season_id}/insights")
+async def statsbomb_season_insights(
+    competition_id: int,
+    season_id: int,
+    _=Depends(get_current_user),
+):
+    """Aggregated season insights: team performance, top scorers, xG analysis, tactical patterns."""
+    insights = sb_get_season_insights(competition_id, season_id)
+    if "error" in insights:
+        raise HTTPException(status_code=404, detail=insights["error"])
+    return insights
 
 
 @app.get("/api/statsbomb/match/{match_id}/pass-network/{team_name}")
