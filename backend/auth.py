@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────
 
-SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "scouting-bfsa-secret-key-change-in-production")
+_secret = os.environ.get("JWT_SECRET_KEY")
+if not _secret:
+    raise ValueError("JWT_SECRET_KEY environment variable is required")
+SECRET_KEY = _secret
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("TOKEN_EXPIRE_MINUTES", "480"))
 
@@ -84,27 +87,14 @@ def init_db():
             """)
         conn.commit()
 
-        cur = _execute(conn, driver, "SELECT COUNT(*) FROM users")
-        count = cur.fetchone()[0]
-        if count == 0:
-            default_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "botafogo2024")
-            _execute(
-                conn, driver,
-                "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
-                (
-                    "admin@botafogo-sp.com",
-                    pwd_context.hash(default_password),
-                    "Administrador",
-                    "admin",
-                ),
-            )
-            conn.commit()
-            logger.info("Default admin user created: admin@botafogo-sp.com")
+        # Seed admin user from environment variables (no hardcoded credentials)
+        admin_email = os.environ.get("ADMIN_EMAIL")
+        admin_password = os.environ.get("ADMIN_PASSWORD")
+        admin_name = os.environ.get("ADMIN_NAME", "Administrador")
 
-        # Ensure the primary admin account exists with correct credentials
-        admin_email = os.environ.get("ADMIN_EMAIL", "caiofelipead@gmail.com")
-        admin_password = os.environ.get("ADMIN_PASSWORD", "bfsa2026")
-        admin_name = os.environ.get("ADMIN_NAME", "Caio Felipe")
+        if not admin_email or not admin_password:
+            logger.warning("ADMIN_EMAIL and ADMIN_PASSWORD env vars not set — skipping admin seed")
+            return
 
         cur = _execute(conn, driver, "SELECT id, password_hash FROM users WHERE email = ?", (admin_email,))
         row = cur.fetchone()
