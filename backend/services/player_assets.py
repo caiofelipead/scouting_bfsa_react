@@ -115,8 +115,25 @@ def load_player_assets_csv(csv_path: str = None):
                 count, len(_player_assets_by_name), len(_club_logos), len(_league_logos))
 
 
+def _is_sofascore_url(url: str) -> bool:
+    """Check if a URL is from SofaScore (which blocks external access with 403)."""
+    if not url:
+        return False
+    return "sofascore" in url.lower()
+
+
+def _usable_url(url: str) -> str:
+    """Return the URL only if it's not from a blocked source (SofaScore)."""
+    if not url or _is_sofascore_url(url):
+        return None
+    return url
+
+
 def get_player_assets(player_name: str, team: str = None) -> dict:
     """Look up player photo, club logo, and league logo.
+
+    Priority: API-Football enrichment cache first (reliable media.api-sports.io URLs),
+    then CSV as fallback (filtering out blocked SofaScore URLs).
 
     Returns dict with keys: photo_url, club_logo, league_logo, league_name
     All values may be None if not found.
@@ -129,48 +146,40 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
     name_norm = _normalize(player_name) if player_name else ""
     team_norm = _normalize(team) if team else ""
 
-    # Try exact (name, team) match first
-    if name_norm and team_norm:
-        entry = _player_assets.get((name_norm, team_norm))
-        if entry:
-            result["photo_url"] = entry.get("photo_url")
-            result["club_logo"] = entry.get("club_logo")
-            result["league_logo"] = entry.get("league_logo")
-            result["league_name"] = entry.get("league_name")
-            if result["photo_url"]:
-                return result
-
-    # Fallback: name-only from CSV
-    if name_norm and not result["photo_url"]:
-        entry = _player_assets_by_name.get(name_norm)
-        if entry:
-            if not result["club_logo"]:
-                result["club_logo"] = entry.get("club_logo")
-            if not result["league_logo"]:
-                result["league_logo"] = entry.get("league_logo")
-            if not result["league_name"]:
-                result["league_name"] = entry.get("league_name")
-            if entry.get("photo_url"):
-                result["photo_url"] = entry["photo_url"]
-                return result
-
-    # Fallback: API-Football enrichment cache (in-memory)
+    # 1) API-Football enrichment cache (in-memory) — most reliable source
     if name_norm:
         try:
             from services.enrichment import get_cached_photo, get_cached_team_logo
             cached_photo = get_cached_photo(player_name, team)
             if cached_photo:
                 result["photo_url"] = cached_photo
-            if not result["club_logo"] and team:
+            if team:
                 cached_logo = get_cached_team_logo(team)
                 if cached_logo:
                     result["club_logo"] = cached_logo
         except Exception:
             pass  # enrichment module not loaded yet
 
-    # At least try to get club logo by team name from CSV
+    # 2) CSV lookup for metadata and fallback URLs (filter out SofaScore)
+    csv_entry = None
+    if name_norm and team_norm:
+        csv_entry = _player_assets.get((name_norm, team_norm))
+    if not csv_entry and name_norm:
+        csv_entry = _player_assets_by_name.get(name_norm)
+
+    if csv_entry:
+        if not result["photo_url"]:
+            result["photo_url"] = _usable_url(csv_entry.get("photo_url"))
+        if not result["club_logo"]:
+            result["club_logo"] = _usable_url(csv_entry.get("club_logo"))
+        if not result["league_logo"]:
+            result["league_logo"] = _usable_url(csv_entry.get("league_logo"))
+        if not result["league_name"]:
+            result["league_name"] = csv_entry.get("league_name")
+
+    # 3) Club logo fallback from CSV index
     if not result["club_logo"] and team_norm and team_norm in _club_logos:
-        result["club_logo"] = _club_logos[team_norm]
+        result["club_logo"] = _usable_url(_club_logos[team_norm])
 
     return result
 
@@ -179,11 +188,13 @@ def get_club_logo(team: str) -> Optional[str]:
     """Get club logo URL by team name."""
     if not _loaded:
         load_player_assets_csv()
-    return _club_logos.get(_normalize(team)) if team else None
+    url = _club_logos.get(_normalize(team)) if team else None
+    return _usable_url(url)
 
 
 def get_league_logo(league: str) -> Optional[str]:
     """Get league logo URL by league name."""
     if not _loaded:
         load_player_assets_csv()
-    return _league_logos.get(_normalize(league)) if league else None
+    url = _league_logos.get(_normalize(league)) if league else None
+    return _usable_url(url)

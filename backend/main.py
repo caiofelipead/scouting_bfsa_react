@@ -2688,6 +2688,7 @@ _ALLOWED_IMAGE_HOSTS = {
     "upload.wikimedia.org",
     "tmssl.akamaized.net",
     "img.a.transfermarkt.technology",
+    "media.api-sports.io",
 }
 
 # Simple in-memory cache for proxied images (URL → (content_type, bytes))
