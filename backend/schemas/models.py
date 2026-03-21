@@ -24,8 +24,8 @@ class TokenResponse(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
 
 
 class UserOut(BaseModel):
@@ -36,9 +36,9 @@ class UserOut(BaseModel):
 
 
 class UserCreate(BaseModel):
-    email: str
-    password: str = Field(min_length=6)
-    name: str
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    name: str = Field(min_length=1, max_length=200)
     role: str = "analyst"
 
 
@@ -80,10 +80,10 @@ class PlayerProfile(BaseModel):
 # ── Rankings ──────────────────────────────────────────────────────────
 
 class RankingRequest(BaseModel):
-    position: str
-    min_minutes: int = 0
-    league: Optional[str] = None
-    top_n: int = 50
+    position: str = Field(min_length=1, max_length=50)
+    min_minutes: int = Field(0, ge=0, le=50000)
+    league: Optional[str] = Field(None, max_length=100)
+    top_n: int = Field(50, ge=1, le=500)
 
 
 class RankingEntry(BaseModel):
@@ -110,10 +110,10 @@ class RankingResponse(BaseModel):
 # ── Similarity ────────────────────────────────────────────────────────
 
 class SimilarityRequest(BaseModel):
-    player_name: str
-    position: str
-    top_n: int = 20
-    min_minutes: int = 500
+    player_name: str = Field(min_length=1, max_length=200)
+    position: str = Field(min_length=1, max_length=50)
+    top_n: int = Field(20, ge=1, le=500)
+    min_minutes: int = Field(500, ge=0, le=50000)
 
 
 class SimilarPlayer(BaseModel):
@@ -164,8 +164,8 @@ class LeagueSummary(BaseModel):
 # ── Scouting Intelligence ─────────────────────────────────────────────
 
 class TrajectoryRequest(BaseModel):
-    player_name: str
-    league: Optional[str] = None
+    player_name: str = Field(min_length=1, max_length=200)
+    league: Optional[str] = Field(None, max_length=100)
 
 
 class TrajectoryResponse(BaseModel):
@@ -212,9 +212,9 @@ class MarketOpportunityEntry(BaseModel):
 
 
 class MarketOpportunitiesRequest(BaseModel):
-    position: Optional[str] = None
-    top_n: int = 50
-    min_minutes: int = 400
+    position: Optional[str] = Field(None, max_length=50)
+    top_n: int = Field(50, ge=1, le=500)
+    min_minutes: int = Field(400, ge=0, le=50000)
 
 
 class MarketOpportunitiesResponse(BaseModel):
@@ -224,12 +224,12 @@ class MarketOpportunitiesResponse(BaseModel):
 
 
 class ReplacementRequest(BaseModel):
-    player_name: str
-    position: Optional[str] = None
-    top_n: int = 20
-    min_minutes: int = 400
-    age_min: Optional[float] = None
-    age_max: Optional[float] = None
+    player_name: str = Field(min_length=1, max_length=200)
+    position: Optional[str] = Field(None, max_length=50)
+    top_n: int = Field(20, ge=1, le=500)
+    min_minutes: int = Field(400, ge=0, le=50000)
+    age_min: Optional[float] = Field(None, ge=14, le=50)
+    age_max: Optional[float] = Field(None, ge=14, le=50)
     league_filter: Optional[List[str]] = None
 
 
@@ -261,9 +261,9 @@ class ReplacementResponse(BaseModel):
 # ── Contract Impact ───────────────────────────────────────────────
 
 class ContractImpactRequest(BaseModel):
-    player_name: str
-    league: Optional[str] = None
-    salary: Optional[float] = None
+    player_name: str = Field(min_length=1, max_length=200)
+    league: Optional[str] = Field(None, max_length=100)
+    salary: Optional[float] = Field(None, ge=0, le=100_000_000)
 
 
 class ContractImpactSquadPlayer(BaseModel):

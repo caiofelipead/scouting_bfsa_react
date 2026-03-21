@@ -5,7 +5,14 @@ import type { User, TokenResponse } from '../types/api';
 export function useAuth() {
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored);
+    } catch {
+      localStorage.removeItem('user');
+      localStorage.removeItem('access_token');
+      return null;
+    }
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
