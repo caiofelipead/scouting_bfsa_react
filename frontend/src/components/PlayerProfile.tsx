@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getFlagUrl } from '../lib/countryFlags';
 import {
   User,
   MapPin,
@@ -232,8 +233,16 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                     </span>
                   )}
                   {summary.nationality && (
-                    <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      <MapPin size={12} strokeWidth={1.5} />
+                    <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      {getFlagUrl(summary.nationality) ? (
+                        <img
+                          src={getFlagUrl(summary.nationality, 20)!}
+                          alt={summary.nationality}
+                          style={{ width: 16, height: 12, objectFit: 'cover', borderRadius: 1 }}
+                        />
+                      ) : (
+                        <MapPin size={12} strokeWidth={1.5} />
+                      )}
                       {summary.nationality}
                     </span>
                   )}

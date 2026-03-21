@@ -4,6 +4,7 @@ main.py — FastAPI Scouting API for Botafogo-SP
 Replaces the Streamlit monolith with async REST endpoints.
 """
 
+import asyncio
 import os
 import time
 import hashlib
@@ -346,6 +347,45 @@ def _ensure_data_loaded():
 
 # ── Lifespan ──────────────────────────────────────────────────────────
 
+async def _auto_enrich_background():
+    """Background task: auto-enrich player photos via API-Football after data loads."""
+    import asyncio
+    # Wait for data to be ready
+    while not _data_ready.is_set():
+        await asyncio.sleep(2)
+
+    try:
+        from services.enrichment import run_bulk_enrichment, load_asset_cache
+
+        df = _data.get("wyscout")
+        if df is None or "Jogador" not in df.columns or "Equipa" not in df.columns:
+            logger.info("Auto-enrichment: no WyScout data available, skipping")
+            return
+
+        # Build {team: [players]} dict
+        teams_with_players: Dict[str, List[str]] = {}
+        for _, row in df.iterrows():
+            team = str(row.get("Equipa", "")).strip() if pd.notna(row.get("Equipa")) else ""
+            player = str(row.get("Jogador", "")).strip()
+            if team and player:
+                teams_with_players.setdefault(team, []).append(player)
+
+        logger.info("Auto-enrichment: starting for %d teams", len(teams_with_players))
+        result = await run_bulk_enrichment(teams_with_players, max_api_calls=90)
+        logger.info(
+            "Auto-enrichment complete: %d teams processed, %d players matched, %d API calls used, stopped: %s",
+            result.get("teams_processed", 0),
+            result.get("players_matched", 0),
+            result.get("api_calls_used", 0),
+            result.get("stopped_reason"),
+        )
+
+        # Reload in-memory cache after enrichment
+        load_asset_cache()
+    except Exception as e:
+        logger.warning("Auto-enrichment failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -356,7 +396,18 @@ async def lifespan(app: FastAPI):
         _data_loading = True
         t = threading.Thread(target=_load_all_data, daemon=True)
         t.start()
+
+    # Start auto-enrichment in background (runs after data loads)
+    enrichment_task = asyncio.create_task(_auto_enrich_background())
+
     yield
+
+    # Cancel enrichment if still running on shutdown
+    enrichment_task.cancel()
+    try:
+        await enrichment_task
+    except asyncio.CancelledError:
+        pass
 
 
 # ── App ───────────────────────────────────────────────────────────────
@@ -788,8 +839,11 @@ async def list_players(
             for photo_col in ("photo_url", "Foto", "ImageDataURL", "image_url"):
                 val = row.get(photo_col)
                 if val is not None and pd.notna(val) and str(val).strip():
-                    photo_url = str(val).strip()
-                    break
+                    candidate = str(val).strip()
+                    # Skip SofaScore URLs (return 403 from server-side)
+                    if "sofascore" not in candidate.lower():
+                        photo_url = candidate
+                        break
 
         # Prefer hardcoded CLUB_LOGOS (logodetimes.com) — more reliable than SofaScore
         club_logo = CLUB_LOGOS.get(team_name) if team_name else None
@@ -1073,13 +1127,17 @@ async def get_player_profile(
         for photo_col in ("photo_url", "Foto", "ImageDataURL", "image_url"):
             val = row.get(photo_col)
             if val is not None and pd.notna(val) and str(val).strip():
-                photo_url = str(val).strip()
-                break
+                candidate = str(val).strip()
+                if "sofascore" not in candidate.lower():
+                    photo_url = candidate
+                    break
     # Fallback: get photo from análises sheet
     if not photo_url and ana_match is not None:
         foto_val = ana_match.get("Foto")
         if foto_val is not None and pd.notna(foto_val) and str(foto_val).strip():
-            photo_url = str(foto_val).strip()
+            candidate = str(foto_val).strip()
+            if "sofascore" not in candidate.lower():
+                photo_url = candidate
 
     # Fallback: on-demand API-Football enrichment (single player, worth the latency)
     if not photo_url and team_name_sc:
