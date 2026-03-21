@@ -19,6 +19,10 @@ import aiohttp
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.requests import Request
 
 from auth import (
     authenticate_user,
@@ -419,9 +423,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+_allowed_origins = os.environ.get(
+    "CORS_ORIGINS",
+    "https://botafogo-sp.vercel.app,http://localhost:5173",
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in _allowed_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -579,7 +592,8 @@ async def admin_enrichment_status(admin: dict = Depends(require_admin)):
 # ══════════════════════════════════════════════════════════════════════
 
 @app.post("/api/auth/login", response_model=TokenResponse)
-async def login(req: LoginRequest):
+@limiter.limit("5/minute")
+async def login(request: Request, req: LoginRequest):
     user = authenticate_user(req.email, req.password)
     if not user:
         raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
@@ -2755,7 +2769,8 @@ _IMAGE_CACHE_MAX = 2000
 
 
 @app.get("/api/image-proxy")
-async def image_proxy(url: str):
+@limiter.limit("30/minute")
+async def image_proxy(request: Request, url: str, _user: dict = Depends(get_current_user)):
     """Proxy external image URLs to avoid CORS/hotlink 403 errors."""
     from urllib.parse import urlparse
 
