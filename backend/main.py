@@ -86,16 +86,6 @@ from services.fuzzy_match import build_skillcorner_index, find_skillcorner_playe
 from services.player_assets import load_player_assets_csv, get_player_assets
 from services.database import init_scouting_tables, load_sheet_dataframe, has_data, get_sync_status
 from services.sync_sheets import sync_all_sheets
-from services.statsbomb_open import (
-    get_competitions as sb_get_competitions,
-    get_matches as sb_get_matches,
-    get_match_summary as sb_get_match_summary,
-    get_lineups as sb_get_lineups,
-    get_player_match_stats as sb_get_player_stats,
-    get_shot_map as sb_get_shot_map,
-    get_pass_network as sb_get_pass_network,
-    get_season_insights as sb_get_season_insights,
-)
 from services.api_football import (
     get_countries as apif_get_countries,
     get_leagues as apif_get_leagues,
@@ -2735,89 +2725,6 @@ async def image_proxy(url: str):
 
     raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
 
-
-
-# ── StatsBomb Open Data endpoints ─────────────────────────────────────
-
-
-@app.get("/api/statsbomb/competitions")
-async def statsbomb_competitions(_=Depends(get_current_user)):
-    """List all available competitions and seasons from StatsBomb Open Data."""
-    competitions = sb_get_competitions()
-    return {"total": len(competitions), "competitions": competitions}
-
-
-@app.get("/api/statsbomb/matches/{competition_id}/{season_id}")
-async def statsbomb_matches(
-    competition_id: int,
-    season_id: int,
-    _=Depends(get_current_user),
-):
-    """List all matches for a competition/season."""
-    matches = sb_get_matches(competition_id, season_id)
-    return {"total": len(matches), "matches": matches}
-
-
-@app.get("/api/statsbomb/match/{match_id}/summary")
-async def statsbomb_match_summary(match_id: int, _=Depends(get_current_user)):
-    """Get aggregated team stats for a match (shots, passes, xG, cards, etc.)."""
-    summary = sb_get_match_summary(match_id)
-    if "error" in summary:
-        raise HTTPException(status_code=404, detail=summary["error"])
-    return summary
-
-
-@app.get("/api/statsbomb/match/{match_id}/lineups")
-async def statsbomb_lineups(match_id: int, _=Depends(get_current_user)):
-    """Get lineups for a match."""
-    lineups = sb_get_lineups(match_id)
-    return {"match_id": match_id, "lineups": lineups}
-
-
-@app.get("/api/statsbomb/match/{match_id}/shots")
-async def statsbomb_shots(match_id: int, _=Depends(get_current_user)):
-    """Get all shots with xG and location for shot map visualization."""
-    shots = sb_get_shot_map(match_id)
-    return {"match_id": match_id, "total": len(shots), "shots": shots}
-
-
-@app.get("/api/statsbomb/match/{match_id}/player/{player_name}")
-async def statsbomb_player_stats(
-    match_id: int,
-    player_name: str,
-    _=Depends(get_current_user),
-):
-    """Get detailed stats for a specific player in a match."""
-    stats = sb_get_player_stats(match_id, player_name)
-    if "error" in stats:
-        raise HTTPException(status_code=404, detail=stats["error"])
-    return stats
-
-
-@app.get("/api/statsbomb/season/{competition_id}/{season_id}/insights")
-async def statsbomb_season_insights(
-    competition_id: int,
-    season_id: int,
-    _=Depends(get_current_user),
-):
-    """Aggregated season insights: team performance, top scorers, xG analysis, tactical patterns."""
-    insights = sb_get_season_insights(competition_id, season_id)
-    if "error" in insights:
-        raise HTTPException(status_code=404, detail=insights["error"])
-    return insights
-
-
-@app.get("/api/statsbomb/match/{match_id}/pass-network/{team_name}")
-async def statsbomb_pass_network(
-    match_id: int,
-    team_name: str,
-    _=Depends(get_current_user),
-):
-    """Get pass network (nodes + edges) for a team in a match."""
-    network = sb_get_pass_network(match_id, team_name)
-    if "error" in network:
-        raise HTTPException(status_code=404, detail=network["error"])
-    return network
 
 
 # ── API-Football v3 endpoints ─────────────────────────────────────────

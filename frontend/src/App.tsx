@@ -21,7 +21,6 @@ import OpportunitiesPage from './pages/OpportunitiesPage';
 import ReplacementsPage from './pages/ReplacementsPage';
 import ContractImpactPage from './pages/ContractImpactPage';
 import ScoutingReportPage from './pages/ScoutingReportPage';
-import StatsBombPage from './pages/StatsBombPage';
 import ApiFootballPage from './pages/ApiFootballPage';
 
 function App() {
@@ -66,8 +65,6 @@ function App() {
         return <ContractImpactPage />;
       case 'scouting_report':
         return <ScoutingReportPage />;
-      case 'statsbomb':
-        return <StatsBombPage />;
       case 'apifootball':
         return <ApiFootballPage />;
       default:
