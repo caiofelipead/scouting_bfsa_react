@@ -436,9 +436,26 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _allowed_origins],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
+
+
+# ── Security headers middleware ──────────────────────────────────────
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -447,64 +464,26 @@ app.add_middleware(
 
 @app.get("/api/health")
 async def health_check():
-    """Health check — returns quickly even during cold start."""
+    """Health check — returns status without exposing internals."""
     ready = _data_ready.is_set()
     counts = {k: len(v) for k, v in _data.items()} if ready else {}
 
-    # Database diagnostics
-    db_diag = {}
-    from services.database import DATABASE_URL
-    db_diag["database_url_set"] = bool(DATABASE_URL)
-    db_diag["database_url_preview"] = (DATABASE_URL[:30] + "...") if DATABASE_URL else "(empty)"
+    db_ok = False
     try:
         from services.database import get_connection
         conn = get_connection()
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM scouting_rows")
-            db_diag["scouting_rows_count"] = cur.fetchone()[0]
-            cur.execute("SELECT sheet_key, COUNT(*) FROM scouting_rows GROUP BY sheet_key")
-            db_diag["rows_per_sheet"] = {r[0]: r[1] for r in cur.fetchall()}
+            cur.execute("SELECT 1")
         conn.close()
-        db_diag["connection"] = "ok"
-    except Exception as e:
-        db_diag["connection"] = f"error: {e}"
+        db_ok = True
+    except Exception:
+        pass
 
-    sc_diag = None
-    if ready:
-        sc_df = _data.get("skillcorner")
-        ws_df = _data.get("wyscout")
-        if sc_df is not None and len(sc_df) > 0:
-            sc_diag = {
-                "columns": list(sc_df.columns),
-                "sample_players": [
-                    {col: (str(row[col]) if pd.notna(row.get(col)) else None) for col in ["player_name", "short_name", "team_name"] if col in sc_df.columns}
-                    for _, row in sc_df.head(5).iterrows()
-                ],
-            }
-            if ws_df is not None and len(ws_df) > 0:
-                ws_sample = [
-                    str(r.get("Jogador", "")) for _, r in ws_df.head(5).iterrows()
-                ]
-                sc_diag["wyscout_sample_names"] = ws_sample
-                # Try matching first wyscout player
-                try:
-                    test_name = str(ws_df.iloc[0].get("Jogador", ""))
-                    test_team = str(ws_df.iloc[0].get("Equipa", "")) if pd.notna(ws_df.iloc[0].get("Equipa")) else None
-                    test_match = find_skillcorner_player(test_name, sc_df, team_name=test_team)
-                    sc_diag["test_match"] = {
-                        "searched": test_name,
-                        "team": test_team,
-                        "found": test_match is not None,
-                        "matched_name": str(test_match.get("player_name", "")) if test_match is not None else None,
-                    }
-                except Exception as e:
-                    sc_diag["test_match_error"] = str(e)
     return {
         "status": "ready" if ready else "loading",
         "data_loaded": ready,
         "counts": counts,
-        "database": db_diag,
-        "skillcorner_diagnostic": sc_diag,
+        "database": {"connection": "ok" if db_ok else "error"},
     }
 
 
@@ -615,7 +594,8 @@ async def admin_list_users(admin: dict = Depends(require_admin)):
 
 
 @app.post("/api/admin/users")
-async def admin_create_user(req: UserCreate, admin: dict = Depends(require_admin)):
+@limiter.limit("10/minute")
+async def admin_create_user(request: Request, req: UserCreate, admin: dict = Depends(require_admin)):
     err = create_user(req.email, req.password, req.name, req.role)
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -1201,7 +1181,9 @@ async def get_player_profile(
 # ══════════════════════════════════════════════════════════════════════
 
 @app.post("/api/rankings", response_model=RankingResponse)
+@limiter.limit("30/minute")
 async def get_rankings(
+    request: Request,
     req: RankingRequest,
     current_user: dict = Depends(get_current_user),
 ):
@@ -1278,7 +1260,9 @@ async def get_rankings(
 
 
 @app.post("/api/rankings/prediction")
+@limiter.limit("20/minute")
 async def get_prediction_rankings(
+    request: Request,
     req: dict,
     current_user: dict = Depends(get_current_user),
 ):
@@ -1385,7 +1369,9 @@ async def get_prediction_rankings(
 # ══════════════════════════════════════════════════════════════════════
 
 @app.post("/api/similarity")
+@limiter.limit("20/minute")
 async def find_similar_players(
+    request: Request,
     req: SimilarityRequest,
     current_user: dict = Depends(get_current_user),
 ):
@@ -1818,7 +1804,8 @@ async def analyses_players(
         raise
     except Exception as e:
         logger.error("analyses_players endpoint failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erro ao processar análises: {str(e)}")
+        logger.error("Erro ao processar análises: %s", e)
+        raise HTTPException(status_code=500, detail="Erro ao processar análises")
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -2017,7 +2004,9 @@ async def get_data_table(
 # ══════════════════════════════════════════════════════════════════════
 
 @app.post("/api/prediction")
+@limiter.limit("20/minute")
 async def predict_contract_success(
+    request: Request,
     req: dict,
     current_user: dict = Depends(get_current_user),
 ):
@@ -2166,7 +2155,9 @@ def _generate_cluster_name(centroid: dict, position: str, cluster_id: int) -> st
 
 
 @app.post("/api/clusters")
+@limiter.limit("20/minute")
 async def get_clusters(
+    request: Request,
     req: dict,
     current_user: dict = Depends(get_current_user),
 ):
@@ -2777,6 +2768,26 @@ async def image_proxy(request: Request, url: str, _user: dict = Depends(get_curr
     parsed = urlparse(url)
     if not parsed.hostname or not parsed.scheme.startswith("http"):
         raise HTTPException(status_code=400, detail="Invalid URL")
+
+    # SSRF protection: only allow known image hosting domains
+    _ALLOWED_IMAGE_DOMAINS = {
+        "media.api-sports.io",
+        "apiv3.apifootball.com",
+        "api.sofascore.app",
+        "www.sofascore.com",
+        "sofascore.com",
+        "img.api.sofascore.app",
+        "api-football-v1.p.rapidapi.com",
+        "cdn.sofifa.net",
+        "cdn.futbin.com",
+        "tmssl.akamaized.net",       # Transfermarkt
+        "img.sofascore.com",
+        "flagcdn.com",
+        "flagsapi.com",
+    }
+    hostname = parsed.hostname.lower()
+    if not any(hostname == d or hostname.endswith("." + d) for d in _ALLOWED_IMAGE_DOMAINS):
+        raise HTTPException(status_code=403, detail="Domain not allowed")
 
     # Check cache
     if url in _image_cache:

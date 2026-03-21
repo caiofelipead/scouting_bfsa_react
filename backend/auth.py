@@ -203,8 +203,14 @@ def create_user(email: str, password: str, name: str, role: str = "analyst") -> 
     pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if not re.match(pattern, email):
         return "Formato de e-mail inválido."
-    if len(password) < 6:
-        return "A senha deve ter pelo menos 6 caracteres."
+    if len(password) < 8:
+        return "A senha deve ter pelo menos 8 caracteres."
+    if not re.search(r"[A-Z]", password):
+        return "A senha deve conter pelo menos uma letra maiúscula."
+    if not re.search(r"[a-z]", password):
+        return "A senha deve conter pelo menos uma letra minúscula."
+    if not re.search(r"\d", password):
+        return "A senha deve conter pelo menos um número."
     if role not in ("admin", "analyst"):
         return "Papel inválido."
 
