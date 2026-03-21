@@ -322,10 +322,11 @@ def _ensure_data_loaded():
 
 async def _auto_enrich_background():
     """Background task: auto-enrich player photos via API-Football after data loads."""
-    import asyncio
-    # Wait for data to be ready
-    while not _data_ready.is_set():
-        await asyncio.sleep(2)
+    # Wait for data to be ready (non-blocking — offloads blocking wait to thread)
+    await asyncio.to_thread(_data_ready.wait, 300)  # 5 min timeout
+    if not _data_ready.is_set():
+        logger.warning("Auto-enrichment: data never became ready, skipping")
+        return
 
     try:
         from services.enrichment import run_bulk_enrichment, load_asset_cache
@@ -425,6 +426,31 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ── Request logging middleware (request_id + response time) ──────────
+import uuid as _uuid
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(_uuid.uuid4())[:8])
+        start = time.time()
+        response = await call_next(request)
+        elapsed_ms = round((time.time() - start) * 1000, 1)
+        response.headers["X-Request-ID"] = request_id
+        # Skip noisy health checks
+        if request.url.path != "/api/health":
+            logger.info(
+                "[%s] %s %s → %s (%.1fms)",
+                request_id,
+                request.method,
+                request.url.path,
+                response.status_code,
+                elapsed_ms,
+            )
+        return response
+
+app.add_middleware(RequestLoggingMiddleware)
 
 # ── Register modular routers ──────────────────────────────────────────
 from routes.auth import router as auth_router
