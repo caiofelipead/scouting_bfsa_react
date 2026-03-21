@@ -1219,6 +1219,14 @@ async def get_rankings(
         return result
 
     ranked = ranked.head(req.top_n)
+
+    # Batch load assets for all players at once (avoid N+1 import overhead)
+    player_teams = [
+        (str(row.get("Jogador", "")), str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None)
+        for _, row in ranked.iterrows()
+    ]
+    assets_map = {pt: get_player_assets(pt[0], pt[1]) for pt in player_teams}
+
     entries = []
     for rank, (idx, row) in enumerate(ranked.iterrows(), 1):
         idx_values = {}
@@ -1229,7 +1237,7 @@ async def get_rankings(
 
         player_name = str(row.get("Jogador", ""))
         team_name = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
-        assets = get_player_assets(player_name, team_name)
+        assets = assets_map.get((player_name, team_name), {})
 
         # Prefer hardcoded logos (logodetimes.com) over SofaScore
         rank_club_logo = (CLUB_LOGOS.get(team_name) if team_name else None) or assets.get("club_logo")
@@ -2754,9 +2762,9 @@ _ALLOWED_IMAGE_HOSTS = {
     "media.api-sports.io",
 }
 
-# Simple in-memory cache for proxied images (URL → (content_type, bytes))
-_image_cache: Dict[str, tuple] = {}
-_IMAGE_CACHE_MAX = 2000
+# Simple in-memory TTL cache for proxied images (URL → (content_type, bytes))
+from cachetools import TTLCache
+_image_cache: TTLCache = TTLCache(maxsize=2000, ttl=3600)  # 1 hour TTL
 
 
 @app.get("/api/image-proxy")
@@ -2862,9 +2870,8 @@ async def image_proxy(request: Request, url: str, _user: dict = Depends(get_curr
                     if resp.status == 200:
                         data = await resp.read()
                         content_type = resp.content_type or "image/png"
-                        # Cache the result
-                        if len(_image_cache) < _IMAGE_CACHE_MAX:
-                            _image_cache[url] = (content_type, data)
+                        # Cache the result (TTLCache handles maxsize & eviction)
+                        _image_cache[url] = (content_type, data)
                         return Response(
                             content=data,
                             media_type=content_type,

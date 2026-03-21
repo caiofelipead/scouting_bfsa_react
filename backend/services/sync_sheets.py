@@ -35,7 +35,7 @@ def _download_sheet_csv(sheet_id: str, sheet_name: str) -> pd.DataFrame:
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded}"
     try:
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             raw = resp.read().decode("utf-8")
         df = pd.read_csv(io.StringIO(raw), dtype=str, na_values=["", "-", "N/A", "nan"])
         logger.info("Downloaded sheet '%s': %d rows x %d cols", sheet_name, len(df), len(df.columns))

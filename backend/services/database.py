@@ -11,10 +11,14 @@ from typing import Dict, Optional
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
+from psycopg2 import pool as pg_pool
 
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
+
+# ── Connection Pool ────────────────────────────────────────────────────
+_pool: Optional[pg_pool.SimpleConnectionPool] = None
 
 
 def _get_pg_url() -> str:
@@ -24,14 +28,33 @@ def _get_pg_url() -> str:
     return url
 
 
+def _get_pool() -> pg_pool.SimpleConnectionPool:
+    global _pool
+    if _pool is None or _pool.closed:
+        url = _get_pg_url()
+        if not url:
+            raise RuntimeError("DATABASE_URL not set — cannot connect to Neon PostgreSQL")
+        _pool = pg_pool.SimpleConnectionPool(
+            minconn=2, maxconn=10, dsn=url, connect_timeout=10
+        )
+        logger.info("PostgreSQL connection pool created (min=2, max=10)")
+    return _pool
+
+
 def get_connection():
-    """Return a psycopg2 connection to Neon PostgreSQL."""
-    url = _get_pg_url()
-    if not url:
-        raise RuntimeError("DATABASE_URL not set — cannot connect to Neon PostgreSQL")
-    conn = psycopg2.connect(url, connect_timeout=10)
+    """Return a psycopg2 connection from the pool."""
+    conn = _get_pool().getconn()
     conn.autocommit = False
     return conn
+
+
+def release_connection(conn):
+    """Return a connection to the pool."""
+    try:
+        if _pool and not _pool.closed:
+            _pool.putconn(conn)
+    except Exception:
+        pass
 
 
 # ── Schema ────────────────────────────────────────────────────────────
@@ -53,6 +76,12 @@ CREATE TABLE IF NOT EXISTS scouting_rows (
 
 CREATE INDEX IF NOT EXISTS idx_scouting_rows_sheet
     ON scouting_rows (sheet_key);
+
+CREATE INDEX IF NOT EXISTS idx_scouting_rows_sheet_row
+    ON scouting_rows (sheet_key, row_index);
+
+CREATE INDEX IF NOT EXISTS idx_scouting_rows_data
+    ON scouting_rows USING gin (data);
 """
 
 
@@ -68,7 +97,7 @@ def init_scouting_tables():
         conn.rollback()
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 # ── Write (sync from Google Sheets) ──────────────────────────────────
@@ -123,7 +152,7 @@ def upsert_sheet_data(sheet_key: str, df: pd.DataFrame):
         conn.rollback()
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 # ── Read (fast queries from Neon) ────────────────────────────────────
@@ -148,7 +177,7 @@ def load_sheet_dataframe(sheet_key: str) -> pd.DataFrame:
         logger.info("Loaded %d rows for sheet '%s' from PostgreSQL", len(df), sheet_key)
         return df
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def get_sync_status() -> Dict[str, Optional[str]]:
@@ -160,7 +189,7 @@ def get_sync_status() -> Dict[str, Optional[str]]:
             rows = cur.fetchall()
         return {row[0]: row[1].isoformat() if row[1] else None for row in rows}
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def has_data() -> bool:
@@ -173,4 +202,4 @@ def has_data() -> bool:
     except Exception:
         return False
     finally:
-        conn.close()
+        release_connection(conn)
