@@ -15,30 +15,19 @@ from typing import Optional, List, Dict, Any
 
 import numpy as np
 import pandas as pd
-import aiohttp
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.requests import Request
 
 from auth import (
-    authenticate_user,
-    create_access_token,
-    create_user,
-    delete_user,
     get_current_user,
     init_db,
-    list_users,
     require_admin,
 )
 from schemas.models import (
-    LoginRequest,
-    TokenResponse,
-    UserCreate,
-    UserOut,
     PlayerProfile,
     PlayerSummary,
     RankingEntry,
@@ -91,27 +80,7 @@ from services.fuzzy_match import build_skillcorner_index, find_skillcorner_playe
 from services.player_assets import load_player_assets_csv, get_player_assets
 from services.database import init_scouting_tables, load_sheet_dataframe, has_data, get_sync_status
 from services.sync_sheets import sync_all_sheets
-from services.api_football import (
-    get_countries as apif_get_countries,
-    get_leagues as apif_get_leagues,
-    get_league_seasons as apif_get_league_seasons,
-    get_teams as apif_get_teams,
-    get_team_info as apif_get_team_info,
-    get_players as apif_get_players,
-    get_squads as apif_get_squads,
-    get_top_scorers as apif_get_top_scorers,
-    get_top_assists as apif_get_top_assists,
-    get_standings as apif_get_standings,
-    get_fixtures as apif_get_fixtures,
-    get_fixture_statistics as apif_get_fixture_statistics,
-    get_fixture_events as apif_get_fixture_events,
-    get_fixture_lineups as apif_get_fixture_lineups,
-    get_fixture_player_stats as apif_get_fixture_player_stats,
-    get_transfers as apif_get_transfers,
-    get_coaches as apif_get_coaches,
-    get_injuries as apif_get_injuries,
-    get_trophies as apif_get_trophies,
-)
+# API-Football imports moved to routes/apifootball.py
 from config.mappings import (
     CLUB_LEAGUE_MAP,
     CLUB_LOGOS,
@@ -457,6 +426,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# ── Register modular routers ──────────────────────────────────────────
+from routes.auth import router as auth_router
+from routes.apifootball import router as apifootball_router
+from routes.proxy import router as proxy_router
+
+app.include_router(auth_router)
+app.include_router(apifootball_router)
+app.include_router(proxy_router)
+
 
 # ══════════════════════════════════════════════════════════════════════
 # HEALTH CHECK
@@ -566,48 +544,7 @@ async def admin_enrichment_status(admin: dict = Depends(require_admin)):
     return stats
 
 
-# ══════════════════════════════════════════════════════════════════════
-# AUTH ENDPOINTS
-# ══════════════════════════════════════════════════════════════════════
-
-@app.post("/api/auth/login", response_model=TokenResponse)
-@limiter.limit("5/minute")
-async def login(request: Request, req: LoginRequest):
-    user = authenticate_user(req.email, req.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
-    token = create_access_token({"sub": user["email"], "role": user["role"], "name": user["name"]})
-    return TokenResponse(
-        access_token=token,
-        user=UserOut(**user),
-    )
-
-
-@app.get("/api/auth/me", response_model=UserOut)
-async def get_me(current_user: dict = Depends(get_current_user)):
-    return UserOut(id=0, **current_user)
-
-
-@app.get("/api/admin/users")
-async def admin_list_users(admin: dict = Depends(require_admin)):
-    return list_users()
-
-
-@app.post("/api/admin/users")
-@limiter.limit("10/minute")
-async def admin_create_user(request: Request, req: UserCreate, admin: dict = Depends(require_admin)):
-    err = create_user(req.email, req.password, req.name, req.role)
-    if err:
-        raise HTTPException(status_code=400, detail=err)
-    return {"message": f"Usuário {req.email} cadastrado com sucesso"}
-
-
-@app.delete("/api/admin/users/{user_id}")
-async def admin_delete_user(user_id: int, admin: dict = Depends(require_admin)):
-    err = delete_user(user_id)
-    if err:
-        raise HTTPException(status_code=400, detail=err)
-    return {"message": "Usuário removido"}
+# ── Auth & User Management routes → see routes/auth.py
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -2749,332 +2686,9 @@ async def get_league_powers(current_user: dict = Depends(get_current_user)):
     }
 
 
-# ── Image Proxy ───────────────────────────────────────────────────────
 
-_ALLOWED_IMAGE_HOSTS = {
-    "api.sofascore.com",
-    "images.fotmob.com",
-    "logodetimes.com",
-    "www.logodetimes.com",
-    "upload.wikimedia.org",
-    "tmssl.akamaized.net",
-    "img.a.transfermarkt.technology",
-    "media.api-sports.io",
-}
+# ── Image Proxy & API-Football routes → see routes/proxy.py, routes/apifootball.py
 
-# Simple in-memory TTL cache for proxied images (URL → (content_type, bytes))
-from cachetools import TTLCache
-_image_cache: TTLCache = TTLCache(maxsize=2000, ttl=3600)  # 1 hour TTL
-
-
-@app.get("/api/image-proxy")
-@limiter.limit("30/minute")
-async def image_proxy(request: Request, url: str, _user: dict = Depends(get_current_user)):
-    """Proxy external image URLs to avoid CORS/hotlink 403 errors."""
-    from urllib.parse import urlparse
-
-    parsed = urlparse(url)
-    if not parsed.hostname or not parsed.scheme.startswith("http"):
-        raise HTTPException(status_code=400, detail="Invalid URL")
-
-    # SSRF protection: only allow known image hosting domains
-    _ALLOWED_IMAGE_DOMAINS = {
-        "media.api-sports.io",
-        "apiv3.apifootball.com",
-        "api.sofascore.app",
-        "www.sofascore.com",
-        "sofascore.com",
-        "img.api.sofascore.app",
-        "api-football-v1.p.rapidapi.com",
-        "cdn.sofifa.net",
-        "cdn.futbin.com",
-        "tmssl.akamaized.net",       # Transfermarkt
-        "img.sofascore.com",
-        "flagcdn.com",
-        "flagsapi.com",
-    }
-    hostname = parsed.hostname.lower()
-    if not any(hostname == d or hostname.endswith("." + d) for d in _ALLOWED_IMAGE_DOMAINS):
-        raise HTTPException(status_code=403, detail="Domain not allowed")
-
-    # Check cache
-    if url in _image_cache:
-        content_type, data = _image_cache[url]
-        return Response(content=data, media_type=content_type,
-                        headers={"Cache-Control": "public, max-age=86400",
-                                 "Access-Control-Allow-Origin": "*"})
-
-    # Build domain-specific header strategies
-    is_sofascore = "sofascore" in (parsed.hostname or "")
-
-    if is_sofascore:
-        # SofaScore requires Referer from their own domain
-        header_strategies = [
-            {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
-                "Referer": "https://www.sofascore.com/",
-                "Origin": "https://www.sofascore.com",
-                "Sec-Fetch-Dest": "image",
-                "Sec-Fetch-Mode": "cors",
-                "Sec-Fetch-Site": "same-site",
-                "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131"',
-                "Sec-Ch-Ua-Platform": '"Windows"',
-            },
-            {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
-                "Accept": "image/*,*/*;q=0.8",
-                "Referer": "https://www.sofascore.com/",
-            },
-            {
-                "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-                "Accept": "*/*",
-            },
-        ]
-    else:
-        header_strategies = [
-            {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": f"{parsed.scheme}://{parsed.hostname}/",
-                "Sec-Fetch-Dest": "image",
-                "Sec-Fetch-Mode": "no-cors",
-                "Sec-Fetch-Site": "cross-site",
-                "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131"',
-                "Sec-Ch-Ua-Platform": '"Windows"',
-            },
-            {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
-                "Accept": "image/*,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
-                "Referer": f"{parsed.scheme}://{parsed.hostname}/",
-            },
-            {
-                "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-                "Accept": "*/*",
-            },
-        ]
-
-    last_status = 502
-    for headers in header_strategies:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url,
-                    timeout=aiohttp.ClientTimeout(total=15),
-                    headers=headers,
-                    allow_redirects=True,
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        content_type = resp.content_type or "image/png"
-                        # Cache the result (TTLCache handles maxsize & eviction)
-                        _image_cache[url] = (content_type, data)
-                        return Response(
-                            content=data,
-                            media_type=content_type,
-                            headers={
-                                "Cache-Control": "public, max-age=86400",
-                                "Access-Control-Allow-Origin": "*",
-                            },
-                        )
-                    last_status = resp.status
-        except aiohttp.ClientError:
-            continue
-
-    raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
-
-
-
-# ── API-Football v3 endpoints ─────────────────────────────────────────
-
-@app.get("/api/apifootball/countries")
-async def apifootball_countries(_=Depends(get_current_user)):
-    """List all countries with league data."""
-    return await apif_get_countries()
-
-
-@app.get("/api/apifootball/leagues")
-async def apifootball_leagues(
-    country: Optional[str] = Query(None),
-    season: Optional[int] = Query(None),
-    _=Depends(get_current_user),
-):
-    """List leagues, optionally filtered by country and/or season."""
-    return await apif_get_leagues(country=country, season=season)
-
-
-@app.get("/api/apifootball/leagues/{league_id}/seasons")
-async def apifootball_league_seasons(league_id: int, _=Depends(get_current_user)):
-    """Get available seasons for a league."""
-    return await apif_get_league_seasons(league_id)
-
-
-@app.get("/api/apifootball/teams")
-async def apifootball_teams(
-    league: int = Query(...),
-    season: int = Query(...),
-    _=Depends(get_current_user),
-):
-    """List teams in a league/season."""
-    return await apif_get_teams(league, season)
-
-
-@app.get("/api/apifootball/teams/{team_id}")
-async def apifootball_team_info(team_id: int, _=Depends(get_current_user)):
-    """Get team details + venue."""
-    info = await apif_get_team_info(team_id)
-    if not info:
-        raise HTTPException(status_code=404, detail="Team not found")
-    return info
-
-
-@app.get("/api/apifootball/players")
-async def apifootball_players(
-    league: Optional[int] = Query(None),
-    season: Optional[int] = Query(None),
-    team: Optional[int] = Query(None),
-    player_id: Optional[int] = Query(None, alias="id"),
-    search: Optional[str] = Query(None),
-    page: int = Query(1),
-    _=Depends(get_current_user),
-):
-    """Search/list players with statistics (paginated, 20 per page)."""
-    return await apif_get_players(
-        league_id=league, season=season, team_id=team,
-        player_id=player_id, search=search, page=page,
-    )
-
-
-@app.get("/api/apifootball/squads/{team_id}")
-async def apifootball_squads(team_id: int, _=Depends(get_current_user)):
-    """Get current squad for a team."""
-    return await apif_get_squads(team_id)
-
-
-@app.get("/api/apifootball/topscorers")
-async def apifootball_top_scorers(
-    league: int = Query(...),
-    season: int = Query(...),
-    _=Depends(get_current_user),
-):
-    """Top scorers for a league/season."""
-    return await apif_get_top_scorers(league, season)
-
-
-@app.get("/api/apifootball/topassists")
-async def apifootball_top_assists(
-    league: int = Query(...),
-    season: int = Query(...),
-    _=Depends(get_current_user),
-):
-    """Top assist providers for a league/season."""
-    return await apif_get_top_assists(league, season)
-
-
-@app.get("/api/apifootball/standings")
-async def apifootball_standings(
-    league: int = Query(...),
-    season: int = Query(...),
-    _=Depends(get_current_user),
-):
-    """League standings."""
-    return await apif_get_standings(league, season)
-
-
-@app.get("/api/apifootball/fixtures")
-async def apifootball_fixtures(
-    league: Optional[int] = Query(None),
-    season: Optional[int] = Query(None),
-    team: Optional[int] = Query(None),
-    date: Optional[str] = Query(None),
-    from_date: Optional[str] = Query(None, alias="from"),
-    to_date: Optional[str] = Query(None, alias="to"),
-    status: Optional[str] = Query(None),
-    last: Optional[int] = Query(None),
-    next_n: Optional[int] = Query(None, alias="next"),
-    fixture_id: Optional[int] = Query(None, alias="id"),
-    round_name: Optional[str] = Query(None, alias="round"),
-    _=Depends(get_current_user),
-):
-    """List fixtures with flexible filters."""
-    return await apif_get_fixtures(
-        league_id=league, season=season, team_id=team,
-        date=date, from_date=from_date, to_date=to_date,
-        status=status, last=last, next_n=next_n,
-        fixture_id=fixture_id, round_name=round_name,
-    )
-
-
-@app.get("/api/apifootball/fixtures/{fixture_id}/statistics")
-async def apifootball_fixture_stats(fixture_id: int, _=Depends(get_current_user)):
-    """Match statistics (possession, shots, passes, etc.)."""
-    return await apif_get_fixture_statistics(fixture_id)
-
-
-@app.get("/api/apifootball/fixtures/{fixture_id}/events")
-async def apifootball_fixture_events(fixture_id: int, _=Depends(get_current_user)):
-    """Match events (goals, cards, subs)."""
-    return await apif_get_fixture_events(fixture_id)
-
-
-@app.get("/api/apifootball/fixtures/{fixture_id}/lineups")
-async def apifootball_fixture_lineups(fixture_id: int, _=Depends(get_current_user)):
-    """Match lineups."""
-    return await apif_get_fixture_lineups(fixture_id)
-
-
-@app.get("/api/apifootball/fixtures/{fixture_id}/players")
-async def apifootball_fixture_players(fixture_id: int, _=Depends(get_current_user)):
-    """Player statistics for a specific fixture."""
-    return await apif_get_fixture_player_stats(fixture_id)
-
-
-@app.get("/api/apifootball/transfers")
-async def apifootball_transfers(
-    player: Optional[int] = Query(None),
-    team: Optional[int] = Query(None),
-    _=Depends(get_current_user),
-):
-    """Transfer history for a player or team."""
-    return await apif_get_transfers(player_id=player, team_id=team)
-
-
-@app.get("/api/apifootball/coaches")
-async def apifootball_coaches(
-    team: Optional[int] = Query(None),
-    coach_id: Optional[int] = Query(None, alias="id"),
-    _=Depends(get_current_user),
-):
-    """Coach profiles."""
-    return await apif_get_coaches(team_id=team, coach_id=coach_id)
-
-
-@app.get("/api/apifootball/injuries")
-async def apifootball_injuries(
-    league: Optional[int] = Query(None),
-    season: Optional[int] = Query(None),
-    fixture: Optional[int] = Query(None),
-    team: Optional[int] = Query(None),
-    _=Depends(get_current_user),
-):
-    """Injury reports."""
-    return await apif_get_injuries(
-        league_id=league, season=season,
-        fixture_id=fixture, team_id=team,
-    )
-
-
-@app.get("/api/apifootball/trophies")
-async def apifootball_trophies(
-    player: Optional[int] = Query(None),
-    coach: Optional[int] = Query(None),
-    _=Depends(get_current_user),
-):
-    """Trophies for a player or coach."""
-    return await apif_get_trophies(player_id=player, coach_id=coach)
 
 
 # ── Run ───────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -6,23 +6,53 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useAuth } from './hooks/useAuth';
 import LoginPage from './components/LoginPage';
 import Layout, { type TabId } from './components/Layout';
-import DashboardPage from './pages/DashboardPage';
-import IndicesPage from './pages/IndicesPage';
-import ReportPage from './pages/ReportPage';
-import ComparisonPage from './pages/ComparisonPage';
-import DataBrowserPage from './pages/DataBrowserPage';
-import RankingsPage from './pages/RankingsPage';
-import SimilarityPage from './pages/SimilarityPage';
-import PredictionPage from './pages/PredictionPage';
-import ClustersPage from './pages/ClustersPage';
-import AnalysesPage from './pages/AnalysesPage';
-import SkillCornerPage from './pages/SkillCornerPage';
-import TrajectoryPage from './pages/TrajectoryPage';
-import OpportunitiesPage from './pages/OpportunitiesPage';
-import ReplacementsPage from './pages/ReplacementsPage';
-import ContractImpactPage from './pages/ContractImpactPage';
-import ScoutingReportPage from './pages/ScoutingReportPage';
-import ApiFootballPage from './pages/ApiFootballPage';
+
+// Lazy-loaded pages — only loaded when the user navigates to them
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const IndicesPage = lazy(() => import('./pages/IndicesPage'));
+const ReportPage = lazy(() => import('./pages/ReportPage'));
+const ComparisonPage = lazy(() => import('./pages/ComparisonPage'));
+const DataBrowserPage = lazy(() => import('./pages/DataBrowserPage'));
+const RankingsPage = lazy(() => import('./pages/RankingsPage'));
+const SimilarityPage = lazy(() => import('./pages/SimilarityPage'));
+const PredictionPage = lazy(() => import('./pages/PredictionPage'));
+const ClustersPage = lazy(() => import('./pages/ClustersPage'));
+const AnalysesPage = lazy(() => import('./pages/AnalysesPage'));
+const SkillCornerPage = lazy(() => import('./pages/SkillCornerPage'));
+const TrajectoryPage = lazy(() => import('./pages/TrajectoryPage'));
+const OpportunitiesPage = lazy(() => import('./pages/OpportunitiesPage'));
+const ReplacementsPage = lazy(() => import('./pages/ReplacementsPage'));
+const ContractImpactPage = lazy(() => import('./pages/ContractImpactPage'));
+const ScoutingReportPage = lazy(() => import('./pages/ScoutingReportPage'));
+const ApiFootballPage = lazy(() => import('./pages/ApiFootballPage'));
+
+const PAGE_MAP: Record<TabId, React.LazyExoticComponent<React.ComponentType>> = {
+  dashboard: DashboardPage,
+  indices: IndicesPage,
+  report: ReportPage,
+  comparison: ComparisonPage,
+  skillcorner: SkillCornerPage,
+  data: DataBrowserPage,
+  rankings: RankingsPage,
+  similarity: SimilarityPage,
+  prediction: PredictionPage,
+  clusters: ClustersPage,
+  analyses: AnalysesPage,
+  trajectory: TrajectoryPage,
+  opportunities: OpportunitiesPage,
+  replacements: ReplacementsPage,
+  contract_impact: ContractImpactPage,
+  scouting_report: ScoutingReportPage,
+  apifootball: ApiFootballPage,
+};
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[40vh]">
+      <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
+    </div>
+  );
+}
 
 function App() {
   const { user, isAuthenticated, loading, error, login, logout } = useAuth();
@@ -32,46 +62,7 @@ function App() {
     return <LoginPage onLogin={login} loading={loading} error={error} />;
   }
 
-  const renderPage = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <DashboardPage />;
-      case 'indices':
-        return <IndicesPage />;
-      case 'report':
-        return <ReportPage />;
-      case 'comparison':
-        return <ComparisonPage />;
-      case 'skillcorner':
-        return <SkillCornerPage />;
-      case 'data':
-        return <DataBrowserPage />;
-      case 'rankings':
-        return <RankingsPage />;
-      case 'similarity':
-        return <SimilarityPage />;
-      case 'prediction':
-        return <PredictionPage />;
-      case 'clusters':
-        return <ClustersPage />;
-      case 'analyses':
-        return <AnalysesPage />;
-      case 'trajectory':
-        return <TrajectoryPage />;
-      case 'opportunities':
-        return <OpportunitiesPage />;
-      case 'replacements':
-        return <ReplacementsPage />;
-      case 'contract_impact':
-        return <ContractImpactPage />;
-      case 'scouting_report':
-        return <ScoutingReportPage />;
-      case 'apifootball':
-        return <ApiFootballPage />;
-      default:
-        return <DashboardPage />;
-    }
-  };
+  const PageComponent = PAGE_MAP[activeTab] || DashboardPage;
 
   return (
     <ErrorBoundary>
@@ -85,7 +76,9 @@ function App() {
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
             <ErrorBoundary>
-              {renderPage()}
+              <Suspense fallback={<PageLoader />}>
+                <PageComponent />
+              </Suspense>
             </ErrorBoundary>
           </motion.div>
         </AnimatePresence>
