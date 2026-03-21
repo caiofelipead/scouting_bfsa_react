@@ -458,3 +458,208 @@ def get_pass_network(match_id: int, team_name: str) -> Dict[str, Any]:
         "nodes": sorted(nodes, key=lambda n: n["total_passes"], reverse=True),
         "edges": edges[:30],  # top 30 connections
     }
+
+
+# ── Season Insights (aggregated) ──────────────────────────────────
+
+def get_season_insights(competition_id: int, season_id: int) -> Dict[str, Any]:
+    """Aggregate match-level data across an entire season for insights."""
+    matches = get_matches(competition_id, season_id)
+    if not matches:
+        return {"error": "No matches found"}
+
+    # Limit to avoid extremely long processing (StatsBomb open data)
+    match_ids = [m["match_id"] for m in matches]
+
+    # Aggregate structures
+    team_agg: Dict[str, Dict[str, Any]] = {}
+    player_goals: Dict[str, Dict[str, Any]] = {}
+    player_xg: Dict[str, Dict[str, Any]] = {}
+    player_assists: Dict[str, Dict[str, Any]] = {}
+    player_key_passes: Dict[str, Dict[str, Any]] = {}
+    all_shots: List[Dict[str, Any]] = []
+    total_goals = 0
+    total_xg = 0.0
+    matches_processed = 0
+
+    for mid in match_ids:
+        try:
+            summary = get_match_summary(mid)
+            if "error" in summary:
+                continue
+
+            matches_processed += 1
+
+            for t in summary.get("teams", []):
+                name = t["team"]
+                if name not in team_agg:
+                    team_agg[name] = {
+                        "team": name,
+                        "matches": 0,
+                        "goals": 0,
+                        "goals_against": 0,
+                        "xg_total": 0.0,
+                        "xg_against": 0.0,
+                        "shots": 0,
+                        "shots_on_target": 0,
+                        "passes": 0,
+                        "passes_completed": 0,
+                        "tackles": 0,
+                        "interceptions": 0,
+                        "fouls": 0,
+                        "yellow_cards": 0,
+                        "red_cards": 0,
+                        "corners": 0,
+                        "dribbles": 0,
+                        "dribbles_completed": 0,
+                        "wins": 0,
+                        "draws": 0,
+                        "losses": 0,
+                    }
+
+                ta = team_agg[name]
+                ta["matches"] += 1
+                ta["goals"] += t["goals"]
+                ta["xg_total"] += t["xg_total"]
+                ta["shots"] += t["shots"]
+                ta["shots_on_target"] += t["shots_on_target"]
+                ta["passes"] += t["passes"]
+                ta["passes_completed"] += t["passes_completed"]
+                ta["tackles"] += t["tackles"]
+                ta["interceptions"] += t["interceptions"]
+                ta["fouls"] += t["fouls"]
+                ta["yellow_cards"] += t["yellow_cards"]
+                ta["red_cards"] += t["red_cards"]
+                ta["corners"] += t["corners"]
+                ta["dribbles"] += t["dribbles"]
+                ta["dribbles_completed"] += t["dribbles_completed"]
+                total_goals += t["goals"]
+                total_xg += t["xg_total"]
+
+            # Compute goals against and W/D/L
+            teams_in_match = summary.get("teams", [])
+            if len(teams_in_match) == 2:
+                t0, t1 = teams_in_match[0], teams_in_match[1]
+                team_agg[t0["team"]]["goals_against"] += t1["goals"]
+                team_agg[t0["team"]]["xg_against"] += t1["xg_total"]
+                team_agg[t1["team"]]["goals_against"] += t0["goals"]
+                team_agg[t1["team"]]["xg_against"] += t0["xg_total"]
+
+                if t0["goals"] > t1["goals"]:
+                    team_agg[t0["team"]]["wins"] += 1
+                    team_agg[t1["team"]]["losses"] += 1
+                elif t0["goals"] < t1["goals"]:
+                    team_agg[t1["team"]]["wins"] += 1
+                    team_agg[t0["team"]]["losses"] += 1
+                else:
+                    team_agg[t0["team"]]["draws"] += 1
+                    team_agg[t1["team"]]["draws"] += 1
+
+            # Collect shots for player-level aggregation
+            shots = get_shot_map(mid)
+            for s in shots:
+                all_shots.append(s)
+                pname = s.get("player", "")
+                team = s.get("team", "")
+                xg_val = s.get("xg", 0)
+                is_goal = s.get("outcome") == "Goal"
+
+                if pname:
+                    if pname not in player_xg:
+                        player_xg[pname] = {"player": pname, "team": team, "xg": 0.0, "shots": 0}
+                    player_xg[pname]["xg"] += xg_val
+                    player_xg[pname]["shots"] += 1
+
+                    if is_goal:
+                        if pname not in player_goals:
+                            player_goals[pname] = {"player": pname, "team": team, "goals": 0, "xg": 0.0}
+                        player_goals[pname]["goals"] += 1
+                        player_goals[pname]["xg"] += xg_val
+
+        except Exception as e:
+            logger.warning("Failed to process match %s: %s", mid, e)
+            continue
+
+    # Finalize team aggregations
+    team_list = []
+    for ta in team_agg.values():
+        m_count = ta["matches"]
+        ta["xg_total"] = round(ta["xg_total"], 2)
+        ta["xg_against"] = round(ta["xg_against"], 2)
+        ta["xg_diff"] = round(ta["goals"] - ta["xg_total"], 2)
+        ta["pass_accuracy"] = round(
+            ta["passes_completed"] / ta["passes"] * 100 if ta["passes"] > 0 else 0, 1
+        )
+        ta["shot_accuracy"] = round(
+            ta["shots_on_target"] / ta["shots"] * 100 if ta["shots"] > 0 else 0, 1
+        )
+        ta["points"] = ta["wins"] * 3 + ta["draws"]
+        ta["goal_diff"] = ta["goals"] - ta["goals_against"]
+        ta["avg_goals"] = round(ta["goals"] / m_count, 2) if m_count > 0 else 0
+        ta["avg_xg"] = round(ta["xg_total"] / m_count, 2) if m_count > 0 else 0
+        ta["defensive_actions"] = ta["tackles"] + ta["interceptions"]
+        ta["avg_defensive"] = round(ta["defensive_actions"] / m_count, 1) if m_count > 0 else 0
+        team_list.append(ta)
+
+    team_list.sort(key=lambda t: (t["points"], t["goal_diff"], t["goals"]), reverse=True)
+
+    # Top scorers
+    top_scorers = sorted(player_goals.values(), key=lambda p: (p["goals"], p["xg"]), reverse=True)[:15]
+    for p in top_scorers:
+        p["xg"] = round(p["xg"], 2)
+        p["xg_diff"] = round(p["goals"] - p["xg"], 2)
+
+    # Top xG (including non-scorers with high xG)
+    top_xg = sorted(player_xg.values(), key=lambda p: p["xg"], reverse=True)[:15]
+    for p in top_xg:
+        p["xg"] = round(p["xg"], 2)
+        p["goals"] = player_goals.get(p["player"], {}).get("goals", 0)
+        p["xg_diff"] = round(p["goals"] - p["xg"], 2)
+
+    # xG overperformers/underperformers (teams)
+    xg_analysis = []
+    for ta in team_list:
+        xg_analysis.append({
+            "team": ta["team"],
+            "goals": ta["goals"],
+            "xg": ta["xg_total"],
+            "diff": ta["xg_diff"],
+            "goals_against": ta["goals_against"],
+            "xg_against": ta["xg_against"],
+        })
+    xg_analysis.sort(key=lambda x: x["diff"], reverse=True)
+
+    # Tactical patterns: most possession, most aggressive pressing, best passing
+    tactical = {
+        "most_possession": sorted(team_list, key=lambda t: t["passes"], reverse=True)[:5],
+        "most_pressing": sorted(team_list, key=lambda t: t["avg_defensive"], reverse=True)[:5],
+        "best_passing": sorted(team_list, key=lambda t: t["pass_accuracy"], reverse=True)[:5],
+        "most_shots": sorted(team_list, key=lambda t: t["shots"], reverse=True)[:5],
+    }
+
+    # Format tactical data (lighter)
+    for key in tactical:
+        tactical[key] = [
+            {"team": t["team"], "value": t["passes"] if key == "most_possession"
+             else t["avg_defensive"] if key == "most_pressing"
+             else t["pass_accuracy"] if key == "best_passing"
+             else t["shots"],
+             "matches": t["matches"]}
+            for t in tactical[key]
+        ]
+
+    return {
+        "competition_id": competition_id,
+        "season_id": season_id,
+        "matches_total": len(matches),
+        "matches_processed": matches_processed,
+        "total_goals": total_goals // 2 if total_goals > 0 else 0,  # goals counted twice (both teams)
+        "total_xg": round(total_xg / 2, 2) if total_xg > 0 else 0,
+        "avg_goals_per_match": round(total_goals / (2 * matches_processed), 2) if matches_processed > 0 else 0,
+        "avg_xg_per_match": round(total_xg / (2 * matches_processed), 2) if matches_processed > 0 else 0,
+        "teams": team_list,
+        "top_scorers": top_scorers,
+        "top_xg": top_xg,
+        "xg_analysis": xg_analysis,
+        "tactical": tactical,
+    }

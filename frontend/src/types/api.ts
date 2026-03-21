@@ -365,3 +365,91 @@ export interface StatsBombPlayerStats {
   long_balls: number;
   through_balls: number;
 }
+
+// ── StatsBomb Season Insights ──
+
+export interface StatsBombSeasonTeam {
+  team: string;
+  matches: number;
+  goals: number;
+  goals_against: number;
+  xg_total: number;
+  xg_against: number;
+  xg_diff: number;
+  shots: number;
+  shots_on_target: number;
+  shot_accuracy: number;
+  passes: number;
+  passes_completed: number;
+  pass_accuracy: number;
+  tackles: number;
+  interceptions: number;
+  fouls: number;
+  yellow_cards: number;
+  red_cards: number;
+  corners: number;
+  dribbles: number;
+  dribbles_completed: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  points: number;
+  goal_diff: number;
+  avg_goals: number;
+  avg_xg: number;
+  defensive_actions: number;
+  avg_defensive: number;
+}
+
+export interface StatsBombTopScorer {
+  player: string;
+  team: string;
+  goals: number;
+  xg: number;
+  xg_diff: number;
+}
+
+export interface StatsBombTopXg {
+  player: string;
+  team: string;
+  xg: number;
+  shots: number;
+  goals: number;
+  xg_diff: number;
+}
+
+export interface StatsBombXgAnalysis {
+  team: string;
+  goals: number;
+  xg: number;
+  diff: number;
+  goals_against: number;
+  xg_against: number;
+}
+
+export interface StatsBombTacticalEntry {
+  team: string;
+  value: number;
+  matches: number;
+}
+
+export interface StatsBombSeasonInsights {
+  competition_id: number;
+  season_id: number;
+  matches_total: number;
+  matches_processed: number;
+  total_goals: number;
+  total_xg: number;
+  avg_goals_per_match: number;
+  avg_xg_per_match: number;
+  teams: StatsBombSeasonTeam[];
+  top_scorers: StatsBombTopScorer[];
+  top_xg: StatsBombTopXg[];
+  xg_analysis: StatsBombXgAnalysis[];
+  tactical: {
+    most_possession: StatsBombTacticalEntry[];
+    most_pressing: StatsBombTacticalEntry[];
+    best_passing: StatsBombTacticalEntry[];
+    most_shots: StatsBombTacticalEntry[];
+  };
+}

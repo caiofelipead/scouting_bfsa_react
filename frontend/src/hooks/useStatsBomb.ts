@@ -7,6 +7,7 @@ import type {
   StatsBombLineup,
   StatsBombShot,
   StatsBombPlayerStats,
+  StatsBombSeasonInsights,
 } from '../types/api';
 
 const STALE_TIME = 30 * 60 * 1000;  // 30 min (historical data doesn't change)
@@ -20,6 +21,7 @@ export const statsBombKeys = {
   shots: (matchId: number) => ['statsbomb', 'shots', matchId] as const,
   playerStats: (matchId: number, player: string) => ['statsbomb', 'player', matchId, player] as const,
   passNetwork: (matchId: number, team: string) => ['statsbomb', 'passNetwork', matchId, team] as const,
+  seasonInsights: (compId: number, seasonId: number) => ['statsbomb', 'seasonInsights', compId, seasonId] as const,
 };
 
 export function useStatsBombCompetitions() {
@@ -96,6 +98,19 @@ export function useStatsBombPlayerStats(matchId: number | null, playerName: stri
       return res.data as StatsBombPlayerStats;
     },
     enabled: !!matchId && !!playerName,
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+}
+
+export function useStatsBombSeasonInsights(competitionId: number | null, seasonId: number | null) {
+  return useQuery({
+    queryKey: statsBombKeys.seasonInsights(competitionId ?? 0, seasonId ?? 0),
+    queryFn: async () => {
+      const res = await api.get(`/statsbomb/season/${competitionId}/${seasonId}/insights`);
+      return res.data as StatsBombSeasonInsights;
+    },
+    enabled: !!competitionId && !!seasonId,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
