@@ -86,6 +86,37 @@ from services.fuzzy_match import build_skillcorner_index, find_skillcorner_playe
 from services.player_assets import load_player_assets_csv, get_player_assets
 from services.database import init_scouting_tables, load_sheet_dataframe, has_data, get_sync_status
 from services.sync_sheets import sync_all_sheets
+from services.statsbomb_open import (
+    get_competitions as sb_get_competitions,
+    get_matches as sb_get_matches,
+    get_match_summary as sb_get_match_summary,
+    get_lineups as sb_get_lineups,
+    get_player_match_stats as sb_get_player_stats,
+    get_shot_map as sb_get_shot_map,
+    get_pass_network as sb_get_pass_network,
+    get_season_insights as sb_get_season_insights,
+)
+from services.api_football import (
+    get_countries as apif_get_countries,
+    get_leagues as apif_get_leagues,
+    get_league_seasons as apif_get_league_seasons,
+    get_teams as apif_get_teams,
+    get_team_info as apif_get_team_info,
+    get_players as apif_get_players,
+    get_squads as apif_get_squads,
+    get_top_scorers as apif_get_top_scorers,
+    get_top_assists as apif_get_top_assists,
+    get_standings as apif_get_standings,
+    get_fixtures as apif_get_fixtures,
+    get_fixture_statistics as apif_get_fixture_statistics,
+    get_fixture_events as apif_get_fixture_events,
+    get_fixture_lineups as apif_get_fixture_lineups,
+    get_fixture_player_stats as apif_get_fixture_player_stats,
+    get_transfers as apif_get_transfers,
+    get_coaches as apif_get_coaches,
+    get_injuries as apif_get_injuries,
+    get_trophies as apif_get_trophies,
+)
 from config.mappings import (
     CLUB_LEAGUE_MAP,
     CLUB_LOGOS,
@@ -2704,6 +2735,278 @@ async def image_proxy(url: str):
 
     raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
 
+
+
+# ── StatsBomb Open Data endpoints ─────────────────────────────────────
+
+
+@app.get("/api/statsbomb/competitions")
+async def statsbomb_competitions(_=Depends(get_current_user)):
+    """List all available competitions and seasons from StatsBomb Open Data."""
+    competitions = sb_get_competitions()
+    return {"total": len(competitions), "competitions": competitions}
+
+
+@app.get("/api/statsbomb/matches/{competition_id}/{season_id}")
+async def statsbomb_matches(
+    competition_id: int,
+    season_id: int,
+    _=Depends(get_current_user),
+):
+    """List all matches for a competition/season."""
+    matches = sb_get_matches(competition_id, season_id)
+    return {"total": len(matches), "matches": matches}
+
+
+@app.get("/api/statsbomb/match/{match_id}/summary")
+async def statsbomb_match_summary(match_id: int, _=Depends(get_current_user)):
+    """Get aggregated team stats for a match (shots, passes, xG, cards, etc.)."""
+    summary = sb_get_match_summary(match_id)
+    if "error" in summary:
+        raise HTTPException(status_code=404, detail=summary["error"])
+    return summary
+
+
+@app.get("/api/statsbomb/match/{match_id}/lineups")
+async def statsbomb_lineups(match_id: int, _=Depends(get_current_user)):
+    """Get lineups for a match."""
+    lineups = sb_get_lineups(match_id)
+    return {"match_id": match_id, "lineups": lineups}
+
+
+@app.get("/api/statsbomb/match/{match_id}/shots")
+async def statsbomb_shots(match_id: int, _=Depends(get_current_user)):
+    """Get all shots with xG and location for shot map visualization."""
+    shots = sb_get_shot_map(match_id)
+    return {"match_id": match_id, "total": len(shots), "shots": shots}
+
+
+@app.get("/api/statsbomb/match/{match_id}/player/{player_name}")
+async def statsbomb_player_stats(
+    match_id: int,
+    player_name: str,
+    _=Depends(get_current_user),
+):
+    """Get detailed stats for a specific player in a match."""
+    stats = sb_get_player_stats(match_id, player_name)
+    if "error" in stats:
+        raise HTTPException(status_code=404, detail=stats["error"])
+    return stats
+
+
+@app.get("/api/statsbomb/season/{competition_id}/{season_id}/insights")
+async def statsbomb_season_insights(
+    competition_id: int,
+    season_id: int,
+    _=Depends(get_current_user),
+):
+    """Aggregated season insights: team performance, top scorers, xG analysis, tactical patterns."""
+    insights = sb_get_season_insights(competition_id, season_id)
+    if "error" in insights:
+        raise HTTPException(status_code=404, detail=insights["error"])
+    return insights
+
+
+@app.get("/api/statsbomb/match/{match_id}/pass-network/{team_name}")
+async def statsbomb_pass_network(
+    match_id: int,
+    team_name: str,
+    _=Depends(get_current_user),
+):
+    """Get pass network (nodes + edges) for a team in a match."""
+    network = sb_get_pass_network(match_id, team_name)
+    if "error" in network:
+        raise HTTPException(status_code=404, detail=network["error"])
+    return network
+
+
+# ── API-Football v3 endpoints ─────────────────────────────────────────
+
+@app.get("/api/apifootball/countries")
+async def apifootball_countries(_=Depends(get_current_user)):
+    """List all countries with league data."""
+    return await apif_get_countries()
+
+
+@app.get("/api/apifootball/leagues")
+async def apifootball_leagues(
+    country: Optional[str] = Query(None),
+    season: Optional[int] = Query(None),
+    _=Depends(get_current_user),
+):
+    """List leagues, optionally filtered by country and/or season."""
+    return await apif_get_leagues(country=country, season=season)
+
+
+@app.get("/api/apifootball/leagues/{league_id}/seasons")
+async def apifootball_league_seasons(league_id: int, _=Depends(get_current_user)):
+    """Get available seasons for a league."""
+    return await apif_get_league_seasons(league_id)
+
+
+@app.get("/api/apifootball/teams")
+async def apifootball_teams(
+    league: int = Query(...),
+    season: int = Query(...),
+    _=Depends(get_current_user),
+):
+    """List teams in a league/season."""
+    return await apif_get_teams(league, season)
+
+
+@app.get("/api/apifootball/teams/{team_id}")
+async def apifootball_team_info(team_id: int, _=Depends(get_current_user)):
+    """Get team details + venue."""
+    info = await apif_get_team_info(team_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return info
+
+
+@app.get("/api/apifootball/players")
+async def apifootball_players(
+    league: Optional[int] = Query(None),
+    season: Optional[int] = Query(None),
+    team: Optional[int] = Query(None),
+    player_id: Optional[int] = Query(None, alias="id"),
+    search: Optional[str] = Query(None),
+    page: int = Query(1),
+    _=Depends(get_current_user),
+):
+    """Search/list players with statistics (paginated, 20 per page)."""
+    return await apif_get_players(
+        league_id=league, season=season, team_id=team,
+        player_id=player_id, search=search, page=page,
+    )
+
+
+@app.get("/api/apifootball/squads/{team_id}")
+async def apifootball_squads(team_id: int, _=Depends(get_current_user)):
+    """Get current squad for a team."""
+    return await apif_get_squads(team_id)
+
+
+@app.get("/api/apifootball/topscorers")
+async def apifootball_top_scorers(
+    league: int = Query(...),
+    season: int = Query(...),
+    _=Depends(get_current_user),
+):
+    """Top scorers for a league/season."""
+    return await apif_get_top_scorers(league, season)
+
+
+@app.get("/api/apifootball/topassists")
+async def apifootball_top_assists(
+    league: int = Query(...),
+    season: int = Query(...),
+    _=Depends(get_current_user),
+):
+    """Top assist providers for a league/season."""
+    return await apif_get_top_assists(league, season)
+
+
+@app.get("/api/apifootball/standings")
+async def apifootball_standings(
+    league: int = Query(...),
+    season: int = Query(...),
+    _=Depends(get_current_user),
+):
+    """League standings."""
+    return await apif_get_standings(league, season)
+
+
+@app.get("/api/apifootball/fixtures")
+async def apifootball_fixtures(
+    league: Optional[int] = Query(None),
+    season: Optional[int] = Query(None),
+    team: Optional[int] = Query(None),
+    date: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None, alias="from"),
+    to_date: Optional[str] = Query(None, alias="to"),
+    status: Optional[str] = Query(None),
+    last: Optional[int] = Query(None),
+    next_n: Optional[int] = Query(None, alias="next"),
+    fixture_id: Optional[int] = Query(None, alias="id"),
+    round_name: Optional[str] = Query(None, alias="round"),
+    _=Depends(get_current_user),
+):
+    """List fixtures with flexible filters."""
+    return await apif_get_fixtures(
+        league_id=league, season=season, team_id=team,
+        date=date, from_date=from_date, to_date=to_date,
+        status=status, last=last, next_n=next_n,
+        fixture_id=fixture_id, round_name=round_name,
+    )
+
+
+@app.get("/api/apifootball/fixtures/{fixture_id}/statistics")
+async def apifootball_fixture_stats(fixture_id: int, _=Depends(get_current_user)):
+    """Match statistics (possession, shots, passes, etc.)."""
+    return await apif_get_fixture_statistics(fixture_id)
+
+
+@app.get("/api/apifootball/fixtures/{fixture_id}/events")
+async def apifootball_fixture_events(fixture_id: int, _=Depends(get_current_user)):
+    """Match events (goals, cards, subs)."""
+    return await apif_get_fixture_events(fixture_id)
+
+
+@app.get("/api/apifootball/fixtures/{fixture_id}/lineups")
+async def apifootball_fixture_lineups(fixture_id: int, _=Depends(get_current_user)):
+    """Match lineups."""
+    return await apif_get_fixture_lineups(fixture_id)
+
+
+@app.get("/api/apifootball/fixtures/{fixture_id}/players")
+async def apifootball_fixture_players(fixture_id: int, _=Depends(get_current_user)):
+    """Player statistics for a specific fixture."""
+    return await apif_get_fixture_player_stats(fixture_id)
+
+
+@app.get("/api/apifootball/transfers")
+async def apifootball_transfers(
+    player: Optional[int] = Query(None),
+    team: Optional[int] = Query(None),
+    _=Depends(get_current_user),
+):
+    """Transfer history for a player or team."""
+    return await apif_get_transfers(player_id=player, team_id=team)
+
+
+@app.get("/api/apifootball/coaches")
+async def apifootball_coaches(
+    team: Optional[int] = Query(None),
+    coach_id: Optional[int] = Query(None, alias="id"),
+    _=Depends(get_current_user),
+):
+    """Coach profiles."""
+    return await apif_get_coaches(team_id=team, coach_id=coach_id)
+
+
+@app.get("/api/apifootball/injuries")
+async def apifootball_injuries(
+    league: Optional[int] = Query(None),
+    season: Optional[int] = Query(None),
+    fixture: Optional[int] = Query(None),
+    team: Optional[int] = Query(None),
+    _=Depends(get_current_user),
+):
+    """Injury reports."""
+    return await apif_get_injuries(
+        league_id=league, season=season,
+        fixture_id=fixture, team_id=team,
+    )
+
+
+@app.get("/api/apifootball/trophies")
+async def apifootball_trophies(
+    player: Optional[int] = Query(None),
+    coach: Optional[int] = Query(None),
+    _=Depends(get_current_user),
+):
+    """Trophies for a player or coach."""
+    return await apif_get_trophies(player_id=player, coach_id=coach)
 
 
 # ── Run ───────────────────────────────────────────────────────────────
