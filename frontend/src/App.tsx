@@ -22,6 +22,7 @@ import ReplacementsPage from './pages/ReplacementsPage';
 import ContractImpactPage from './pages/ContractImpactPage';
 import ScoutingReportPage from './pages/ScoutingReportPage';
 import StatsBombPage from './pages/StatsBombPage';
+import ApiFootballPage from './pages/ApiFootballPage';
 
 function App() {
   const { user, isAuthenticated, loading, error, login, logout } = useAuth();
@@ -67,6 +68,8 @@ function App() {
         return <ScoutingReportPage />;
       case 'statsbomb':
         return <StatsBombPage />;
+      case 'apifootball':
+        return <ApiFootballPage />;
       default:
         return <DashboardPage />;
     }
