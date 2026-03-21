@@ -310,6 +310,14 @@ def _load_all_data():
     except Exception as e:
         logger.warning("Could not load player assets CSV: %s", e)
 
+    # Initialize API-Football asset enrichment cache
+    try:
+        from services.enrichment import init_asset_tables, load_asset_cache
+        init_asset_tables()
+        load_asset_cache()
+    except Exception as e:
+        logger.warning("Could not init asset enrichment cache: %s", e)
+
     _data_ready.set()
     _data_loading = False
     logger.info("All data loaded successfully: %s", {k: len(v) for k, v in _data.items()})
@@ -465,6 +473,54 @@ async def admin_resync(current_user: dict = Depends(require_admin)):
 
     counts = {k: len(v) for k, v in _data.items()}
     return {"sync_results": sync_results, "memory_counts": counts}
+
+
+# ── Asset Enrichment (API-Football photos/logos) ──────────────────────
+
+@app.post("/api/admin/enrich-assets")
+async def admin_enrich_assets(
+    max_api_calls: int = Query(default=90, le=100, description="Max API calls (free tier = 100/day)"),
+    admin: dict = Depends(require_admin),
+):
+    """Bulk enrich player photos and club logos from API-Football.
+
+    Processes all unique teams in WyScout data, searches API-Football for
+    team ID + logo, then fetches squad to match player photos.
+    Results are cached in PostgreSQL to avoid re-fetching.
+    """
+    from services.enrichment import run_bulk_enrichment
+
+    df = _get_wyscout()
+    if "Jogador" not in df.columns or "Equipa" not in df.columns:
+        raise HTTPException(status_code=500, detail="WyScout data missing Jogador/Equipa columns")
+
+    # Build {team: [players]} dict
+    teams_with_players: Dict[str, List[str]] = {}
+    for _, row in df.iterrows():
+        team = str(row.get("Equipa", "")).strip() if pd.notna(row.get("Equipa")) else ""
+        player = str(row.get("Jogador", "")).strip()
+        if team and player:
+            teams_with_players.setdefault(team, []).append(player)
+
+    result = await run_bulk_enrichment(teams_with_players, max_api_calls=max_api_calls)
+    return result
+
+
+@app.get("/api/admin/enrichment-status")
+async def admin_enrichment_status(admin: dict = Depends(require_admin)):
+    """Get current enrichment progress: how many players have photos, teams resolved, etc."""
+    from services.enrichment import get_enrichment_stats
+    stats = get_enrichment_stats()
+
+    # Add WyScout totals for context
+    try:
+        df = _get_wyscout()
+        stats["wyscout_total_players"] = len(df)
+        stats["wyscout_unique_teams"] = df["Equipa"].nunique() if "Equipa" in df.columns else 0
+    except Exception:
+        pass
+
+    return stats
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1024,6 +1080,19 @@ async def get_player_profile(
         foto_val = ana_match.get("Foto")
         if foto_val is not None and pd.notna(foto_val) and str(foto_val).strip():
             photo_url = str(foto_val).strip()
+
+    # Fallback: on-demand API-Football enrichment (single player, worth the latency)
+    if not photo_url and team_name_sc:
+        try:
+            from services.enrichment import enrich_single_player
+            enriched = await enrich_single_player(jogador_name, team_name_sc)
+            if enriched:
+                if enriched.get("photo_url"):
+                    photo_url = enriched["photo_url"]
+                if not club_logo_url and enriched.get("club_logo"):
+                    club_logo_url = enriched["club_logo"]
+        except Exception as e:
+            logger.debug("On-demand enrichment failed for %s: %s", jogador_name, e)
 
     return {
         "summary": {

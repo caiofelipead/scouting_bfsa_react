@@ -137,20 +137,39 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
             result["club_logo"] = entry.get("club_logo")
             result["league_logo"] = entry.get("league_logo")
             result["league_name"] = entry.get("league_name")
-            return result
+            if result["photo_url"]:
+                return result
 
-    # Fallback: name-only
-    if name_norm:
+    # Fallback: name-only from CSV
+    if name_norm and not result["photo_url"]:
         entry = _player_assets_by_name.get(name_norm)
         if entry:
-            result["photo_url"] = entry.get("photo_url")
-            result["club_logo"] = entry.get("club_logo")
-            result["league_logo"] = entry.get("league_logo")
-            result["league_name"] = entry.get("league_name")
-            return result
+            if not result["club_logo"]:
+                result["club_logo"] = entry.get("club_logo")
+            if not result["league_logo"]:
+                result["league_logo"] = entry.get("league_logo")
+            if not result["league_name"]:
+                result["league_name"] = entry.get("league_name")
+            if entry.get("photo_url"):
+                result["photo_url"] = entry["photo_url"]
+                return result
 
-    # At least try to get club logo by team name
-    if team_norm and team_norm in _club_logos:
+    # Fallback: API-Football enrichment cache (in-memory)
+    if name_norm:
+        try:
+            from services.enrichment import get_cached_photo, get_cached_team_logo
+            cached_photo = get_cached_photo(player_name, team)
+            if cached_photo:
+                result["photo_url"] = cached_photo
+            if not result["club_logo"] and team:
+                cached_logo = get_cached_team_logo(team)
+                if cached_logo:
+                    result["club_logo"] = cached_logo
+        except Exception:
+            pass  # enrichment module not loaded yet
+
+    # At least try to get club logo by team name from CSV
+    if not result["club_logo"] and team_norm and team_norm in _club_logos:
         result["club_logo"] = _club_logos[team_norm]
 
     return result
