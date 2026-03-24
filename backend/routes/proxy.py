@@ -47,7 +47,7 @@ _ALLOWED_IMAGE_DOMAINS = {
 
 
 @router.get("/image-proxy")
-@limiter.limit("30/minute")
+@limiter.limit("300/minute")
 async def image_proxy(request: Request, url: str):
     """Proxy external image URLs to avoid CORS/hotlink 403 errors."""
     parsed = urlparse(url)
@@ -181,3 +181,37 @@ async def image_proxy(request: Request, url: str):
     else:
         logger.warning("Image proxy: all strategies failed for %s (last status: %d)", url, last_status)
     raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
+
+
+# ── Cached team logo endpoint ──────────────────────────────────────────
+
+# In-memory cache for logo bytes: team_name_norm → (bytes, content_type)
+_logo_bytes_cache: Dict[str, tuple] = {}
+
+
+@router.get("/team-logo/{team_name_norm}")
+async def get_team_logo(team_name_norm: str):
+    """Serve locally cached team logo (avoids CDN 403 issues)."""
+    # Check memory cache
+    if team_name_norm in _logo_bytes_cache:
+        data, ct = _logo_bytes_cache[team_name_norm]
+        return Response(
+            content=data, media_type=ct,
+            headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
+        )
+
+    # Load from DB
+    try:
+        from services.enrichment import get_team_logo_bytes
+        result = get_team_logo_bytes(team_name_norm)
+        if result:
+            data, ct = result
+            _logo_bytes_cache[team_name_norm] = (data, ct)
+            return Response(
+                content=data, media_type=ct,
+                headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
+            )
+    except Exception as e:
+        logger.warning("Failed to load cached logo for %s: %s", team_name_norm, e)
+
+    raise HTTPException(status_code=404, detail="Logo not found")

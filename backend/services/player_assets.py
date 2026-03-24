@@ -115,9 +115,16 @@ def load_player_assets_csv(csv_path: str = None):
                 count, len(_player_assets_by_name), len(_club_logos), len(_league_logos))
 
 
-def _usable_url(url: str) -> str:
-    """Return the URL if it looks valid, or None."""
+def _is_sofascore_url(url: str) -> bool:
+    """Check if a URL is from SofaScore (which blocks external/server-side access with 403)."""
     if not url:
+        return False
+    return "sofascore" in url.lower()
+
+
+def _usable_url(url: str) -> str:
+    """Return the URL only if it's not from a blocked source (SofaScore returns 403 server-side)."""
+    if not url or _is_sofascore_url(url):
         return None
     return url
 
@@ -126,7 +133,7 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
     """Look up player photo, club logo, and league logo.
 
     Priority: API-Football enrichment cache first (reliable media.api-sports.io URLs),
-    then CSV as fallback (SofaScore URLs served via image proxy).
+    then CSV as fallback (filtering out blocked SofaScore URLs).
 
     Returns dict with keys: photo_url, club_logo, league_logo, league_name
     All values may be None if not found.
@@ -153,7 +160,7 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
         except Exception:
             pass  # enrichment module not loaded yet
 
-    # 2) CSV lookup for metadata and fallback URLs
+    # 2) CSV lookup for metadata and fallback URLs (filter out SofaScore)
     csv_entry = None
     if name_norm and team_norm:
         csv_entry = _player_assets.get((name_norm, team_norm))
