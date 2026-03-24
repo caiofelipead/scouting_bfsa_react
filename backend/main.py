@@ -557,8 +557,12 @@ async def admin_enrich_assets(
     result = await run_bulk_enrichment(teams_with_players, max_api_calls=max_api_calls, retry_not_found=retry_not_found)
 
     # Backfill logo bytes for any teams with URL but no cached bytes
-    backfilled = await backfill_logo_bytes()
-    result["logos_backfilled"] = backfilled
+    try:
+        backfilled = await backfill_logo_bytes()
+        result["logos_backfilled"] = backfilled
+    except Exception as e:
+        logger.warning("Logo backfill failed: %s", e)
+        result["logos_backfilled"] = f"error: {e}"
 
     # Reload in-memory cache so new logos are served immediately
     load_asset_cache()
