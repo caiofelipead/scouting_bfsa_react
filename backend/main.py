@@ -802,10 +802,10 @@ async def list_players(
                         photo_url = candidate
                         break
 
-        # Prefer hardcoded CLUB_LOGOS (logodetimes.com) — more reliable than SofaScore
-        club_logo = CLUB_LOGOS.get(team_name) if team_name else None
+        # Prefer API-Football enrichment logos (media.api-sports.io), fallback to hardcoded
+        club_logo = assets.get("club_logo")
         if not club_logo:
-            club_logo = assets.get("club_logo")
+            club_logo = CLUB_LOGOS.get(team_name) if team_name else None
 
         players.append({
             "id": int(idx) if isinstance(idx, (int, np.integer)) else hash(str(idx)) % 10**8,
@@ -1074,10 +1074,10 @@ async def get_player_profile(
     # Get photo, club logo, and league logo from asset service (CSV with SofaScore data)
     assets = get_player_assets(jogador_name, team_name_sc)
     photo_url = assets.get("photo_url")
-    # Prefer hardcoded CLUB_LOGOS (logodetimes.com) over SofaScore
-    club_logo_url = CLUB_LOGOS.get(team_name_sc) if team_name_sc else None
+    # Prefer API-Football enrichment logos (media.api-sports.io), fallback to hardcoded
+    club_logo_url = assets.get("club_logo")
     if not club_logo_url:
-        club_logo_url = assets.get("club_logo")
+        club_logo_url = CLUB_LOGOS.get(team_name_sc) if team_name_sc else None
 
     # Fallback: try WyScout DataFrame columns for photo_url
     if not photo_url:
@@ -1202,10 +1202,10 @@ async def get_rankings(
         team_name = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
         assets = assets_map.get((player_name, team_name), {})
 
-        # Prefer hardcoded logos (logodetimes.com) over SofaScore
-        rank_club_logo = (CLUB_LOGOS.get(team_name) if team_name else None) or assets.get("club_logo")
+        # Prefer API-Football enrichment logos, fallback to hardcoded
+        rank_club_logo = assets.get("club_logo") or (CLUB_LOGOS.get(team_name) if team_name else None)
         rank_league_name = assets.get("league_name") or ""
-        rank_league_logo = LEAGUE_LOGOS.get(rank_league_name) or assets.get("league_logo")
+        rank_league_logo = assets.get("league_logo") or LEAGUE_LOGOS.get(rank_league_name)
 
         entries.append(RankingEntry(
             rank=rank,
@@ -1313,7 +1313,7 @@ async def get_prediction_rankings(
             "tier_origin": pred["tier_origin"],
             "tier_target": pred["tier_target"],
             "photo_url": pred_assets.get("photo_url"),
-            "club_logo": (CLUB_LOGOS.get(pred_team_name) if pred_team_name else None) or pred_assets.get("club_logo"),
+            "club_logo": pred_assets.get("club_logo") or (CLUB_LOGOS.get(pred_team_name) if pred_team_name else None),
             "league_logo": pred_assets.get("league_logo"),
         })
 
