@@ -163,16 +163,28 @@ def _upsert_team_asset(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO team_assets_cache (team_name, team_name_norm, api_football_team_id, club_logo, logo_bytes, logo_content_type, match_quality)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (team_name_norm)
-                DO UPDATE SET api_football_team_id = EXCLUDED.api_football_team_id,
-                              club_logo = EXCLUDED.club_logo,
-                              logo_bytes = COALESCE(EXCLUDED.logo_bytes, team_assets_cache.logo_bytes),
-                              logo_content_type = COALESCE(EXCLUDED.logo_content_type, team_assets_cache.logo_content_type),
-                              match_quality = EXCLUDED.match_quality
-            """, (team_name, _normalize(team_name), api_football_team_id, club_logo, logo_bytes, logo_content_type, match_quality))
+            try:
+                cur.execute("""
+                    INSERT INTO team_assets_cache (team_name, team_name_norm, api_football_team_id, club_logo, logo_bytes, logo_content_type, match_quality)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (team_name_norm)
+                    DO UPDATE SET api_football_team_id = EXCLUDED.api_football_team_id,
+                                  club_logo = EXCLUDED.club_logo,
+                                  logo_bytes = COALESCE(EXCLUDED.logo_bytes, team_assets_cache.logo_bytes),
+                                  logo_content_type = COALESCE(EXCLUDED.logo_content_type, team_assets_cache.logo_content_type),
+                                  match_quality = EXCLUDED.match_quality
+                """, (team_name, _normalize(team_name), api_football_team_id, club_logo, logo_bytes, logo_content_type, match_quality))
+            except Exception:
+                # Fallback: logo_bytes columns might not exist yet
+                conn.rollback()
+                cur.execute("""
+                    INSERT INTO team_assets_cache (team_name, team_name_norm, api_football_team_id, club_logo, match_quality)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (team_name_norm)
+                    DO UPDATE SET api_football_team_id = EXCLUDED.api_football_team_id,
+                                  club_logo = EXCLUDED.club_logo,
+                                  match_quality = EXCLUDED.match_quality
+                """, (team_name, _normalize(team_name), api_football_team_id, club_logo, match_quality))
         conn.commit()
     except Exception:
         conn.rollback()
@@ -520,22 +532,26 @@ async def enrich_team(
     if not team_id:
         return result
 
-    # Check if all players are already cached — skip squad fetch to save API quota
-    all_players_cached = True
-    for pname in wyscout_players:
-        existing = _get_player_asset(_normalize(pname), team_norm)
-        if not existing or (not existing.get("photo_url") and existing.get("match_quality") not in ("not_found",)):
-            all_players_cached = False
-            break
+    # Check if all players are already cached (in-memory) — skip squad fetch to save API quota
+    if _cache_loaded:
+        all_players_cached = True
+        cached_with_photo = 0
+        for pname in wyscout_players:
+            key = (_normalize(pname), team_norm)
+            entry = _cached_player_assets.get(key)
+            if entry:
+                if entry.get("photo_url"):
+                    cached_with_photo += 1
+            else:
+                # Player not in cache at all — need to fetch squad
+                all_players_cached = False
+                break
 
-    if all_players_cached:
-        result["skipped"] = True
-        result["matched"] = sum(
-            1 for p in wyscout_players
-            if (_get_player_asset(_normalize(p), team_norm) or {}).get("photo_url")
-        )
-        result["unmatched"] = len(wyscout_players) - result["matched"]
-        return result
+        if all_players_cached:
+            result["skipped"] = True
+            result["matched"] = cached_with_photo
+            result["unmatched"] = len(wyscout_players) - cached_with_photo
+            return result
 
     # Get squad from API-Football
     try:
