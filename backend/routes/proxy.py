@@ -1,8 +1,11 @@
 """Image proxy route with SSRF protection."""
 
+import logging
 import os
 from typing import Dict
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 import aiohttp
 from cachetools import TTLCache
@@ -66,19 +69,33 @@ async def image_proxy(request: Request, url: str):
     is_sofascore = "sofascore" in (parsed.hostname or "")
     is_api_sports = "api-sports.io" in (parsed.hostname or "") or "api-football-v1" in (parsed.hostname or "")
 
-    if is_api_sports and _API_FOOTBALL_KEY:
-        header_strategies = [
-            {
+    if is_api_sports:
+        header_strategies = []
+        # Strategy 1: API key auth (most reliable when key is available)
+        if _API_FOOTBALL_KEY:
+            header_strategies.append({
                 "x-apisports-key": _API_FOOTBALL_KEY,
                 "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            },
-            {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                "Referer": "https://www.api-football.com/",
-            },
-        ]
+            })
+        # Strategy 2: Browser-like with api-football.com Referer
+        header_strategies.append({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "Referer": "https://www.api-football.com/",
+            "Origin": "https://www.api-football.com",
+        })
+        # Strategy 3: Simple request without Referer/Origin
+        header_strategies.append({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept": "image/*,*/*;q=0.8",
+        })
+        # Strategy 4: Dashboard Referer (alternative referrer some CDNs accept)
+        header_strategies.append({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept": "image/*,*/*;q=0.8",
+            "Referer": "https://dashboard.api-football.com/",
+        })
     elif is_sofascore:
         header_strategies = [
             {
@@ -159,5 +176,8 @@ async def image_proxy(request: Request, url: str):
     # client auth failures.  Map them to 502 so the frontend's 401 interceptor
     # doesn't mistakenly clear the user session.
     if last_status in (401, 403):
+        logger.warning("Image proxy: upstream returned %d for %s (mapped to 502)", last_status, url)
         last_status = 502
+    else:
+        logger.warning("Image proxy: all strategies failed for %s (last status: %d)", url, last_status)
     raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
