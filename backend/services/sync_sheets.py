@@ -1,15 +1,18 @@
 """
 sync_sheets.py — Sync Google Sheets → Neon PostgreSQL.
-Pulls CSV exports from Google Sheets and upserts into the database.
+Pulls data from Google Sheets (via Service Account API or public CSV fallback)
+and upserts into the database.
 Can be run as a standalone script (cron) or triggered via API endpoint.
 """
 
 import os
 import io
+import json
+import base64
 import logging
 import urllib.parse
 import urllib.request
-from typing import Dict
+from typing import Dict, Optional
 
 import pandas as pd
 
@@ -28,9 +31,63 @@ SHEET_NAMES = {
     "wyscout": "WyScout",
 }
 
+# ---------- Google Sheets API (Service Account) ----------
+
+_sheets_service = None
+
+
+def _get_sheets_service():
+    """Build and cache an authenticated Google Sheets API service."""
+    global _sheets_service
+    if _sheets_service is not None:
+        return _sheets_service
+
+    from google.oauth2.service_account import Credentials
+    from googleapiclient.discovery import build
+
+    creds_raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+    if not creds_raw:
+        return None
+
+    # Accept raw JSON or base64-encoded JSON
+    try:
+        creds_info = json.loads(creds_raw)
+    except json.JSONDecodeError:
+        creds_info = json.loads(base64.b64decode(creds_raw))
+
+    creds = Credentials.from_service_account_info(
+        creds_info,
+        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    )
+    _sheets_service = build("sheets", "v4", credentials=creds)
+    logger.info("Google Sheets API service initialized with Service Account")
+    return _sheets_service
+
+
+def _download_sheet_api(sheet_id: str, sheet_name: str) -> pd.DataFrame:
+    """Download a sheet tab via Google Sheets API (authenticated)."""
+    service = _get_sheets_service()
+    result = service.spreadsheets().values().get(
+        spreadsheetId=sheet_id,
+        range=sheet_name,
+    ).execute()
+
+    values = result.get("values", [])
+    if not values:
+        return pd.DataFrame()
+
+    # First row = headers, rest = data
+    headers = values[0]
+    rows = values[1:]
+    df = pd.DataFrame(rows, columns=headers)
+    df = df.astype(str)
+    df = df.replace({"": pd.NA, "-": pd.NA, "N/A": pd.NA, "nan": pd.NA})
+    logger.info("Downloaded sheet '%s' via API: %d rows x %d cols", sheet_name, len(df), len(df.columns))
+    return df
+
 
 def _download_sheet_csv(sheet_id: str, sheet_name: str) -> pd.DataFrame:
-    """Download a single Google Sheet tab as CSV → DataFrame."""
+    """Download a single Google Sheet tab as CSV (public, no auth)."""
     encoded = urllib.parse.quote(sheet_name)
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded}"
     try:
@@ -38,11 +95,19 @@ def _download_sheet_csv(sheet_id: str, sheet_name: str) -> pd.DataFrame:
         with urllib.request.urlopen(req, timeout=30) as resp:
             raw = resp.read().decode("utf-8")
         df = pd.read_csv(io.StringIO(raw), dtype=str, na_values=["", "-", "N/A", "nan"])
-        logger.info("Downloaded sheet '%s': %d rows x %d cols", sheet_name, len(df), len(df.columns))
+        logger.info("Downloaded sheet '%s' via public CSV: %d rows x %d cols", sheet_name, len(df), len(df.columns))
         return df
     except Exception as e:
         logger.error("Failed to download sheet '%s': %s", sheet_name, e)
         return pd.DataFrame()
+
+
+def _download_sheet(sheet_id: str, sheet_name: str) -> pd.DataFrame:
+    """Download a sheet tab — uses API if Service Account is configured, else public CSV."""
+    if _get_sheets_service() is not None:
+        return _download_sheet_api(sheet_id, sheet_name)
+    logger.warning("GOOGLE_SERVICE_ACCOUNT_JSON not set — falling back to public CSV export")
+    return _download_sheet_csv(sheet_id, sheet_name)
 
 
 def sync_all_sheets() -> Dict[str, int]:
@@ -54,7 +119,7 @@ def sync_all_sheets() -> Dict[str, int]:
     results = {}
     for key, sheet_name in SHEET_NAMES.items():
         try:
-            df = _download_sheet_csv(GOOGLE_SHEET_ID, sheet_name)
+            df = _download_sheet(GOOGLE_SHEET_ID, sheet_name)
             count = upsert_sheet_data(key, df)
             results[key] = count
         except Exception as e:
@@ -73,7 +138,7 @@ def sync_single_sheet(sheet_key: str) -> int:
     if not sheet_name:
         raise ValueError(f"Unknown sheet key: {sheet_key}")
 
-    df = _download_sheet_csv(GOOGLE_SHEET_ID, sheet_name)
+    df = _download_sheet(GOOGLE_SHEET_ID, sheet_name)
     return upsert_sheet_data(sheet_key, df)
 
 
