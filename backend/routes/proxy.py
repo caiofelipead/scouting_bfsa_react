@@ -47,7 +47,7 @@ _ALLOWED_IMAGE_DOMAINS = {
 
 
 @router.get("/image-proxy")
-@limiter.limit("30/minute")
+@limiter.limit("300/minute")
 async def image_proxy(request: Request, url: str):
     """Proxy external image URLs to avoid CORS/hotlink 403 errors."""
     parsed = urlparse(url)
