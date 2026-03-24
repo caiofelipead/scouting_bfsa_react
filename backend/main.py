@@ -796,11 +796,8 @@ async def list_players(
             for photo_col in ("photo_url", "Foto", "ImageDataURL", "image_url"):
                 val = row.get(photo_col)
                 if val is not None and pd.notna(val) and str(val).strip():
-                    candidate = str(val).strip()
-                    # Skip SofaScore URLs (return 403 from server-side)
-                    if "sofascore" not in candidate.lower():
-                        photo_url = candidate
-                        break
+                    photo_url = str(val).strip()
+                    break
 
         # Prefer API-Football enrichment logos (media.api-sports.io), fallback to hardcoded
         club_logo = assets.get("club_logo")
@@ -1084,17 +1081,13 @@ async def get_player_profile(
         for photo_col in ("photo_url", "Foto", "ImageDataURL", "image_url"):
             val = row.get(photo_col)
             if val is not None and pd.notna(val) and str(val).strip():
-                candidate = str(val).strip()
-                if "sofascore" not in candidate.lower():
-                    photo_url = candidate
-                    break
+                photo_url = str(val).strip()
+                break
     # Fallback: get photo from análises sheet
     if not photo_url and ana_match is not None:
         foto_val = ana_match.get("Foto")
         if foto_val is not None and pd.notna(foto_val) and str(foto_val).strip():
-            candidate = str(foto_val).strip()
-            if "sofascore" not in candidate.lower():
-                photo_url = candidate
+            photo_url = str(foto_val).strip()
 
     # Fallback: on-demand API-Football enrichment (single player, worth the latency)
     if not photo_url and team_name_sc:
