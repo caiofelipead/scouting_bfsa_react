@@ -1,5 +1,6 @@
 """Image proxy route with SSRF protection."""
 
+import os
 from typing import Dict
 from urllib.parse import urlparse
 
@@ -14,6 +15,9 @@ from starlette.requests import Request
 
 router = APIRouter(prefix="/api", tags=["proxy"])
 limiter = Limiter(key_func=get_remote_address)
+
+# API-Football key for media.api-sports.io images
+_API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
 
 # TTL cache for proxied images (URL -> (content_type, bytes))
 _image_cache: TTLCache = TTLCache(maxsize=2000, ttl=3600)  # 1 hour TTL
@@ -60,8 +64,22 @@ async def image_proxy(request: Request, url: str):
 
     # Build domain-specific header strategies
     is_sofascore = "sofascore" in (parsed.hostname or "")
+    is_api_sports = "api-sports.io" in (parsed.hostname or "") or "api-football-v1" in (parsed.hostname or "")
 
-    if is_sofascore:
+    if is_api_sports and _API_FOOTBALL_KEY:
+        header_strategies = [
+            {
+                "x-apisports-key": _API_FOOTBALL_KEY,
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            },
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Referer": "https://www.api-football.com/",
+            },
+        ]
+    elif is_sofascore:
         header_strategies = [
             {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -137,4 +155,9 @@ async def image_proxy(request: Request, url: str):
         except aiohttp.ClientError:
             continue
 
+    # Never forward 401/403 from upstream — these are internal auth issues, not
+    # client auth failures.  Map them to 502 so the frontend's 401 interceptor
+    # doesn't mistakenly clear the user session.
+    if last_status in (401, 403):
+        last_status = 502
     raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
