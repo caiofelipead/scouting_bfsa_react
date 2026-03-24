@@ -5,13 +5,12 @@ from urllib.parse import urlparse
 
 import aiohttp
 from cachetools import TTLCache
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.requests import Request
 
-from auth import get_current_user
 
 router = APIRouter(prefix="/api", tags=["proxy"])
 limiter = Limiter(key_func=get_remote_address)
@@ -34,12 +33,15 @@ _ALLOWED_IMAGE_DOMAINS = {
     "img.sofascore.com",
     "flagcdn.com",
     "flagsapi.com",
+    "logodetimes.com",
+    "www.logodetimes.com",
+    "upload.wikimedia.org",
 }
 
 
 @router.get("/image-proxy")
 @limiter.limit("30/minute")
-async def image_proxy(request: Request, url: str, _user: dict = Depends(get_current_user)):
+async def image_proxy(request: Request, url: str):
     """Proxy external image URLs to avoid CORS/hotlink 403 errors."""
     parsed = urlparse(url)
     if not parsed.hostname or not parsed.scheme.startswith("http"):
