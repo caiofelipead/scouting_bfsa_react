@@ -98,7 +98,7 @@ def init_db():
 
         cur = _execute(conn, driver, "SELECT id, password_hash FROM users WHERE email = ?", (admin_email,))
         row = cur.fetchone()
-        new_hash = pwd_context.hash(admin_password)
+        new_hash = hash_password(admin_password)
 
         if row is None:
             _execute(
@@ -123,12 +123,17 @@ def init_db():
 
 # ── Password & Token ──────────────────────────────────────────────────
 
+def _truncate_for_bcrypt(plain: str) -> str:
+    """Bcrypt silently ignores bytes beyond 72; truncate explicitly to avoid errors."""
+    return plain.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+
+
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return pwd_context.verify(_truncate_for_bcrypt(plain), hashed)
 
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    return pwd_context.hash(_truncate_for_bcrypt(plain))
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
