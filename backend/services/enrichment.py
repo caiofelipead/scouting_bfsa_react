@@ -520,7 +520,24 @@ async def enrich_team(
     if not team_id:
         return result
 
-    # Get squad
+    # Check if all players are already cached — skip squad fetch to save API quota
+    all_players_cached = True
+    for pname in wyscout_players:
+        existing = _get_player_asset(_normalize(pname), team_norm)
+        if not existing or (not existing.get("photo_url") and existing.get("match_quality") not in ("not_found",)):
+            all_players_cached = False
+            break
+
+    if all_players_cached:
+        result["skipped"] = True
+        result["matched"] = sum(
+            1 for p in wyscout_players
+            if (_get_player_asset(_normalize(p), team_norm) or {}).get("photo_url")
+        )
+        result["unmatched"] = len(wyscout_players) - result["matched"]
+        return result
+
+    # Get squad from API-Football
     try:
         squad = await get_squads(team_id)
         result["api_calls"] += 1
