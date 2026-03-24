@@ -530,6 +530,7 @@ async def admin_resync(current_user: dict = Depends(require_admin)):
 @app.post("/api/admin/enrich-assets")
 async def admin_enrich_assets(
     max_api_calls: int = Query(default=90, le=100, description="Max API calls (free tier = 100/day)"),
+    retry_not_found: bool = Query(default=False, description="Re-search teams previously not found"),
     admin: dict = Depends(require_admin),
 ):
     """Bulk enrich player photos and club logos from API-Football.
@@ -537,8 +538,9 @@ async def admin_enrich_assets(
     Processes all unique teams in WyScout data, searches API-Football for
     team ID + logo, then fetches squad to match player photos.
     Results are cached in PostgreSQL to avoid re-fetching.
+    Use retry_not_found=true to re-search teams that weren't found before.
     """
-    from services.enrichment import run_bulk_enrichment
+    from services.enrichment import run_bulk_enrichment, load_asset_cache, backfill_logo_bytes
 
     df = _get_wyscout()
     if "Jogador" not in df.columns or "Equipa" not in df.columns:
@@ -552,7 +554,15 @@ async def admin_enrich_assets(
         if team and player:
             teams_with_players.setdefault(team, []).append(player)
 
-    result = await run_bulk_enrichment(teams_with_players, max_api_calls=max_api_calls)
+    result = await run_bulk_enrichment(teams_with_players, max_api_calls=max_api_calls, retry_not_found=retry_not_found)
+
+    # Backfill logo bytes for any teams with URL but no cached bytes
+    backfilled = await backfill_logo_bytes()
+    result["logos_backfilled"] = backfilled
+
+    # Reload in-memory cache so new logos are served immediately
+    load_asset_cache()
+
     return result
 
 
