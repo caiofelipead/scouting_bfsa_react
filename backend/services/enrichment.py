@@ -256,8 +256,9 @@ def get_all_cached_assets() -> Dict[Tuple[str, str], dict]:
 def get_all_cached_team_logos() -> Dict[str, str]:
     """Load all cached team logos into memory.
 
-    Returns local endpoint URLs for teams that have cached logo bytes,
-    falling back to the original CDN URL otherwise.
+    Returns local endpoint URLs for teams that have cached logo bytes.
+    For teams without bytes, returns None (allows CLUB_LOGOS fallback)
+    since CDN URLs (media.api-sports.io) are blocked server-side.
     """
     from services.database import get_connection
     result: Dict[str, str] = {}
@@ -270,8 +271,10 @@ def get_all_cached_team_logos() -> Dict[str, str]:
                 if has_bytes:
                     # Serve from local endpoint (avoids CDN 403)
                     result[team_norm] = f"/api/team-logo/{team_norm}"
-                else:
+                elif club_logo and "api-sports.io" not in club_logo:
+                    # Non-CDN URL (e.g. logodetimes.com) — use directly
                     result[team_norm] = club_logo
+                # else: CDN URL without bytes — skip, let CLUB_LOGOS fallback handle it
         conn.close()
     except Exception as e:
         logger.warning("Could not load cached team logos: %s", e)
@@ -455,6 +458,7 @@ def _match_squad_players(
 async def enrich_team(
     team_name: str,
     wyscout_players: List[str],
+    retry_not_found: bool = False,
 ) -> Dict[str, Any]:
     """Enrich a single team: resolve team in API-Football, match squad, save to DB.
 
@@ -474,16 +478,22 @@ async def enrich_team(
         team_id = cached_team.get("api_football_team_id")
         club_logo = cached_team.get("club_logo")
         if cached_team.get("match_quality") == "not_found":
-            # Team was searched before and not found — skip
-            # But still mark unmatched players
-            for pname in wyscout_players:
-                existing = _get_player_asset(_normalize(pname), team_norm)
-                if not existing:
-                    _upsert_player_asset(pname, team_name, None, club_logo, None, None, "team_not_found")
-                    result["unmatched"] += 1
-            result["skipped"] = True
-            return result
-    else:
+            if retry_not_found:
+                # Clear the not_found entry and re-search
+                cached_team = None
+            else:
+                # Team was searched before and not found — skip
+                for pname in wyscout_players:
+                    existing = _get_player_asset(_normalize(pname), team_norm)
+                    if not existing:
+                        _upsert_player_asset(pname, team_name, None, club_logo, None, None, "team_not_found")
+                        result["unmatched"] += 1
+                result["skipped"] = True
+                return result
+
+    logo_bytes_downloaded = False
+
+    if not cached_team:
         # Search for team in API-Football
         match = await _search_team_in_apifootball(team_name)
         result["api_calls"] += 1
@@ -492,6 +502,7 @@ async def enrich_team(
             club_logo = match["team"].get("logo")
             # Download logo image bytes for local caching
             logo_data = await _download_image(club_logo)
+            logo_bytes_downloaded = logo_data is not None
             _upsert_team_asset(
                 team_name, team_id, club_logo, "found",
                 logo_bytes=logo_data[0] if logo_data else None,
@@ -537,9 +548,13 @@ async def enrich_team(
                 _upsert_player_asset(pname, team_name, None, club_logo, None, team_id, "not_found")
             result["unmatched"] += 1
 
-    # Update in-memory cache — use local endpoint if logo was downloaded
-    logo_url_for_cache = f"/api/team-logo/{team_norm}" if club_logo else ""
-    _cached_team_logos[team_norm] = logo_url_for_cache
+    # Update in-memory cache — use local endpoint only if bytes were downloaded
+    if logo_bytes_downloaded:
+        logo_url_for_cache = f"/api/team-logo/{team_norm}"
+    else:
+        logo_url_for_cache = None  # Let CLUB_LOGOS fallback handle it
+    if logo_url_for_cache:
+        _cached_team_logos[team_norm] = logo_url_for_cache
     for pname, m in matched.items():
         if m.get("photo"):
             _cached_player_assets[(_normalize(pname), team_norm)] = {"photo_url": m["photo"], "club_logo": logo_url_for_cache}
@@ -550,12 +565,14 @@ async def enrich_team(
 async def run_bulk_enrichment(
     teams_with_players: Dict[str, List[str]],
     max_api_calls: int = 90,
+    retry_not_found: bool = False,
 ) -> Dict[str, Any]:
     """Run bulk enrichment for all teams.
 
     Args:
         teams_with_players: {team_name: [player_name, ...]}
         max_api_calls: Maximum API calls to make (default 90, safe for 100/day limit)
+        retry_not_found: If True, re-search teams previously marked as not_found
 
     Returns: summary dict with results per team
     """
@@ -572,7 +589,7 @@ async def run_bulk_enrichment(
             break
 
         try:
-            team_result = await enrich_team(team_name, players)
+            team_result = await enrich_team(team_name, players, retry_not_found=retry_not_found)
             total_api_calls += team_result["api_calls"]
             total_matched += team_result["matched"]
             total_unmatched += team_result["unmatched"]
