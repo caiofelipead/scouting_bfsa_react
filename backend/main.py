@@ -329,7 +329,7 @@ async def _auto_enrich_background():
         return
 
     try:
-        from services.enrichment import run_bulk_enrichment, load_asset_cache
+        from services.enrichment import run_bulk_enrichment, load_asset_cache, backfill_logo_bytes
 
         df = _data.get("wyscout")
         if df is None or "Jogador" not in df.columns or "Equipa" not in df.columns:
@@ -353,6 +353,9 @@ async def _auto_enrich_background():
             result.get("api_calls_used", 0),
             result.get("stopped_reason"),
         )
+
+        # Backfill logo bytes for teams enriched before this feature
+        await backfill_logo_bytes()
 
         # Reload in-memory cache after enrichment
         load_asset_cache()

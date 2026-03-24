@@ -9,12 +9,17 @@ for persistent caching to avoid wasting API quota.
 """
 
 import asyncio
+import base64
 import logging
+import os
 import unicodedata
 import re
 from typing import Dict, List, Optional, Tuple, Any
 
+import aiohttp
 from rapidfuzz import fuzz
+
+_API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +55,8 @@ CREATE TABLE IF NOT EXISTS team_assets_cache (
     team_name_norm TEXT NOT NULL UNIQUE,
     api_football_team_id INTEGER,
     club_logo TEXT,
+    logo_bytes BYTEA,
+    logo_content_type TEXT DEFAULT 'image/png',
     match_quality TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -83,12 +90,47 @@ def init_asset_tables():
         with conn.cursor() as cur:
             cur.execute(_CREATE_ASSET_TABLES_SQL)
         conn.commit()
-        logger.info("Asset cache tables initialized")
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
+
+    # Migration: add logo_bytes columns if table existed before this change
+    conn = get_connection()
+    for col, col_type in [("logo_bytes", "BYTEA"), ("logo_content_type", "TEXT DEFAULT 'image/png'")]:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f"ALTER TABLE team_assets_cache ADD COLUMN IF NOT EXISTS {col} {col_type}")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+    conn.close()
+    logger.info("Asset cache tables initialized")
+
+
+async def _download_image(url: str) -> Optional[Tuple[bytes, str]]:
+    """Download an image from media.api-sports.io using API key auth.
+
+    Returns (bytes, content_type) or None if download fails.
+    """
+    if not url:
+        return None
+    headers = {"User-Agent": "Mozilla/5.0"}
+    if _API_FOOTBALL_KEY and "api-sports.io" in url:
+        headers["x-apisports-key"] = _API_FOOTBALL_KEY
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status == 200:
+                    data = await resp.read()
+                    ct = resp.content_type or "image/png"
+                    if len(data) > 0:
+                        return (data, ct)
+                logger.debug("Image download failed for %s: status %d", url, resp.status)
+    except Exception as e:
+        logger.debug("Image download error for %s: %s", url, e)
+    return None
 
 
 def _get_team_asset(team_name_norm: str) -> Optional[dict]:
@@ -109,19 +151,28 @@ def _get_team_asset(team_name_norm: str) -> Optional[dict]:
         conn.close()
 
 
-def _upsert_team_asset(team_name: str, api_football_team_id: Optional[int], club_logo: Optional[str], match_quality: str):
+def _upsert_team_asset(
+    team_name: str,
+    api_football_team_id: Optional[int],
+    club_logo: Optional[str],
+    match_quality: str,
+    logo_bytes: Optional[bytes] = None,
+    logo_content_type: str = "image/png",
+):
     from services.database import get_connection
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO team_assets_cache (team_name, team_name_norm, api_football_team_id, club_logo, match_quality)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO team_assets_cache (team_name, team_name_norm, api_football_team_id, club_logo, logo_bytes, logo_content_type, match_quality)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (team_name_norm)
                 DO UPDATE SET api_football_team_id = EXCLUDED.api_football_team_id,
                               club_logo = EXCLUDED.club_logo,
+                              logo_bytes = COALESCE(EXCLUDED.logo_bytes, team_assets_cache.logo_bytes),
+                              logo_content_type = COALESCE(EXCLUDED.logo_content_type, team_assets_cache.logo_content_type),
                               match_quality = EXCLUDED.match_quality
-            """, (team_name, _normalize(team_name), api_football_team_id, club_logo, match_quality))
+            """, (team_name, _normalize(team_name), api_football_team_id, club_logo, logo_bytes, logo_content_type, match_quality))
         conn.commit()
     except Exception:
         conn.rollback()
@@ -203,19 +254,47 @@ def get_all_cached_assets() -> Dict[Tuple[str, str], dict]:
 
 
 def get_all_cached_team_logos() -> Dict[str, str]:
-    """Load all cached team logos into memory."""
+    """Load all cached team logos into memory.
+
+    Returns local endpoint URLs for teams that have cached logo bytes,
+    falling back to the original CDN URL otherwise.
+    """
     from services.database import get_connection
     result: Dict[str, str] = {}
     try:
         conn = get_connection()
         with conn.cursor() as cur:
-            cur.execute("SELECT team_name_norm, club_logo FROM team_assets_cache WHERE club_logo IS NOT NULL")
+            cur.execute("SELECT team_name_norm, club_logo, (logo_bytes IS NOT NULL) AS has_bytes FROM team_assets_cache WHERE club_logo IS NOT NULL")
             for row in cur.fetchall():
-                result[row[0]] = row[1]
+                team_norm, club_logo, has_bytes = row
+                if has_bytes:
+                    # Serve from local endpoint (avoids CDN 403)
+                    result[team_norm] = f"/api/team-logo/{team_norm}"
+                else:
+                    result[team_norm] = club_logo
         conn.close()
     except Exception as e:
         logger.warning("Could not load cached team logos: %s", e)
     return result
+
+
+def get_team_logo_bytes(team_name_norm: str) -> Optional[Tuple[bytes, str]]:
+    """Get cached logo bytes and content type for a team."""
+    from services.database import get_connection
+    try:
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT logo_bytes, logo_content_type FROM team_assets_cache WHERE team_name_norm = %s AND logo_bytes IS NOT NULL",
+                (team_name_norm,),
+            )
+            row = cur.fetchone()
+            if row:
+                return (bytes(row[0]), row[1] or "image/png")
+        conn.close()
+    except Exception as e:
+        logger.warning("Could not load logo bytes for %s: %s", team_name_norm, e)
+    return None
 
 
 def get_enrichment_stats() -> dict:
@@ -411,7 +490,13 @@ async def enrich_team(
         if match:
             team_id = match["team"]["id"]
             club_logo = match["team"].get("logo")
-            _upsert_team_asset(team_name, team_id, club_logo, "found")
+            # Download logo image bytes for local caching
+            logo_data = await _download_image(club_logo)
+            _upsert_team_asset(
+                team_name, team_id, club_logo, "found",
+                logo_bytes=logo_data[0] if logo_data else None,
+                logo_content_type=logo_data[1] if logo_data else "image/png",
+            )
         else:
             _upsert_team_asset(team_name, None, None, "not_found")
             for pname in wyscout_players:
@@ -452,11 +537,12 @@ async def enrich_team(
                 _upsert_player_asset(pname, team_name, None, club_logo, None, team_id, "not_found")
             result["unmatched"] += 1
 
-    # Update in-memory cache
-    _cached_team_logos[team_norm] = club_logo or ""
+    # Update in-memory cache — use local endpoint if logo was downloaded
+    logo_url_for_cache = f"/api/team-logo/{team_norm}" if club_logo else ""
+    _cached_team_logos[team_norm] = logo_url_for_cache
     for pname, m in matched.items():
         if m.get("photo"):
-            _cached_player_assets[(_normalize(pname), team_norm)] = {"photo_url": m["photo"], "club_logo": club_logo}
+            _cached_player_assets[(_normalize(pname), team_norm)] = {"photo_url": m["photo"], "club_logo": logo_url_for_cache}
 
     return result
 
@@ -545,3 +631,50 @@ async def enrich_single_player(player_name: str, team_name: str = None) -> Optio
         logger.warning("On-demand enrichment failed for %s (%s): %s", player_name, team_name, e)
 
     return None
+
+
+async def backfill_logo_bytes():
+    """Download logo bytes for teams that have a URL but no cached bytes.
+
+    This handles teams that were enriched before the logo_bytes feature was added.
+    Does NOT count against API quota — just downloads from the CDN.
+    """
+    from services.database import get_connection
+    conn = get_connection()
+    teams_to_backfill = []
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT team_name_norm, club_logo FROM team_assets_cache "
+                "WHERE club_logo IS NOT NULL AND logo_bytes IS NULL AND match_quality = 'found'"
+            )
+            teams_to_backfill = cur.fetchall()
+    finally:
+        conn.close()
+
+    if not teams_to_backfill:
+        return 0
+
+    logger.info("Backfilling logo bytes for %d teams", len(teams_to_backfill))
+    count = 0
+    for team_norm, logo_url in teams_to_backfill:
+        logo_data = await _download_image(logo_url)
+        if logo_data:
+            conn = get_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE team_assets_cache SET logo_bytes = %s, logo_content_type = %s WHERE team_name_norm = %s",
+                        (logo_data[0], logo_data[1], team_norm),
+                    )
+                conn.commit()
+                count += 1
+            except Exception:
+                conn.rollback()
+            finally:
+                conn.close()
+        # Small delay to avoid hammering the CDN
+        await asyncio.sleep(0.2)
+
+    logger.info("Backfilled %d/%d team logos", count, len(teams_to_backfill))
+    return count
