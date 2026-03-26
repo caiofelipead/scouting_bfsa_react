@@ -35,9 +35,9 @@ def _get_pool() -> pg_pool.SimpleConnectionPool:
         if not url:
             raise RuntimeError("DATABASE_URL not set — cannot connect to Neon PostgreSQL")
         _pool = pg_pool.SimpleConnectionPool(
-            minconn=2, maxconn=10, dsn=url, connect_timeout=10
+            minconn=2, maxconn=15, dsn=url, connect_timeout=10
         )
-        logger.info("PostgreSQL connection pool created (min=2, max=10)")
+        logger.info("PostgreSQL connection pool created (min=2, max=15)")
     return _pool
 
 
