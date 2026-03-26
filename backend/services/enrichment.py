@@ -84,7 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_pac_team ON player_assets_cache (team_name_norm);
 
 def init_asset_tables():
     """Create asset cache tables if they don't exist."""
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -94,7 +94,7 @@ def init_asset_tables():
         conn.rollback()
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
     # Migration: add logo_bytes columns if table existed before this change
     conn = get_connection()
@@ -105,7 +105,7 @@ def init_asset_tables():
             conn.commit()
         except Exception:
             conn.rollback()
-    conn.close()
+    release_connection(conn)
     logger.info("Asset cache tables initialized")
 
 
@@ -135,7 +135,7 @@ async def _download_image(url: str) -> Optional[Tuple[bytes, str]]:
 
 def _get_team_asset(team_name_norm: str) -> Optional[dict]:
     """Check if a team was already resolved."""
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -148,7 +148,7 @@ def _get_team_asset(team_name_norm: str) -> Optional[dict]:
                 return {"api_football_team_id": row[0], "club_logo": row[1], "match_quality": row[2]}
         return None
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def _upsert_team_asset(
@@ -159,7 +159,7 @@ def _upsert_team_asset(
     logo_bytes: Optional[bytes] = None,
     logo_content_type: str = "image/png",
 ):
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -190,11 +190,11 @@ def _upsert_team_asset(
         conn.rollback()
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def _get_player_asset(player_name_norm: str, team_name_norm: str) -> Optional[dict]:
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -207,7 +207,7 @@ def _get_player_asset(player_name_norm: str, team_name_norm: str) -> Optional[di
                 return {"photo_url": row[0], "club_logo": row[1], "match_quality": row[2]}
         return None
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def _upsert_player_asset(
@@ -219,7 +219,7 @@ def _upsert_player_asset(
     api_football_team_id: Optional[int],
     match_quality: str,
 ):
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -246,12 +246,12 @@ def _upsert_player_asset(
         conn.rollback()
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def get_all_cached_assets() -> Dict[Tuple[str, str], dict]:
     """Load all cached player assets into memory (for startup warm-up)."""
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     result: Dict[Tuple[str, str], dict] = {}
     try:
         conn = get_connection()
@@ -259,7 +259,7 @@ def get_all_cached_assets() -> Dict[Tuple[str, str], dict]:
             cur.execute("SELECT player_name_norm, team_name_norm, photo_url, club_logo FROM player_assets_cache WHERE photo_url IS NOT NULL")
             for row in cur.fetchall():
                 result[(row[0], row[1])] = {"photo_url": row[2], "club_logo": row[3]}
-        conn.close()
+        release_connection(conn)
     except Exception as e:
         logger.warning("Could not load cached assets: %s", e)
     return result
@@ -272,7 +272,7 @@ def get_all_cached_team_logos() -> Dict[str, str]:
     For teams without bytes, returns None (allows CLUB_LOGOS fallback)
     since CDN URLs (media.api-sports.io) are blocked server-side.
     """
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     result: Dict[str, str] = {}
     try:
         conn = get_connection()
@@ -287,7 +287,7 @@ def get_all_cached_team_logos() -> Dict[str, str]:
                     # Non-CDN URL (e.g. logodetimes.com) — use directly
                     result[team_norm] = club_logo
                 # else: CDN URL without bytes — skip, let CLUB_LOGOS fallback handle it
-        conn.close()
+        release_connection(conn)
     except Exception as e:
         logger.warning("Could not load cached team logos: %s", e)
     return result
@@ -295,7 +295,7 @@ def get_all_cached_team_logos() -> Dict[str, str]:
 
 def get_team_logo_bytes(team_name_norm: str) -> Optional[Tuple[bytes, str]]:
     """Get cached logo bytes and content type for a team."""
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     try:
         conn = get_connection()
         with conn.cursor() as cur:
@@ -306,7 +306,7 @@ def get_team_logo_bytes(team_name_norm: str) -> Optional[Tuple[bytes, str]]:
             row = cur.fetchone()
             if row:
                 return (bytes(row[0]), row[1] or "image/png")
-        conn.close()
+        release_connection(conn)
     except Exception as e:
         logger.warning("Could not load logo bytes for %s: %s", team_name_norm, e)
     return None
@@ -314,7 +314,7 @@ def get_team_logo_bytes(team_name_norm: str) -> Optional[Tuple[bytes, str]]:
 
 def get_enrichment_stats() -> dict:
     """Return counts for enrichment status."""
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     stats = {"teams_total": 0, "teams_found": 0, "players_total": 0, "players_with_photo": 0, "players_not_found": 0}
     try:
         conn = get_connection()
@@ -328,7 +328,7 @@ def get_enrichment_stats() -> dict:
             stats["players_total"] = row[0]
             stats["players_with_photo"] = row[1]
             stats["players_not_found"] = row[2]
-        conn.close()
+        release_connection(conn)
     except Exception as e:
         logger.warning("Could not get enrichment stats: %s", e)
     return stats
@@ -689,7 +689,7 @@ async def backfill_logo_bytes():
     This handles teams that were enriched before the logo_bytes feature was added.
     Does NOT count against API quota — just downloads from the CDN.
     """
-    from services.database import get_connection
+    from services.database import get_connection, release_connection
     conn = get_connection()
     teams_to_backfill = []
     try:
@@ -700,7 +700,7 @@ async def backfill_logo_bytes():
             )
             teams_to_backfill = cur.fetchall()
     finally:
-        conn.close()
+        release_connection(conn)
 
     if not teams_to_backfill:
         return 0
@@ -722,7 +722,7 @@ async def backfill_logo_bytes():
             except Exception:
                 conn.rollback()
             finally:
-                conn.close()
+                release_connection(conn)
         # Small delay to avoid hammering the CDN
         await asyncio.sleep(0.2)
 

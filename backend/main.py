@@ -477,12 +477,14 @@ async def health_check():
 
     db_ok = False
     try:
-        from services.database import get_connection
+        from services.database import get_connection, release_connection
         conn = get_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1")
-        conn.close()
-        db_ok = True
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            db_ok = True
+        finally:
+            release_connection(conn)
     except Exception:
         pass
 
