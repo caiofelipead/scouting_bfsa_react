@@ -1,0 +1,292 @@
+# Modelos de Machine Learning — Scouting BFSA
+
+## Visao Geral
+
+O sistema utiliza 7 modelos de ML no **Scouting Intelligence Engine** mais um motor preditivo original (**predictive_engine v3.0**). Todos os modelos sao calibrados com base em literatura academica (172 artigos revisados) e pesquisas brasileiras (PIBITI/TCC).
+
+---
+
+## Scouting Intelligence Engine (7 Modelos)
+
+### Modelo 1: Player Trajectory Model
+
+**Objetivo:** Prever a evolucao de carreira de um jogador nas proximas temporadas.
+
+**Algoritmo:** Gradient Boosting Regressor
+
+**Pipeline:**
+```
+Dados brutos
+  → Normalizacao z-score
+  → Feature Selection (Mutual Information)
+  → Gradient Boosting Regressor
+  → Cross-Validation (k-fold)
+  → predicted_rating_next_season
+```
+
+**Saidas:**
+- `predicted_rating_next_season` — Rating previsto para proxima temporada
+- `trajectory_score` — Score de trajetoria (0-100)
+- `trajectory_class` — Classificacao: `improving`, `stable`, `declining`
+
+**Base Cientifica:**
+| Referencia | Contribuicao |
+|---|---|
+| Decroos et al. (KDD 2019) — VAEP | Valoracao de acoes: VAEP(acao) = ΔP(gol) − ΔP(sofrer gol) |
+| Bransen & Van Haaren (2020) | Contribuicao de passes on-the-ball |
+| SciSkill Forecasting (MDPI 2025) | 86 features, RF para ETV, XGBoost para SciSkill |
+| Can We Predict Success? (ICSPORTS 2025) | N=8.770, SHAP: trajetorias > atributos estaticos, F1=0.86 |
+| Age Curves 2.0 (TransferLab) | Curvas de decaimento por habilidade |
+
+**Endpoint:** `POST /api/trajectory`
+
+---
+
+### Modelo 2: Market Value Prediction
+
+**Objetivo:** Estimar valor de transferencia de um jogador em EUR.
+
+**Algoritmo:** XGBoost Regressor
+
+**Segmentacao:** 9 modelos especializados por posicao x faixa etaria:
+```
+                    Jovem (≤23)    Prime (24-29)    Veterano (30+)
+Goleiro/Defensor    modelo_1       modelo_2         modelo_3
+Meio-campista       modelo_4       modelo_5         modelo_6
+Atacante            modelo_7       modelo_8         modelo_9
+```
+
+**Saidas:**
+- `estimated_market_value` — Valor estimado em EUR
+- `market_value_gap` — Diferenca entre valor real e estimado
+
+**Base Cientifica:**
+| Referencia | Contribuicao |
+|---|---|
+| Khalife et al. (MDPI 2025) | 9 modelos posicao x idade, R² > 0.91 atacantes jovens |
+| Poli, Besson, Ravenel (CIES 2021) | MLR R² > 85% |
+| Gyarmati & Stanojevic (2016) | Data-driven player assessment |
+
+**Endpoint:** `POST /api/market_value`
+
+---
+
+### Modelo 3: Market Opportunity Detector
+
+**Objetivo:** Identificar jogadores com alto potencial e valor de mercado abaixo do esperado.
+
+**Formula:**
+```
+opportunity_score = performance_score × trajectory_weight × value_gap_factor − age_penalty
+```
+
+**Classificacao:**
+| Faixa | Classificacao |
+|---|---|
+| > 80 | Exceptional Opportunity |
+| 60-80 | High Opportunity |
+| 40-60 | Moderate Opportunity |
+| < 40 | Low Opportunity |
+
+**Inspiracao:** Modelos de recrutamento do Brighton (Caicedo £4.5M → £115M), Brentford e FC Midtjylland.
+
+**Base Cientifica:**
+| Referencia | Contribuicao |
+|---|---|
+| Brighton Analytics (Starlizard) | Caso Caicedo e Mitoma |
+| GDA (TransferLab/Analytics FC) | Goal Difference Added via Cadeias de Markov |
+| SciSkill Forecasting (MDPI 2025) | Combinacao de performance + trajetoria |
+
+**Endpoint:** `POST /api/market_opportunities`
+
+---
+
+### Modelo 4: Player Replacement Engine
+
+**Objetivo:** Encontrar substitutos ideais para um jogador de referencia.
+
+**Metodos de Similaridade (3 combinados):**
+
+```
+                            Peso
+Cosine Similarity           45%     Angulo entre vetores de metricas
+Mahalanobis Distance        35%     Distancia ponderada por correlacao
+Cluster Proximity           20%     Proximidade no espaco de clusters
+─────────────────────────────────
+Total                      100%     Score final de similaridade
+```
+
+**Pipeline:**
+```
+Jogador referencia
+  → Extrair vetor de metricas
+  → Filtrar candidatos (mesma posicao, ligas alvo)
+  → Calcular 3 distancias
+  → Ponderar: 0.45×Cosine + 0.35×Mahalanobis + 0.20×ClusterProx
+  → Ranquear por similaridade descendente
+  → Enriquecer com trajetoria e valor de mercado
+```
+
+**Base Cientifica:**
+| Referencia | Contribuicao |
+|---|---|
+| KickClone — Bhatt et al. (AIMV 2025) | Normalizacao → PCA → Cosine → Top-K, +200K jogadores |
+| Spatial Similarity Index (PMC 2025) | Estatistica de Lee para similaridade espacial |
+| FPSRec (IEEE BigData 2024) | IA generativa para relatorios de scouting |
+
+**Endpoint:** `POST /api/replacements`
+
+---
+
+### Modelo 5: Temporal Performance Trend
+
+**Objetivo:** Analisar tendencia temporal de performance.
+
+**Calculo:**
+```
+trend = rolling_mean(current_window) − rolling_mean(previous_window)
+```
+
+**Classificacao:**
+| Tendencia | Criterio |
+|---|---|
+| `improving` | trend > +threshold |
+| `stable` | -threshold ≤ trend ≤ +threshold |
+| `declining` | trend < -threshold |
+
+**Referencia:** Age Curves 2.0 (TransferLab/Analytics FC) — curvas de decaimento por habilidade (drible decai cedo, passe se mantem estavel).
+
+---
+
+### Modelo 6: League Strength Adjustment
+
+**Objetivo:** Ajustar metricas de jogadores pelo nivel competitivo da liga.
+
+**Formula:**
+```
+adjusted_metric = raw_metric × league_strength_factor × opta_league_power
+```
+
+**Fonte:** Opta Power Rankings (Stats Perform 2025)
+- 13.500+ clubes avaliados
+- Escala 0-100
+- Baseado em Elo modificado
+
+**Endpoint:** `GET /api/league_powers`
+
+---
+
+### Modelo 7: Contract Impact Analyzer
+
+**Objetivo:** Analisar o impacto potencial de uma contratacao no elenco do Botafogo-SP.
+
+**6 Componentes do Score:**
+```
+                              Peso    Descricao
+Necessidade Posicional        20%     Carencia na posicao do elenco atual
+Ganho de Qualidade            25%     Melhoria vs titulares atuais
+Complementaridade Tatica      15%     Encaixe no esquema tatico
+Perfil Etario                 10%     Alinhamento com janela de idade ideal
+Eficiencia Financeira         15%     Custo-beneficio da operacao
+Avaliacao de Risco            15%     Fatores de risco (lesoes, adaptacao)
+───────────────────────────────────
+Impact Score                 100%     Score final (0-100)
+```
+
+**Classificacao de Impacto:**
+| Score | Classificacao |
+|---|---|
+| > 80 | Impacto Excepcional |
+| 60-80 | Alto Impacto |
+| 40-60 | Impacto Moderado |
+| < 40 | Baixo Impacto |
+
+**Base Cientifica:**
+| Referencia | Contribuicao |
+|---|---|
+| Pappalardo et al. (2019) PlayeRank | Framework de avaliacao multi-dimensional |
+| Kuper & Szymanski (2009) Soccernomics | Economia do futebol |
+| Poli et al. (CIES 2021) | Modelo econometrico de transferencias |
+| Age Curves 2.0 | Perfil etario ideal por posicao |
+| Frost & Groom (2025) | Processo de integracao e recrutamento |
+
+**Endpoint:** `POST /api/contract_impact`
+
+---
+
+## Motor Preditivo Original (predictive_engine v3.0)
+
+### Scout Score Preditivo (SSP)
+Ensemble score combinando multiplas fontes:
+```
+SSP = w1×WP_score + w2×xG_residual + w3×cluster_fit + w4×percentil_score
+```
+
+### Win-Probability Model
+Logistic Regression com coeficientes calibrados por posicao:
+```
+WP = σ(β0 + β1×metric1 + β2×metric2 + ... + βn×metricN)
+```
+
+### Clusterizacao Tatica
+Pipeline de 3 etapas:
+```
+Metricas por posicao
+  → K-Means (k clusters iniciais)
+  → Gaussian Mixture Model (refinamento)
+  → Random Forest Interpreter (importancia de features)
+  → Perfis taticos nomeados
+```
+
+### Similaridade Avancada
+```
+Mahalanobis Distance + Random Forest Proximity
+  → Score de similaridade composto
+```
+
+### ContractSuccessPredictor
+Predicao de probabilidade de sucesso com ajuste por forca de liga:
+```
+P(success) = base_prediction × league_adjustment_factor
+```
+
+---
+
+## Mapa de Referencias Cientificas
+
+```
+                    M1        M2        M3        M4        M5        M6        M7
+Referencia          Traj.     Value     Opport.   Replace.  Trend     League    Impact
+─────────────────────────────────────────────────────────────────────────────────────
+VAEP (KDD 2019)     ●                   ●
+Bransen 2020        ●
+SciSkill (2025)     ●                   ●
+ICSPORTS 2025       ●
+Age Curves 2.0      ●                                       ●                   ●
+Khalife (2025)                ●
+CIES 2021                     ●                                                  ●
+Gyarmati 2016                 ●
+GDA TransferLab     ●                   ●
+Brighton/Starlizard                     ●
+KickClone 2025                                    ●
+Spatial Sim. 2025                                 ●
+FPSRec 2024                                      ●
+Opta Power 2025                                                       ●
+PlayeRank 2019                                                                   ●
+Soccernomics 2009                                                                ●
+Frost & Groom 2025                                                               ●
+```
+
+---
+
+## Calibracao Academica Brasileira
+
+| Pesquisador | Instituicao | Ano | Contribuicao |
+|---|---|---|---|
+| Joao Vitor Oliveira | Insper (PIBITI) | 2025 | Coeficientes β de rating por posicao |
+| Victor Valvano Schimidt | UNESP | 2021 | Coeficientes de win-probability |
+| Eduardo Baptista dos Santos | MBA USP/ICMC | 2024 | Classificacao de jogadores por posicao |
+| Frederico Ferra | NOVA IMS | 2025 | PCA + K-Means + RF para clustering |
+| Tiago Pinto | ISEP Porto | 2024 | Gradient Boosting para predicao |
+| Felipe Nunes | UFMG | 2025 | Fuzzy + Random Forest para recrutamento |
+| Gabriel Buso | UFSC | 2025 | Modelos xG e xGOT |
