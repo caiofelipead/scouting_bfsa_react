@@ -30,4 +30,12 @@ describe('proxyImageUrl', () => {
   it('returns null for empty string', () => {
     expect(proxyImageUrl('')).toBeNull();
   });
+
+  it('encodes team-logo URLs with spaces', () => {
+    expect(proxyImageUrl('/api/team-logo/ldu quito')).toBe('/api/team-logo/ldu%20quito');
+  });
+
+  it('passes through team-logo URLs without spaces', () => {
+    expect(proxyImageUrl('/api/team-logo/millonarios')).toBe('/api/team-logo/millonarios');
+  });
 });

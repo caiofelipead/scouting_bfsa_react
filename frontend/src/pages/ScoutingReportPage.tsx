@@ -12,6 +12,7 @@ import ReportRadar from '../components/report/ReportRadar';
 import WedgeRadar from '../components/report/WedgeRadar';
 import DeltaChart from '../components/report/DeltaChart';
 import { C, QUADRANT, PAGE_WIDTH, PAGE_HEIGHT, FONTS_HREF, BFSA_SHIELD, injectFonts, styles } from './scoutingReportStyles';
+import { proxyImageUrl } from '../lib/api';
 
 // ── Page wrapper component with shield watermark + auto-scaling ──
 function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
@@ -777,7 +778,7 @@ export default function ScoutingReportPage() {
                   <div style={{ ...styles.card, flex: 1, display: 'flex', flexDirection: 'column' as const }}>
                     <div style={styles.analysisHeader}>
                       {data.player.clubLogo && (
-                        <img src={`/api/image-proxy?url=${encodeURIComponent(data.player.clubLogo)}`} alt={data.player.club} style={{ width: 36, height: 36, objectFit: 'contain' }} crossOrigin="anonymous" onError={(e) => { const img = e.target as HTMLImageElement; if (img.src.includes('/api/image-proxy')) { img.src = data.player.clubLogo!; } else { img.style.display = 'none'; } }} />
+                        <img src={proxyImageUrl(data.player.clubLogo)!} alt={data.player.club} style={{ width: 36, height: 36, objectFit: 'contain' }} crossOrigin="anonymous" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       )}
                       <div>
                         <div style={styles.analysisLabel}>ANÁLISE</div>

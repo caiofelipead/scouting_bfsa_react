@@ -158,8 +158,10 @@ def _upsert_team_asset(
     match_quality: str,
     logo_bytes: Optional[bytes] = None,
     logo_content_type: str = "image/png",
-):
+) -> bool:
+    """Upsert team asset. Returns True if logo_bytes were persisted to DB."""
     from services.database import get_connection, release_connection
+    bytes_saved = False
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -174,6 +176,7 @@ def _upsert_team_asset(
                                   logo_content_type = COALESCE(EXCLUDED.logo_content_type, team_assets_cache.logo_content_type),
                                   match_quality = EXCLUDED.match_quality
                 """, (team_name, _normalize(team_name), api_football_team_id, club_logo, logo_bytes, logo_content_type, match_quality))
+                bytes_saved = logo_bytes is not None and len(logo_bytes) > 0
             except Exception:
                 # Fallback: logo_bytes columns might not exist yet
                 conn.rollback()
@@ -185,12 +188,14 @@ def _upsert_team_asset(
                                   club_logo = EXCLUDED.club_logo,
                                   match_quality = EXCLUDED.match_quality
                 """, (team_name, _normalize(team_name), api_football_team_id, club_logo, match_quality))
+                bytes_saved = False
         conn.commit()
     except Exception:
         conn.rollback()
         raise
     finally:
         release_connection(conn)
+    return bytes_saved
 
 
 def _get_player_asset(player_name_norm: str, team_name_norm: str) -> Optional[dict]:
@@ -277,7 +282,7 @@ def get_all_cached_team_logos() -> Dict[str, str]:
     try:
         conn = get_connection()
         with conn.cursor() as cur:
-            cur.execute("SELECT team_name_norm, club_logo, (logo_bytes IS NOT NULL) AS has_bytes FROM team_assets_cache WHERE club_logo IS NOT NULL")
+            cur.execute("SELECT team_name_norm, club_logo, (logo_bytes IS NOT NULL AND length(logo_bytes) > 0) AS has_bytes FROM team_assets_cache WHERE club_logo IS NOT NULL")
             for row in cur.fetchall():
                 team_norm, club_logo, has_bytes = row
                 if has_bytes:
@@ -296,19 +301,44 @@ def get_all_cached_team_logos() -> Dict[str, str]:
 def get_team_logo_bytes(team_name_norm: str) -> Optional[Tuple[bytes, str]]:
     """Get cached logo bytes and content type for a team."""
     from services.database import get_connection, release_connection
+    conn = None
     try:
         conn = get_connection()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT logo_bytes, logo_content_type FROM team_assets_cache WHERE team_name_norm = %s AND logo_bytes IS NOT NULL",
+                "SELECT logo_bytes, logo_content_type FROM team_assets_cache WHERE team_name_norm = %s AND logo_bytes IS NOT NULL AND length(logo_bytes) > 0",
                 (team_name_norm,),
             )
             row = cur.fetchone()
             if row:
                 return (bytes(row[0]), row[1] or "image/png")
-        release_connection(conn)
     except Exception as e:
         logger.warning("Could not load logo bytes for %s: %s", team_name_norm, e)
+    finally:
+        if conn:
+            release_connection(conn)
+    return None
+
+
+def get_team_cdn_url(team_name_norm: str) -> Optional[str]:
+    """Get the CDN logo URL for a team (without bytes). Used as fallback."""
+    from services.database import get_connection, release_connection
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT club_logo FROM team_assets_cache WHERE team_name_norm = %s AND club_logo IS NOT NULL",
+                (team_name_norm,),
+            )
+            row = cur.fetchone()
+            if row and row[0]:
+                return row[0]
+    except Exception as e:
+        logger.warning("Could not load CDN URL for %s: %s", team_name_norm, e)
+    finally:
+        if conn:
+            release_connection(conn)
     return None
 
 
@@ -514,8 +544,7 @@ async def enrich_team(
             club_logo = match["team"].get("logo")
             # Download logo image bytes for local caching
             logo_data = await _download_image(club_logo)
-            logo_bytes_downloaded = logo_data is not None
-            _upsert_team_asset(
+            logo_bytes_downloaded = _upsert_team_asset(
                 team_name, team_id, club_logo, "found",
                 logo_bytes=logo_data[0] if logo_data else None,
                 logo_content_type=logo_data[1] if logo_data else "image/png",
