@@ -116,14 +116,14 @@ def load_player_assets_csv(csv_path: str = None):
 
 
 def _is_sofascore_url(url: str) -> bool:
-    """Check if a URL is from SofaScore (which blocks external/server-side access with 403)."""
+    """Check if a URL is from SofaScore (which blocks server-side requests with 403)."""
     if not url:
         return False
     return "sofascore" in url.lower()
 
 
 def _usable_url(url: str) -> str:
-    """Return the URL only if it's not from a blocked source (SofaScore returns 403 server-side)."""
+    """Return the URL only if it's not from a blocked source."""
     if not url or _is_sofascore_url(url):
         return None
     return url

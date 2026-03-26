@@ -90,7 +90,7 @@ export default function ComparisonPage() {
           <div>
             <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
             <select value={position} onChange={(e) => setPosition(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
-              {(positions.length > 0 ? positions : ['Atacante','Extremo','Meia','Volante','Lateral','Zagueiro','Goleiro']).map(p => <option key={p} value={p}>{p}</option>)}
+              {(positions.length > 0 ? positions : ['Atacante','Extremo','Meia','Volante','Lateral direito','Lateral esquerdo','Zagueiro','Goleiro']).map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { Upload } from 'lucide-react';
+import { proxyImageUrl } from '../../lib/api';
 
 // External logo URLs
 const YOUTUBE_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Youtube_logo.png';
@@ -132,10 +133,10 @@ export default function ReportHeader({
             <img src={fullBodyImage} alt={name} style={styles.fullBodyImg} />
           ) : photo && !photoError ? (
             <img
-              src={`/api/image-proxy?url=${encodeURIComponent(photo)}`}
+              src={proxyImageUrl(photo)!}
               alt={name}
               style={styles.fullBodyImg}
-              crossOrigin="anonymous"
+              referrerPolicy="no-referrer"
               onError={(e) => {
                 const img = e.target as HTMLImageElement;
                 // If proxy failed, try direct URL as fallback
@@ -207,10 +208,10 @@ export default function ReportHeader({
               <img src={customClubLogo} alt={club} style={styles.clubLogo} />
             ) : clubLogo ? (
               <img
-                src={`/api/image-proxy?url=${encodeURIComponent(clubLogo)}`}
+                src={proxyImageUrl(clubLogo)!}
                 alt={club}
                 style={styles.clubLogo}
-                crossOrigin="anonymous"
+                referrerPolicy="no-referrer"
                 onError={(e) => {
                   const img = e.target as HTMLImageElement;
                   if (img.src.includes('/api/image-proxy')) {

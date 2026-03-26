@@ -1639,15 +1639,17 @@ _CLUB_LEAGUE_MAP_NORM = {
 # ============================================
 POSICAO_MAP = {
     'Atacante': 'Atacante', 'Extremo': 'Extremo', 'Meia': 'Meia',
-    'Volante': 'Volante', 'Lateral direito': 'Lateral', 'Lateral esquerdo': 'Lateral',
+    'Volante': 'Volante',
+    'Lateral direito': 'Lateral direito', 'Lateral esquerdo': 'Lateral esquerdo',
     'Zagueiro': 'Zagueiro', 'Goleiro': 'Goleiro',
     'CF': 'Atacante', 'SS': 'Atacante',
     'LW': 'Extremo', 'RW': 'Extremo', 'LWF': 'Extremo', 'RWF': 'Extremo',
     'LAMF': 'Extremo', 'RAMF': 'Extremo',
     'AMF': 'Meia', 'LCMF': 'Meia', 'RCMF': 'Meia', 'CMF': 'Meia',
     'DMF': 'Volante', 'LDMF': 'Volante', 'RDMF': 'Volante',
-    'LB': 'Lateral', 'RB': 'Lateral', 'LWB': 'Lateral', 'RWB': 'Lateral',
-    'LB5': 'Lateral', 'RB5': 'Lateral',
+    'LB': 'Lateral esquerdo', 'RB': 'Lateral direito',
+    'LWB': 'Lateral esquerdo', 'RWB': 'Lateral direito',
+    'LB5': 'Lateral esquerdo', 'RB5': 'Lateral direito',
     'CB': 'Zagueiro', 'LCB': 'Zagueiro', 'RCB': 'Zagueiro',
     'LCB3': 'Zagueiro', 'RCB3': 'Zagueiro', 'CCB3': 'Zagueiro',
     'GK': 'Goleiro',
@@ -1663,7 +1665,7 @@ POSICAO_ALIAS = {
     'ponta': 'Extremo', 'extremo': 'Extremo', 'ala': 'Extremo',
     'meia': 'Meia', 'meio-campista': 'Meia', 'meia ofensivo': 'Meia', 'armador': 'Meia',
     'volante': 'Volante', 'primeiro volante': 'Volante',
-    'lateral': 'Lateral', 'lateral-direito': 'Lateral', 'lateral-esquerdo': 'Lateral',
+    'lateral-direito': 'Lateral direito', 'lateral-esquerdo': 'Lateral esquerdo',
     'zagueiro': 'Zagueiro', 'defensor central': 'Zagueiro',
     'goleiro': 'Goleiro', 'guarda-redes': 'Goleiro',
 }
@@ -1797,7 +1799,38 @@ INDICES_CONFIG = {
             'Faltas/90', 'Cartões amarelos/90', 'Cartões vermelhos/90',
         ],
     },
-    'Lateral': {
+    'Lateral direito': {
+        'Apoio Ofensivo': [
+            'Cruzamentos/90', 'Cruzamentos certos, %',
+            'Cruzamentos para a área de baliza/90',
+            'Passes para terço final/90', 'Passes certos para terço final, %',
+            'Toques na área/90', 'Passes para a área de penálti/90',
+        ],
+        'Progressão': [
+            'Corridas progressivas/90', 'Passes progressivos/90',
+            'Passes progressivos certos, %', 'Acelerações/90',
+            'Passes em profundidade/90',
+        ],
+        '1x1 Ofensivo': [
+            'Dribles/90', 'Dribles com sucesso, %',
+            'Duelos ofensivos/90', 'Duelos ofensivos ganhos, %',
+            'Faltas sofridas/90',
+        ],
+        'Defesa': [
+            'Duelos defensivos/90', 'Duelos defensivos ganhos, %',
+            'Interseções/90', 'Cortes/90',
+            'Ações defensivas com êxito/90', 'Remates intercetados/90',
+        ],
+        'Duelos': [
+            'Duelos/90', 'Duelos ganhos, %',
+            'Duelos aérios/90', 'Duelos aéreos ganhos, %',
+        ],
+        'Criação': [
+            'Assistências/90', 'Assistências esperadas/90',
+            'Passes chave/90', 'Segundas assistências/90',
+        ],
+    },
+    'Lateral esquerdo': {
         'Apoio Ofensivo': [
             'Cruzamentos/90', 'Cruzamentos certos, %',
             'Cruzamentos para a área de baliza/90',
@@ -1874,7 +1907,6 @@ SKILLCORNER_INDICES = {
     'Extremo': ['Inverted winger index', 'Wide winger index'],
     'Meia': ['Dynamic number 8 index', 'Box to box midfielder index'],
     'Volante': ['Number 6 index', 'Box to box midfielder index'],
-    'Lateral': ['Intense full back index', 'Technical full back index'],
     'Lateral direito': ['Intense full back index', 'Technical full back index'],
     'Lateral esquerdo': ['Intense full back index', 'Technical full back index'],
     'Zagueiro': ['Physical & aggressive defender index', 'Ball playing central defender index'],
@@ -1921,7 +1953,11 @@ def get_posicao_categoria(posicao):
     posicao_str = str(posicao).strip()
     if posicao_str in INDICES_CONFIG:
         return posicao_str
-    return POSICAO_MAP.get(posicao_str, 'Meia')
+    mapped = POSICAO_MAP.get(posicao_str, 'Meia')
+    # Backwards compat: old "Lateral" without side defaults to "Lateral direito"
+    if mapped == 'Lateral':
+        return 'Lateral direito'
+    return mapped
 
 
 def is_serie_b_team(team_name):
