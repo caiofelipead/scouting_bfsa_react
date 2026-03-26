@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Download, ImageDown, Loader2, Eye, Zap } from 'lucide-react';
-import { toPng } from 'html-to-image';
-import { jsPDF } from 'jspdf';
+// Lazy-load export libraries — only fetched when user clicks Export
+// Saves ~80KB from initial bundle
+const loadToPng = () => import('html-to-image').then((m) => m.toPng);
+const loadJsPDF = () => import('jspdf').then((m) => m.jsPDF);
 import { useScoutingReport, useAnalysesPlayers, useSkillCornerSearchReport, useSkillCornerPlayer } from '../hooks/useScoutingReport';
 import { usePlayers } from '../hooks/usePlayers';
 import ReportHeader from '../components/report/ReportHeader';
@@ -340,7 +342,7 @@ export default function ScoutingReportPage() {
 
       // ── 6. Capture ──
       const toPngOptions = {
-        pixelRatio: 2,
+        pixelRatio: 1.5,  // Reduced from 2 — still sharp but ~44% less memory per capture
         width: PAGE_WIDTH,
         height: PAGE_HEIGHT,
         skipFonts: true,
@@ -350,6 +352,7 @@ export default function ScoutingReportPage() {
       };
 
       try {
+        const toPng = await loadToPng();
         // First call primes resource loading (documented workaround)
         await toPng(clone, toPngOptions);
         const dataUrl = await toPng(clone, toPngOptions);
@@ -404,7 +407,8 @@ export default function ScoutingReportPage() {
 
       const pdfWidthMm = PAGE_WIDTH * 0.2646;
       const pdfHeightMm = PAGE_HEIGHT * 0.2646;
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [pdfWidthMm, pdfHeightMm] });
+      const JsPDF = await loadJsPDF();
+      const pdf = new JsPDF({ orientation: 'landscape', unit: 'mm', format: [pdfWidthMm, pdfHeightMm] });
 
       images.forEach((imgData, i) => {
         if (i > 0) pdf.addPage([pdfWidthMm, pdfHeightMm], 'landscape');

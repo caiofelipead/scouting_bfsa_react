@@ -21,6 +21,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.requests import Request
+from starlette.middleware.gzip import GZipMiddleware
 
 from auth import (
     get_current_user,
@@ -427,11 +428,17 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
+# ── GZip compression (~70% payload reduction for JSON responses) ─────
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 
 # ── Security headers middleware ──────────────────────────────────────
 from starlette.middleware.base import BaseHTTPMiddleware
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    # Paths whose responses rarely change — cache aggressively
+    _CACHEABLE_PREFIXES = ("/api/config/", "/api/team-logo/", "/api/image-proxy")
+
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -440,6 +447,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        # Add Cache-Control for static/config endpoints to reduce redundant requests
+        path = request.url.path
+        if any(path.startswith(p) for p in self._CACHEABLE_PREFIXES):
+            response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=7200"
+        elif path == "/api/health":
+            response.headers["Cache-Control"] = "no-cache"
+
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -875,6 +890,11 @@ async def get_player_profile(
     sc_override: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
+    cache_key = _endpoint_cache.make_key("profile", player_display_name, sc_override or "")
+    cached = _endpoint_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     df = _get_wyscout()
     if "JogadorDisplay" not in df.columns:
         raise HTTPException(status_code=404, detail="Coluna JogadorDisplay não encontrada")
@@ -1149,7 +1169,7 @@ async def get_player_profile(
         except Exception as e:
             logger.debug("On-demand enrichment failed for %s: %s", jogador_name, e)
 
-    return {
+    result = {
         "summary": {
             "id": idx_val,
             "name": str(row.get("Jogador", "")),
@@ -1177,6 +1197,8 @@ async def get_player_profile(
         "prediction": prediction,
         "analises": analises_data,
     }
+    _endpoint_cache.set(cache_key, result)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1386,6 +1408,11 @@ async def find_similar_players(
     req: SimilarityRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    cache_key = _endpoint_cache.make_key("similarity", req.player_name, req.position, req.top_n, req.min_minutes)
+    cached = _endpoint_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     df = _get_wyscout()
     position = get_posicao_categoria(req.position)
 
@@ -1430,11 +1457,13 @@ async def find_similar_players(
             "matched_metrics": int(row.get("matched_metrics", 0)),
         })
 
-    return {
+    result = {
         "reference_player": req.player_name,
         "position": position,
         "similar_players": similar_players,
     }
+    _endpoint_cache.set(cache_key, result)
+    return result
 
 
 @app.get("/api/similarity/breakdown")
@@ -1883,14 +1912,21 @@ async def get_player_indices(
 # ══════════════════════════════════════════════════════════════════════
 
 @app.post("/api/comparison")
+@limiter.limit("20/minute")
 async def compare_players_indices(
+    request: Request,
     req: dict,
     current_user: dict = Depends(get_current_user),
 ):
     """Compare two players' indices for a given position."""
-    df = _get_wyscout()
     p1_name = req.get("player1", "")
     p2_name = req.get("player2", "")
+    cache_key = _endpoint_cache.make_key("comparison", p1_name, p2_name, req.get("position", "Meia"))
+    cached = _endpoint_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    df = _get_wyscout()
     pos = get_posicao_categoria(req.get("position", "Meia"))
 
     mask1 = df["JogadorDisplay"] == p1_name
@@ -1924,7 +1960,7 @@ async def compare_players_indices(
             "position_raw": str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else None,
         }
 
-    return {
+    result = {
         "position": pos,
         "player1": _player_info(row1),
         "player2": _player_info(row2),
@@ -1932,6 +1968,8 @@ async def compare_players_indices(
         "indices1": {k: round(v, 1) for k, v in idx1.items()},
         "indices2": {k: round(v, 1) for k, v in idx2.items()},
     }
+    _endpoint_cache.set(cache_key, result)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -2022,8 +2060,13 @@ async def predict_contract_success(
     current_user: dict = Depends(get_current_user),
 ):
     """Predict contract success probability for a player at a target league."""
-    df = _get_wyscout()
     player_name = req.get("player_name", "")
+    cache_key = _endpoint_cache.make_key("prediction", player_name, req.get("position", ""), req.get("league_target", ""))
+    cached = _endpoint_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    df = _get_wyscout()
     league_origin = req.get("league_origin", "")
     league_target = req.get("league_target", "Serie B Brasil")
 
@@ -2058,7 +2101,7 @@ async def predict_contract_success(
         minutes=minutes,
     )
 
-    return {
+    result = {
         "player": {
             "name": str(row_data.get("Jogador", "")),
             "display_name": player_name,
@@ -2071,6 +2114,8 @@ async def predict_contract_success(
         "ssp_score": round(ssp, 1),
         "prediction": pred,
     }
+    _endpoint_cache.set(cache_key, result)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -2173,10 +2218,17 @@ async def get_clusters(
     current_user: dict = Depends(get_current_user),
 ):
     """Run tactical clustering for a position."""
+    position_raw = req.get("position", "Meia")
+    player_name = req.get("player_name", "")
+    cache_key = _endpoint_cache.make_key("clusters", position_raw, player_name, req.get("min_minutes", 500))
+    cached = _endpoint_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     from services.predictive_engine import TacticalClusterer, DataPreprocessor
 
     df = _get_wyscout()
-    position = get_posicao_categoria(req.get("position", "Meia"))
+    position = get_posicao_categoria(position_raw)
     min_minutes = req.get("min_minutes", 500)
 
     # Filter by position
@@ -2232,12 +2284,14 @@ async def get_clusters(
             "features": [{"metric": m, "zscore": round(v, 2)} for m, v in top_features],
         })
 
-    return {
+    result = {
         "position": position,
         "n_clusters": tc.optimal_k,
         "total_players": len(df_f),
         "clusters": clusters,
     }
+    _endpoint_cache.set(cache_key, result)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -2518,7 +2572,9 @@ def _get_scouting_engine() -> ScoutingIntelligenceEngine:
 
 
 @app.post("/api/trajectory", response_model=TrajectoryResponse)
+@limiter.limit("20/minute")
 async def predict_trajectory(
+    request: Request,
     req: TrajectoryRequest,
     current_user: dict = Depends(get_current_user),
 ):
@@ -2527,8 +2583,13 @@ async def predict_trajectory(
     Scientific basis: Decroos et al. (2019), Pappalardo et al. (2019),
     Bransen & Van Haaren (2020). Model: Gradient Boosting Regressor.
     """
-    df = _get_wyscout()
     player_name = req.player_name
+    cache_key = _endpoint_cache.make_key("trajectory", player_name, req.position or "", req.league or "")
+    cached = _endpoint_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    df = _get_wyscout()
 
     mask = df["JogadorDisplay"] == player_name
     if mask.sum() == 0:
@@ -2548,7 +2609,7 @@ async def predict_trajectory(
     engine = _get_scouting_engine()
     traj = engine.trajectory_model.predict_trajectory(row_data, league)
 
-    return TrajectoryResponse(
+    result = TrajectoryResponse(
         player=str(row_data.get("Jogador", "")),
         display_name=player_name,
         position=pos,
@@ -2560,6 +2621,8 @@ async def predict_trajectory(
         top_features=traj.get("top_features"),
         method=traj.get("method"),
     )
+    _endpoint_cache.set(cache_key, result)
+    return result
 
 
 
