@@ -143,8 +143,34 @@ POSITION_PROFILES = {
         efficiency_features=['Passes certos, %', 'Duelos defensivos ganhos, %', 'Duelos ganhos, %'],
         domain_weights={'offensive': 0.10, 'passing': 0.25, 'physical': 0.15, 'defensive': 0.35, 'efficiency': 0.15},
     ),
-    'Lateral': PositionProfile(
-        name='Lateral',
+    'Lateral direito': PositionProfile(
+        name='Lateral direito',
+        offensive_features=[
+            'Cruzamentos/90', 'Cruzamentos certos, %', 'Cruzamentos para a area de baliza/90',
+            'Toques na area/90', 'Passes para a area de penalti/90',
+            'Assistencias/90', 'Assistencias esperadas/90',
+        ],
+        defensive_features=[
+            'Duelos defensivos/90', 'Duelos defensivos ganhos, %',
+            'Intersecoes/90', 'Cortes/90',
+            'Acoes defensivas com exito/90', 'Remates intercetados/90',
+        ],
+        passing_features=[
+            'Passes para terco final/90', 'Passes certos para terco final, %',
+            'Passes progressivos/90', 'Passes progressivos certos, %',
+            'Passes em profundidade/90', 'Passes chave/90',
+        ],
+        physical_features=[
+            'Corridas progressivas/90', 'Aceleracoes/90',
+            'Dribles/90', 'Dribles com sucesso, %',
+            'Duelos/90', 'Duelos ganhos, %',
+            'Duelos aerios/90', 'Duelos aereos ganhos, %',
+        ],
+        efficiency_features=['Cruzamentos certos, %', 'Duelos defensivos ganhos, %', 'Dribles com sucesso, %'],
+        domain_weights={'offensive': 0.25, 'passing': 0.20, 'physical': 0.20, 'defensive': 0.25, 'efficiency': 0.10},
+    ),
+    'Lateral esquerdo': PositionProfile(
+        name='Lateral esquerdo',
         offensive_features=[
             'Cruzamentos/90', 'Cruzamentos certos, %', 'Cruzamentos para a area de baliza/90',
             'Toques na area/90', 'Passes para a area de penalti/90',

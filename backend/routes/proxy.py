@@ -21,23 +21,23 @@ limiter = Limiter(key_func=get_remote_address)
 
 # API-Football key for media.api-sports.io images
 _API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
+if not _API_FOOTBALL_KEY:
+    logger.warning("API_FOOTBALL_KEY not set — media.api-sports.io images may fail")
 
 # TTL cache for proxied images (URL -> (content_type, bytes))
 _image_cache: TTLCache = TTLCache(maxsize=2000, ttl=3600)  # 1 hour TTL
+
+# Cache failed URLs to avoid repeated upstream requests (URL -> True)
+_failed_cache: TTLCache = TTLCache(maxsize=5000, ttl=1800)  # 30 min TTL
 
 # SSRF protection: only allow known image hosting domains
 _ALLOWED_IMAGE_DOMAINS = {
     "media.api-sports.io",
     "apiv3.apifootball.com",
-    "api.sofascore.app",
-    "www.sofascore.com",
-    "sofascore.com",
-    "img.api.sofascore.app",
     "api-football-v1.p.rapidapi.com",
     "cdn.sofifa.net",
     "cdn.futbin.com",
     "tmssl.akamaized.net",
-    "img.sofascore.com",
     "flagcdn.com",
     "flagsapi.com",
     "logodetimes.com",
@@ -65,8 +65,11 @@ async def image_proxy(request: Request, url: str):
                         headers={"Cache-Control": "public, max-age=86400",
                                  "Access-Control-Allow-Origin": "*"})
 
+    # Skip URLs known to be broken (avoids spamming upstream)
+    if url in _failed_cache:
+        raise HTTPException(status_code=404, detail="Image not available (cached failure)")
+
     # Build domain-specific header strategies
-    is_sofascore = "sofascore" in (parsed.hostname or "")
     is_api_sports = "api-sports.io" in (parsed.hostname or "") or "api-football-v1" in (parsed.hostname or "")
 
     if is_api_sports:
@@ -96,30 +99,6 @@ async def image_proxy(request: Request, url: str):
             "Accept": "image/*,*/*;q=0.8",
             "Referer": "https://dashboard.api-football.com/",
         })
-    elif is_sofascore:
-        header_strategies = [
-            {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
-                "Referer": "https://www.sofascore.com/",
-                "Origin": "https://www.sofascore.com",
-                "Sec-Fetch-Dest": "image",
-                "Sec-Fetch-Mode": "cors",
-                "Sec-Fetch-Site": "same-site",
-                "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131"',
-                "Sec-Ch-Ua-Platform": '"Windows"',
-            },
-            {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
-                "Accept": "image/*,*/*;q=0.8",
-                "Referer": "https://www.sofascore.com/",
-            },
-            {
-                "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-                "Accept": "*/*",
-            },
-        ]
     else:
         header_strategies = [
             {
@@ -171,6 +150,9 @@ async def image_proxy(request: Request, url: str):
                     last_status = resp.status
         except aiohttp.ClientError:
             continue
+
+    # Cache the failure so we don't keep spamming upstream
+    _failed_cache[url] = True
 
     # Never forward 401/403 from upstream — these are internal auth issues, not
     # client auth failures.  Map them to 502 so the frontend's 401 interceptor

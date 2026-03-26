@@ -82,14 +82,13 @@ RATING_COEFFICIENTS = {
         'totalLongBalls': 0.60,
         'totalClearance': 0.49,
     },
-    'Lateral': {
-        # Mesma base de defensores, ajustado
-        'goals': 0.52,
-        'goalAssist': 0.33,
-        'penaltyWon': 0.17,
-        'onTargetScoringAttempt': 0.14,
-        'hitWoodwork': 0.12,
-        'totalCross': 0.10,  # cruzamentos relevantes para laterais
+    'Lateral direito': {
+        'goals': 0.52, 'goalAssist': 0.33, 'penaltyWon': 0.17,
+        'onTargetScoringAttempt': 0.14, 'hitWoodwork': 0.12, 'totalCross': 0.10,
+    },
+    'Lateral esquerdo': {
+        'goals': 0.52, 'goalAssist': 0.33, 'penaltyWon': 0.17,
+        'onTargetScoringAttempt': 0.14, 'hitWoodwork': 0.12, 'totalCross': 0.10,
     },
     'Volante': {
         # Meio-campistas
@@ -151,13 +150,13 @@ RATING_COEFFICIENTS = {
 # Posições conforme taxonomia do estudo: Lat, Zag, Vol, Mca, Mat, Pta, Cav
 
 WP_COEFFICIENTS = {
-    'Lateral': {
-        'local': 0.45,              # mandante (alto)
-        'goals': 0.35,              # moderado
-        'goalAssist': 0.40,         # moderado-alto (> gol para laterais)
-        'accuratePass': 0.30,       # moderado (Ligue 1 = alto)
-        'totalCross': -0.25,        # NEGATIVO — cruzamento reduz P(win)
-        'accurateCross': 0.10,      # cruzamento certo: levemente positivo
+    'Lateral direito': {
+        'local': 0.45, 'goals': 0.35, 'goalAssist': 0.40,
+        'accuratePass': 0.30, 'totalCross': -0.25, 'accurateCross': 0.10,
+    },
+    'Lateral esquerdo': {
+        'local': 0.45, 'goals': 0.35, 'goalAssist': 0.40,
+        'accuratePass': 0.30, 'totalCross': -0.25, 'accurateCross': 0.10,
     },
     'Zagueiro': {
         'local': 0.40,
@@ -217,7 +216,8 @@ WP_COEFFICIENTS = {
 BEST_MODELS_PER_POSITION = {
     'Goleiro':  {'model': 'LightGBM',    'precision': 0.80, 'recall': 0.80, 'f1': 0.79, 'accuracy': 0.73},
     'Zagueiro': {'model': 'XGBoost',     'precision': 0.78, 'recall': 0.83, 'f1': 0.80, 'accuracy': 0.72},
-    'Lateral':  {'model': 'ExtraTrees',  'precision': 0.80, 'recall': 0.77, 'f1': 0.77, 'accuracy': 0.75},
+    'Lateral direito':  {'model': 'ExtraTrees',  'precision': 0.80, 'recall': 0.77, 'f1': 0.77, 'accuracy': 0.75},
+    'Lateral esquerdo': {'model': 'ExtraTrees',  'precision': 0.80, 'recall': 0.77, 'f1': 0.77, 'accuracy': 0.75},
     'Volante':  {'model': 'RandomForest','precision': 0.79, 'recall': 0.89, 'f1': 0.83, 'accuracy': 0.78},
     'Meia':     {'model': 'ExtraTrees',  'precision': 0.76, 'recall': 0.77, 'f1': 0.76, 'accuracy': 0.72},
     'Atacante': {'model': 'RandomForest','precision': 0.74, 'recall': 0.83, 'f1': 0.78, 'accuracy': 0.71},
@@ -228,7 +228,8 @@ BEST_MODELS_PER_POSITION = {
 TOP_FEATURES_PER_POSITION = {
     'Goleiro': ['saves', 'goalsConceded', 'penaltySave', 'minutesPlayed', 'totalLongBalls', 'cleanSheet'],
     'Zagueiro': ['duelsWon', 'totalClearance', 'interception', 'accuratePass', 'aerialWon', 'goals'],
-    'Lateral': ['totalCross', 'accurateCross', 'keyPass', 'duelWon', 'accuratePass', 'interception'],
+    'Lateral direito': ['totalCross', 'accurateCross', 'keyPass', 'duelWon', 'accuratePass', 'interception'],
+    'Lateral esquerdo': ['totalCross', 'accurateCross', 'keyPass', 'duelWon', 'accuratePass', 'interception'],
     'Volante': ['accuratePass', 'interception', 'duelWon', 'possessionLostCtrl', 'keyPass', 'totalContest'],
     'Meia': ['keyPass', 'bigChanceCreated', 'goalAssist', 'accuratePass', 'goals', 'dribbleWon'],
     'Atacante': ['goals', 'onTargetScoringAttempt', 'bigChanceCreated', 'goalAssist', 'dribbleWon', 'age'],

@@ -27,6 +27,7 @@ function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: strin
       src={proxyImageUrl(src)!}
       alt={alt}
       className={size === 'lg' ? 'player-photo-hex-lg' : 'player-photo-hex'}
+      referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
     />
   );
@@ -40,6 +41,7 @@ function ClubLogo({ url, alt, className = 'w-3.5 h-3.5 object-contain' }: { url:
       src={proxyImageUrl(url)!}
       alt={alt}
       className={className}
+      referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
     />
   );

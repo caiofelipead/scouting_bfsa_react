@@ -165,7 +165,14 @@ REPLACEMENT_FEATURES = {
         'Passes longos/90', 'Passes longos certos, %',
         'Duelos ganhos, %', 'Cortes/90',
     ],
-    'Lateral': [
+    'Lateral direito': [
+        'Cruzamentos/90', 'Cruzamentos certos, %',
+        'Assistencias/90', 'Passes progressivos/90',
+        'Corridas progressivas/90', 'Aceleracoes/90',
+        'Duelos defensivos/90', 'Duelos defensivos ganhos, %',
+        'Intersecoes/90', 'Dribles/90',
+    ],
+    'Lateral esquerdo': [
         'Cruzamentos/90', 'Cruzamentos certos, %',
         'Assistencias/90', 'Passes progressivos/90',
         'Corridas progressivas/90', 'Aceleracoes/90',
@@ -608,9 +615,8 @@ class MarketValueModel:
         'Extremo': 1.35,
         'Meia': 1.15,
         'Volante': 0.95,
-        'Lateral': 0.85,
-        'Lateral Direito': 0.85,
-        'Lateral Esquerdo': 0.85,
+        'Lateral direito': 0.85,
+        'Lateral esquerdo': 0.85,
         'Zagueiro': 0.80,
         'Goleiro': 0.65,
     }

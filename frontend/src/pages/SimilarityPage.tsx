@@ -118,7 +118,8 @@ export default function SimilarityPage() {
                   <option value="Extremo">Extremo</option>
                   <option value="Meia">Meia</option>
                   <option value="Volante">Volante</option>
-                  <option value="Lateral">Lateral</option>
+                  <option value="Lateral direito">Lateral direito</option>
+                  <option value="Lateral esquerdo">Lateral esquerdo</option>
                   <option value="Zagueiro">Zagueiro</option>
                   <option value="Goleiro">Goleiro</option>
                 </>
