@@ -566,10 +566,8 @@ async def admin_enrich_assets(
 ):
     """Bulk enrich player photos and club logos from API-Football.
 
-    Processes all unique teams in WyScout data, searches API-Football for
-    team ID + logo, then fetches squad to match player photos.
-    Results are cached in PostgreSQL to avoid re-fetching.
-    Use retry_not_found=true to re-search teams that weren't found before.
+    Runs in background to avoid Render's 60s request timeout.
+    Check progress via GET /api/admin/enrichment-status.
     """
     from services.enrichment import run_bulk_enrichment, load_asset_cache, backfill_logo_bytes
 
@@ -585,27 +583,35 @@ async def admin_enrich_assets(
         if team and player:
             teams_with_players.setdefault(team, []).append(player)
 
-    result = await run_bulk_enrichment(teams_with_players, max_api_calls=max_api_calls, retry_not_found=retry_not_found)
+    # Run enrichment in background to avoid 60s timeout
+    async def _run_enrichment():
+        try:
+            result = await run_bulk_enrichment(teams_with_players, max_api_calls=max_api_calls, retry_not_found=retry_not_found)
+            logger.info("Manual enrichment complete: %s", result)
 
-    # Backfill logo bytes for any teams with URL but no cached bytes
-    try:
-        backfilled = await backfill_logo_bytes()
-        result["logos_backfilled"] = backfilled
-    except Exception as e:
-        logger.warning("Logo backfill failed: %s", e)
-        result["logos_backfilled"] = f"error: {e}"
+            # Backfill logo bytes
+            try:
+                await backfill_logo_bytes()
+            except Exception as e:
+                logger.warning("Logo backfill failed: %s", e)
 
-    # Reload in-memory cache so new logos are served immediately
-    load_asset_cache()
+            # Reload caches
+            load_asset_cache()
+            try:
+                from routes.proxy import prewarm_logo_bytes_cache
+                prewarm_logo_bytes_cache()
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error("Background enrichment failed: %s", e)
 
-    # Refresh logo bytes cache
-    try:
-        from routes.proxy import prewarm_logo_bytes_cache
-        prewarm_logo_bytes_cache()
-    except Exception:
-        pass
+    asyncio.create_task(_run_enrichment())
 
-    return result
+    return {
+        "status": "started",
+        "message": f"Enrichment iniciado em background com max_api_calls={max_api_calls}, retry_not_found={retry_not_found}. Acompanhe via GET /api/admin/enrichment-status",
+        "teams_to_process": len(teams_with_players),
+    }
 
 
 @app.get("/api/admin/enrichment-status")
