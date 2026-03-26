@@ -204,4 +204,20 @@ npm run dev
 
 ---
 
+## Documentação Completa
+
+Documentação detalhada disponível na pasta [`docs/`](docs/):
+
+| Documento | Descrição |
+|-----------|-----------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitetura do sistema, diagramas, stack tecnológica e padrões de projeto |
+| [API.md](docs/API.md) | Documentação completa da API REST com exemplos de request/response |
+| [FRONTEND.md](docs/FRONTEND.md) | Estrutura do frontend, componentes, hooks, sistema de design e otimizações |
+| [BACKEND.md](docs/BACKEND.md) | Estrutura do backend, serviços, modelos de dados e integrações |
+| [ML_MODELS.md](docs/ML_MODELS.md) | Documentação detalhada dos 7 modelos de ML com referências científicas |
+| [SETUP.md](docs/SETUP.md) | Guia completo de instalação e configuração local |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Guia de deploy em produção (Vercel + Render) |
+
+---
+
 **Desenvolvido para Botafogo SA Ribeirão Preto**
