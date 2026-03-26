@@ -64,6 +64,11 @@ export function proxyImageUrl(url: string | null | undefined): string | null {
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return `/api/image-proxy?url=${encodeURIComponent(url)}`;
   }
+  // Encode path segments for local URLs (e.g. /api/team-logo/ldu quito → /api/team-logo/ldu%20quito)
+  if (url.startsWith('/api/team-logo/')) {
+    const teamName = url.slice('/api/team-logo/'.length);
+    return `/api/team-logo/${encodeURIComponent(teamName)}`;
+  }
   return url;
 }
 

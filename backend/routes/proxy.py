@@ -169,12 +169,37 @@ async def image_proxy(request: Request, url: str):
 
 # In-memory cache for logo bytes: team_name_norm → (bytes, content_type)
 _logo_bytes_cache: Dict[str, tuple] = {}
+# Teams known to have no logo (avoid repeated DB lookups)
+_logo_miss_cache: TTLCache = TTLCache(maxsize=5000, ttl=3600)
+
+
+def prewarm_logo_bytes_cache():
+    """Load all team logo bytes from DB at startup to avoid per-request DB hits."""
+    try:
+        from services.database import get_connection, release_connection
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT team_name_norm, logo_bytes, logo_content_type "
+                    "FROM team_assets_cache "
+                    "WHERE logo_bytes IS NOT NULL AND length(logo_bytes) > 0"
+                )
+                count = 0
+                for row in cur.fetchall():
+                    _logo_bytes_cache[row[0]] = (bytes(row[1]), row[2] or "image/png")
+                    count += 1
+            logger.info("Pre-warmed logo bytes cache with %d teams", count)
+        finally:
+            release_connection(conn)
+    except Exception as e:
+        logger.warning("Failed to pre-warm logo bytes cache: %s", e)
 
 
 @router.get("/team-logo/{team_name_norm}")
 async def get_team_logo(team_name_norm: str):
     """Serve locally cached team logo (avoids CDN 403 issues)."""
-    # Check memory cache
+    # Check memory cache (pre-warmed at startup)
     if team_name_norm in _logo_bytes_cache:
         data, ct = _logo_bytes_cache[team_name_norm]
         return Response(
@@ -182,7 +207,11 @@ async def get_team_logo(team_name_norm: str):
             headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
         )
 
-    # Load from DB
+    # Already checked and not found
+    if team_name_norm in _logo_miss_cache:
+        raise HTTPException(status_code=404, detail="Logo not found")
+
+    # Load from DB (in case bytes were added after startup)
     try:
         from services.enrichment import get_team_logo_bytes
         result = get_team_logo_bytes(team_name_norm)
@@ -196,4 +225,34 @@ async def get_team_logo(team_name_norm: str):
     except Exception as e:
         logger.warning("Failed to load cached logo for %s: %s", team_name_norm, e)
 
+    # Fallback: redirect to CDN URL via image-proxy (if available)
+    try:
+        from services.enrichment import get_team_cdn_url
+        cdn_url = get_team_cdn_url(team_name_norm)
+        if cdn_url:
+            from starlette.responses import RedirectResponse
+            proxy_url = f"/api/image-proxy?url={cdn_url}"
+            return RedirectResponse(url=proxy_url, status_code=307)
+    except Exception as e:
+        logger.debug("CDN fallback failed for %s: %s", team_name_norm, e)
+
+    # Fallback: try hardcoded CLUB_LOGOS mapping
+    try:
+        from config.mappings import CLUB_LOGOS
+        # Check if any CLUB_LOGOS key normalizes to this team_name_norm
+        for team_key, logo_url in CLUB_LOGOS.items():
+            import unicodedata
+            import re
+            norm_key = unicodedata.normalize("NFD", team_key.lower())
+            norm_key = "".join(c for c in norm_key if unicodedata.category(c) != "Mn")
+            norm_key = re.sub(r"[^a-z0-9\s]", "", norm_key)
+            norm_key = " ".join(norm_key.split())
+            if norm_key == team_name_norm:
+                from starlette.responses import RedirectResponse
+                proxy_url = f"/api/image-proxy?url={logo_url}"
+                return RedirectResponse(url=proxy_url, status_code=307)
+    except Exception:
+        pass
+
+    _logo_miss_cache[team_name_norm] = True
     raise HTTPException(status_code=404, detail="Logo not found")

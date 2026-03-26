@@ -292,6 +292,13 @@ def _load_all_data():
     except Exception as e:
         logger.warning("Could not init asset enrichment cache: %s", e)
 
+    # Pre-warm team logo bytes cache for the /api/team-logo endpoint
+    try:
+        from routes.proxy import prewarm_logo_bytes_cache
+        prewarm_logo_bytes_cache()
+    except Exception as e:
+        logger.warning("Could not pre-warm logo bytes cache: %s", e)
+
     _data_ready.set()
     _data_loading = False
     logger.info("All data loaded successfully: %s", {k: len(v) for k, v in _data.items()})
@@ -359,6 +366,13 @@ async def _auto_enrich_background():
 
         # Reload in-memory cache after enrichment
         load_asset_cache()
+
+        # Refresh logo bytes cache
+        try:
+            from routes.proxy import prewarm_logo_bytes_cache
+            prewarm_logo_bytes_cache()
+        except Exception:
+            pass
     except Exception as e:
         logger.warning("Auto-enrichment failed: %s", e)
 
@@ -568,6 +582,13 @@ async def admin_enrich_assets(
 
     # Reload in-memory cache so new logos are served immediately
     load_asset_cache()
+
+    # Refresh logo bytes cache
+    try:
+        from routes.proxy import prewarm_logo_bytes_cache
+        prewarm_logo_bytes_cache()
+    except Exception:
+        pass
 
     return result
 
