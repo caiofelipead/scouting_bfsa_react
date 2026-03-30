@@ -281,12 +281,12 @@ REGRESSION_CONFIG = {
 }
 
 CLASSIFICATION_CLASSES = {
-    # Classificação de desempenho em 5 classes (Tiago Pinto)
-    'Muito Baixo': (0.00, 0.20),
-    'Baixo':       (0.20, 0.40),
-    'Médio':       (0.40, 0.60),
-    'Alto':        (0.60, 0.80),
-    'Muito Alto':  (0.80, 1.00),
+    # Classificação de desempenho em 5 classes (ajustado para distribuição real)
+    'Muito Baixo': (0.00, 0.38),
+    'Baixo':       (0.38, 0.50),
+    'Médio':       (0.50, 0.62),
+    'Alto':        (0.62, 0.72),
+    'Muito Alto':  (0.72, 1.00),
 }
 
 
@@ -396,7 +396,7 @@ def classify_performance(score: float) -> str:
     for label, (low, high) in CLASSIFICATION_CLASSES.items():
         if low <= score / 100.0 < high:
             return label
-    return 'Muito Alto' if score >= 80 else 'Médio'
+    return 'Muito Alto' if score >= 72 else 'Médio'
 
 
 def get_wp_significance_threshold() -> Dict[str, str]:
