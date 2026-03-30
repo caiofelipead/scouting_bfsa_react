@@ -1703,6 +1703,12 @@ INDICES_CONFIG = {
             'Ações defensivas com êxito/90', 'Duelos/90', 'Duelos ganhos, %',
             'Interseções/90',
         ],
+        'Passes Quebrando Linhas': [
+            'Passes inteligentes/90', 'Passes inteligentes certos, %',
+            'Passes em profundidade/90', 'Passes em profundidade certos, %',
+            'Passes progressivos/90', 'Passes progressivos certos, %',
+            'Passes chave/90', 'Passes para a área de penálti/90',
+        ],
     },
     'Extremo': {
         'Finalização': [
@@ -1734,6 +1740,12 @@ INDICES_CONFIG = {
         'Trabalho Defensivo': [
             'Ações defensivas com êxito/90', 'Duelos defensivos/90',
             'Duelos defensivos ganhos, %', 'Interseções/90',
+        ],
+        'Passes Quebrando Linhas': [
+            'Passes inteligentes/90', 'Passes inteligentes certos, %',
+            'Passes em profundidade/90', 'Passes em profundidade certos, %',
+            'Passes progressivos/90', 'Passes chave/90',
+            'Passes para a área de penálti/90', 'Passes precisos para a área de penálti, %',
         ],
     },
     'Meia': {
@@ -1768,6 +1780,14 @@ INDICES_CONFIG = {
             'Ações defensivas com êxito/90', 'Duelos defensivos/90',
             'Duelos defensivos ganhos, %', 'Interseções/90', 'Cortes/90',
         ],
+        'Passes Quebrando Linhas': [
+            'Passes inteligentes/90', 'Passes inteligentes certos, %',
+            'Passes em profundidade/90', 'Passes em profundidade certos, %',
+            'Passes progressivos/90', 'Passes progressivos certos, %',
+            'Passes chave/90', 'Passes para a área de penálti/90',
+            'Passes precisos para a área de penálti, %',
+            'Passes para terço final/90', 'Passes certos para terço final, %',
+        ],
     },
     'Volante': {
         'Recuperação': [
@@ -1797,6 +1817,12 @@ INDICES_CONFIG = {
         ],
         'Disciplina': [
             'Faltas/90', 'Cartões amarelos/90', 'Cartões vermelhos/90',
+        ],
+        'Passes Quebrando Linhas': [
+            'Passes progressivos/90', 'Passes progressivos certos, %',
+            'Passes para terço final/90', 'Passes certos para terço final, %',
+            'Passes em profundidade/90', 'Passes em profundidade certos, %',
+            'Passes inteligentes/90',
         ],
     },
     'Lateral direito': {
@@ -1829,6 +1855,12 @@ INDICES_CONFIG = {
             'Assistências/90', 'Assistências esperadas/90',
             'Passes chave/90', 'Segundas assistências/90',
         ],
+        'Passes Quebrando Linhas': [
+            'Passes progressivos/90', 'Passes progressivos certos, %',
+            'Passes para terço final/90', 'Passes certos para terço final, %',
+            'Passes em profundidade/90', 'Passes inteligentes/90',
+            'Passes para a área de penálti/90',
+        ],
     },
     'Lateral esquerdo': {
         'Apoio Ofensivo': [
@@ -1860,6 +1892,12 @@ INDICES_CONFIG = {
             'Assistências/90', 'Assistências esperadas/90',
             'Passes chave/90', 'Segundas assistências/90',
         ],
+        'Passes Quebrando Linhas': [
+            'Passes progressivos/90', 'Passes progressivos certos, %',
+            'Passes para terço final/90', 'Passes certos para terço final, %',
+            'Passes em profundidade/90', 'Passes inteligentes/90',
+            'Passes para a área de penálti/90',
+        ],
     },
     'Zagueiro': {
         'Duelos Defensivos': [
@@ -1887,6 +1925,11 @@ INDICES_CONFIG = {
         ],
         'Disciplina': [
             'Faltas/90', 'Cartões amarelos/90', 'Cartões vermelhos/90',
+        ],
+        'Passes Quebrando Linhas': [
+            'Passes progressivos/90', 'Passes progressivos certos, %',
+            'Passes para terço final/90', 'Passes certos para terço final, %',
+            'Passes em profundidade/90', 'Passes longos/90', 'Passes longos certos, %',
         ],
     },
     'Goleiro': {

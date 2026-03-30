@@ -44,6 +44,7 @@ POSITION_WEIGHTS = {
         'Passes recebidos/90': 0.5, 'Passes/90': 0.5, 'Passes certos, %': 0.5,
         'Assistencias/90': 1.5, 'Assistencias esperadas/90': 1.5,
         'Segundas assistencias/90': 0.5, 'Passes chave/90': 1.0,
+        'Passes inteligentes/90': 1.0, 'Passes em profundidade/90': 0.5,
         'Acoes defensivas com exito/90': 0.5,
     },
     'Extremo': {
@@ -98,6 +99,7 @@ POSITION_WEIGHTS = {
         'Passes progressivos/90': 1.5, 'Passes progressivos certos, %': 1.0,
         'Passes para terco final/90': 1.0,
         'Corridas progressivas/90': 0.5, 'Passes em profundidade/90': 0.5,
+        'Passes inteligentes/90': 1.0, 'Passes em profundidade certos, %': 0.5,
         'Faltas/90': 1.0, 'Cartoes amarelos/90': 0.5,
     },
     'Lateral direito': {
@@ -117,6 +119,7 @@ POSITION_WEIGHTS = {
         'Duelos/90': 1.0, 'Duelos ganhos, %': 1.0,
         'Duelos aerios/90': 1.0, 'Duelos aereos ganhos, %': 1.0,
         'Assistencias/90': 1.5, 'Assistencias esperadas/90': 1.5, 'Passes chave/90': 1.0,
+        'Passes inteligentes/90': 0.5,
     },
     'Lateral esquerdo': {
         'Cruzamentos/90': 2.0, 'Cruzamentos certos, %': 1.5,
@@ -135,6 +138,7 @@ POSITION_WEIGHTS = {
         'Duelos/90': 1.0, 'Duelos ganhos, %': 1.0,
         'Duelos aerios/90': 1.0, 'Duelos aereos ganhos, %': 1.0,
         'Assistencias/90': 1.5, 'Assistencias esperadas/90': 1.5, 'Passes chave/90': 1.0,
+        'Passes inteligentes/90': 0.5,
     },
     'Zagueiro': {
         'Duelos defensivos/90': 2.5, 'Duelos defensivos ganhos, %': 2.5,
@@ -149,6 +153,7 @@ POSITION_WEIGHTS = {
         'Passes para a frente/90': 1.0, 'Passes para a frente certos, %': 1.0,
         'Passes progressivos/90': 1.0, 'Passes progressivos certos, %': 0.5,
         'Passes para terco final/90': 0.5, 'Corridas progressivas/90': 0.5,
+        'Passes inteligentes/90': 0.5, 'Passes em profundidade/90': 0.5,
         'Faltas/90': 1.0, 'Cartoes amarelos/90': 0.5,
     },
     'Goleiro': {
