@@ -49,10 +49,11 @@ function ClubLogo({ url, alt, className = 'w-3.5 h-3.5 object-contain' }: { url:
 
 function getRecommendationBadge(score: number | null): { label: string; cls: string } | null {
   if (score == null) return null;
-  if (score >= 75) return { label: 'Top Target', cls: 'badge-top-target' };
-  if (score >= 55) return { label: 'Monitorar', cls: 'badge-monitor' };
-  if (score < 35) return { label: 'Descartar', cls: 'badge-discard' };
-  return null;
+  if (score >= 72) return { label: 'Top Target', cls: 'badge-top-target' };
+  if (score >= 62) return { label: 'Alta Prioridade', cls: 'badge-high-priority' };
+  if (score >= 50) return { label: 'Monitorar', cls: 'badge-monitor' };
+  if (score >= 38) return { label: 'Avaliar', cls: 'badge-evaluate' };
+  return { label: 'Descartar', cls: 'badge-discard' };
 }
 
 export default function DashboardPage() {
