@@ -114,6 +114,13 @@ Análise de impacto de contratação no elenco do Botafogo-SP.
 | Pappalardo et al. (ACM TIST, 2019) — PlayeRank | Passes Quebrando Linhas + M7 |
 | PIM — Player Impact Metric (ScienceDirect, 2025) | Passes Quebrando Linhas |
 | Analytics FC (2022) — Breaking the First Line | Passes Quebrando Linhas |
+| StatsBomb Radars (2023 Update) — PAdj metrics | Calibracao de Pesos |
+| Wyscout Index (dataglossary.wyscout.com) | Calibracao de Pesos |
+| TOPSTATS (Sanchez-Lopez et al., Apunts 2023) | Calibracao de Pesos |
+| Cafe Tactiques — Defensive Metrics (2023) | Calibracao de Pesos |
+| Breaking The Lines — GK Analytics (2024) | Calibracao de Pesos |
+| Soccerment — xGoT, Advanced Metrics | Calibracao de Pesos |
+| DataMB — Position Radars (2025) | Calibracao de Pesos |
 
 ### Referências Detalhadas
 
