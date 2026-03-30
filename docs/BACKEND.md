@@ -121,10 +121,16 @@ Motor preditivo original com ~47KB. Inclui:
 ### similarity.py — Similaridade e Indices
 
 Modulo de ~22KB responsavel por:
-- Calculo de indices compostos por posicao
+- Calculo de indices compostos por posicao (incluindo "Passes Quebrando Linhas")
 - Percentis vs jogadores da mesma posicao
 - Comparacao entre dois jogadores
 - Busca de jogadores similares
+
+**Indice "Passes Quebrando Linhas":** Proxy do metrica "line-breaking passes" do StatsBomb 360,
+construido com metricas Wyscout disponiveis (smart passes, through balls, progressive passes,
+passes to final third, passes to penalty area). Presente em todas as 7 posicoes de campo com
+pesos ajustados por posicao. Baseado em: StatsBomb 360 (Odegaard, Dez 2023), Passing Danger
+Index (Griffis, Cafe Tactiques 2022), PlayeRank (Pappalardo et al., 2019).
 
 ---
 

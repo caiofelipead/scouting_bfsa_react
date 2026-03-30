@@ -109,6 +109,11 @@ Análise de impacto de contratação no elenco do Botafogo-SP.
 | MDPI 2025 Systematic Review (172 artigos) | Visão geral |
 | LJMU + KU Leuven (2025) | Visão geral / agenda |
 | Frost & Groom (2025) | Processo de integração |
+| StatsBomb 360 — Line-Breaking Passes (2021) | Passes Quebrando Linhas |
+| Griffis — Passing Danger Index (Café Tactiques, 2022) | Passes Quebrando Linhas |
+| Pappalardo et al. (ACM TIST, 2019) — PlayeRank | Passes Quebrando Linhas + M7 |
+| PIM — Player Impact Metric (ScienceDirect, 2025) | Passes Quebrando Linhas |
+| Analytics FC (2022) — Breaking the First Line | Passes Quebrando Linhas |
 
 ### Referências Detalhadas
 
@@ -191,6 +196,7 @@ npm run dev
 
 ## Funcionalidades
 
+- **Passes Quebrando Linhas:** Indice composto proxy de line-breaking passes (StatsBomb 360) usando metricas Wyscout
 - **Perfil Individual:** Radar de atributos + percentis estilo Wyscout
 - **Comparativo:** Scatter plot + comparação entre jogadores
 - **Dados Físicos:** Métricas SkillCorner com radar de rankings

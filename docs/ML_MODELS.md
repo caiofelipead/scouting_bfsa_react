@@ -255,9 +255,9 @@ P(success) = base_prediction × league_adjustment_factor
 ## Mapa de Referencias Cientificas
 
 ```
-                    M1        M2        M3        M4        M5        M6        M7
-Referencia          Traj.     Value     Opport.   Replace.  Trend     League    Impact
-─────────────────────────────────────────────────────────────────────────────────────
+                    M1        M2        M3        M4        M5        M6        M7        LBP
+Referencia          Traj.     Value     Opport.   Replace.  Trend     League    Impact    LineBrk
+────────────────────────────────────────────────────────────────────────────────────────────────
 VAEP (KDD 2019)     ●                   ●
 Bransen 2020        ●
 SciSkill (2025)     ●                   ●
@@ -272,10 +272,58 @@ KickClone 2025                                    ●
 Spatial Sim. 2025                                 ●
 FPSRec 2024                                      ●
 Opta Power 2025                                                       ●
-PlayeRank 2019                                                                   ●
+PlayeRank 2019                                                                   ●        ●
 Soccernomics 2009                                                                ●
 Frost & Groom 2025                                                               ●
+StatsBomb 360 2021                                                                         ●
+PDI Griffis 2022                                                                           ●
+PIM ScienceDirect25                                                                        ●
+Analytics FC 2022                                                                          ●
+xT vs VAEP 2020                                                                           ●
 ```
+
+---
+
+## Indice Composto: Passes Quebrando Linhas
+
+### Motivacao
+
+A metrica "line-breaking passes" do StatsBomb 360 (ex: Odegaard com 17 passes quebrando linhas em um unico jogo, Dez 2023) e uma variavel critica para scouting analitico. Como o sistema utiliza dados Wyscout, foi construido um proxy composto que aproxima essa metrica.
+
+### Fundamentacao Cientifica
+
+| Referencia | Contribuicao |
+|---|---|
+| StatsBomb 360 — Line-Breaking Passes (2021) | Definicao original: passes que avancam ≥10% em direcao ao gol e cruzam um par de defensores |
+| Griffis (Cafe Tactiques, 2022) — Passing Danger Index | Media harmonica de smart passes + deep completions + key passes + shot assists |
+| Pappalardo et al. (ACM TIST, 2019) — PlayeRank | Framework role-aware com pesos aprendidos via SVM para avaliacao multi-dimensional |
+| Decroos et al. (AAAI 2020) — xT vs VAEP | xT correlaciona mais com playmaking; VAEP favorece finalizacao |
+| Springer (2025) — Decoding Defensive Performance | XGBoost + DNN para avaliar acoes defensivas com OBV, VAEP, xT |
+| PIM — Player Impact Metric (ScienceDirect, 2025) | Pesos aprendidos por regressao logistica ordinal sobre xG + xT |
+| Analytics FC (2022) — Breaking the First Line | Random Forest treinado em localizacao, angulo e comprimento de passe |
+| Lin (Medium, 2025) — Decoding LBPs in EURO 2024 | Jenks Natural Breaks para detectar linhas defensivas com dados 360 |
+| arXiv (2025) — Through the Gaps | Clustering para descobrir LBPs taticos em dados de tracking |
+
+### Composicao por Posicao
+
+As metricas Wyscout utilizadas como proxy, com enfase variavel por posicao:
+
+| Metrica Wyscout | Proxy de | Peso Meia | Peso Extremo | Peso Volante | Peso Lateral | Peso Zagueiro |
+|---|---|---|---|---|---|---|
+| Passes inteligentes/90 | Smart passes (penetrativos, entre linhas) | Alto | Alto | Medio | Baixo | Baixo |
+| Passes em profundidade/90 | Through balls (atras da ultima linha) | Alto | Alto | Medio | Medio | Baixo |
+| Passes progressivos/90 | Avancos significativos (quebra da 1a linha) | Alto | Medio | Alto | Alto | Alto |
+| Passes para terco final/90 | Quebra da linha de meio-campo | Alto | Medio | Alto | Alto | Alto |
+| Passes para a area de penalti/90 | Quebra da ultima linha defensiva | Alto | Alto | Baixo | Medio | Baixo |
+| Passes chave/90 | Ultimo passe antes de finalizacao | Medio | Medio | Baixo | Baixo | — |
+| Acuracia das metricas acima (%) | Qualidade de execucao | Medio | Medio | Medio | Medio | Medio |
+
+### Validacao
+
+O indice foi projetado para capturar jogadores do perfil "construtor" (Odegaard, De Bruyne, Kroos) que se destacam em:
+1. Volume de passes que ultrapassam linhas defensivas
+2. Qualidade/precisao desses passes
+3. Capacidade de jogar entre linhas com criatividade
 
 ---
 
