@@ -127,7 +127,7 @@ Retorna dados do radar de atributos (estilo Wyscout).
 ```
 
 ### `GET /players/{name}/indices`
-Retorna indices compostos do jogador por posicao.
+Retorna indices compostos do jogador por posicao, incluindo o indice "Passes Quebrando Linhas" (proxy de line-breaking passes do StatsBomb 360).
 
 **Response (200):**
 ```json
@@ -142,6 +142,16 @@ Retorna indices compostos do jogador por posicao.
       "metrics": [
         { "name": "Goals per 90", "value": 0.45, "percentile": 88 },
         { "name": "xG per 90", "value": 0.38, "percentile": 85 }
+      ]
+    },
+    {
+      "name": "Passes Quebrando Linhas",
+      "value": 72.5,
+      "percentile": 78,
+      "metrics": [
+        { "name": "Passes inteligentes/90", "value": 2.1, "percentile": 82 },
+        { "name": "Passes em profundidade/90", "value": 0.8, "percentile": 75 },
+        { "name": "Passes progressivos/90", "value": 5.3, "percentile": 71 }
       ]
     }
   ]

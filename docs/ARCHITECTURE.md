@@ -42,7 +42,8 @@ O Scouting BFSA é uma plataforma profissional de análise e avaliação de joga
 │  │                                                                  │    │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐      │    │
 │  │  │ similarity.py │  │calibration.py│  │league_power_     │      │    │
-│  │  │ (Cosine+Maha) │  │(Acadêmico)   │  │model.py (Opta)   │      │    │
+│  │  │(Cosine+Maha+  │  │(Acadêmico)   │  │model.py (Opta)   │      │    │
+│  │  │ LineBrkPass)  │  │              │  │                  │      │    │
 │  │  └──────────────┘  └──────────────┘  └──────────────────┘      │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
