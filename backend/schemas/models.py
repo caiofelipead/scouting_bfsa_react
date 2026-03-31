@@ -294,5 +294,76 @@ class ContractImpactResponse(BaseModel):
     squad_context: Dict[str, Any] = {}
 
 
+# ── Coaches ──────────────────────────────────────────────────────────
+
+class CoachTacticalRadar(BaseModel):
+    construcao: Optional[float] = None
+    pressing: Optional[float] = None
+    trans_ofensiva: Optional[float] = None
+    trans_defensiva: Optional[float] = None
+    altura_bloco: Optional[float] = None
+    org_ofensiva: Optional[float] = None
+    flexibilidade: Optional[float] = None
+    uso_base: Optional[float] = None
+    gestao: Optional[float] = None
+
+
+class CoachSeason(BaseModel):
+    id_treinador: str
+    clube: Optional[str] = None
+    temporada: Optional[str] = None
+    divisao: Optional[str] = None
+    competicao: Optional[str] = None
+    jogos: Optional[int] = None
+    vitorias: Optional[int] = None
+    empates: Optional[int] = None
+    derrotas: Optional[int] = None
+    aproveitamento: Optional[float] = None
+    posicao_final: Optional[str] = None
+    motivo_saida: Optional[str] = None
+
+
+class CoachProfile(BaseModel):
+    id_treinador: str
+    nome: str
+    nascimento: Optional[str] = None
+    nacionalidade: Optional[str] = None
+    licenca: Optional[str] = None
+    status: Optional[str] = None
+    faixa_salarial: Optional[str] = None
+    formacao_pref: Optional[str] = None
+    formacao_alt: Optional[str] = None
+    clube_atual: Optional[str] = None
+    observacoes: Optional[str] = None
+    tactical: CoachTacticalRadar = CoachTacticalRadar()
+    historico: List[CoachSeason] = []
+    metricas: Dict[str, Any] = {}
+
+
+class CoachComparison(BaseModel):
+    coaches: List[CoachProfile]
+
+
+class CoachRankingEntry(BaseModel):
+    rank: int
+    id_treinador: str
+    nome: str
+    clube_atual: Optional[str] = None
+    status: Optional[str] = None
+    licenca: Optional[str] = None
+    formacao_pref: Optional[str] = None
+    score: float
+    aproveitamento_geral: Optional[float] = None
+    aproveitamento_ponderado: Optional[float] = None
+    estabilidade: Optional[float] = None
+    tactical: CoachTacticalRadar = CoachTacticalRadar()
+
+
+class CoachRankingResponse(BaseModel):
+    total: int
+    coaches: List[CoachRankingEntry]
+    weights: Dict[str, float] = {}
+
+
 # Fix forward reference
 TokenResponse.model_rebuild()

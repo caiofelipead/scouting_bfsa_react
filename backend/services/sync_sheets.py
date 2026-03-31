@@ -29,6 +29,8 @@ SHEET_NAMES = {
     "oferecidos": "Oferecidos",
     "skillcorner": "SkillCorner",
     "wyscout": "WyScout",
+    "treinadores_perfil": "Treinadores_Perfil",
+    "treinadores_historico": "Treinadores_Histórico",
 }
 
 # ---------- Google Sheets API (Service Account) ----------
@@ -127,6 +129,26 @@ def sync_all_sheets() -> Dict[str, int]:
             results[key] = -1
 
     logger.info("Sync complete: %s", results)
+    return results
+
+
+def sync_coach_sheets() -> Dict[str, int]:
+    """Sync coach-related sheets from Google Sheets → Neon PostgreSQL."""
+    init_scouting_tables()
+
+    coach_keys = ["treinadores_perfil", "treinadores_historico"]
+    results = {}
+    for key in coach_keys:
+        try:
+            sheet_name = SHEET_NAMES[key]
+            df = _download_sheet(GOOGLE_SHEET_ID, sheet_name)
+            count = upsert_sheet_data(key, df)
+            results[key] = count
+        except Exception as e:
+            logger.error("Sync failed for '%s': %s", key, e)
+            results[key] = -1
+
+    logger.info("Coach sync complete: %s", results)
     return results
 
 

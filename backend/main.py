@@ -2796,6 +2796,112 @@ async def analyze_contract_impact(
     return ContractImpactResponse(**impact)
 
 
+# ── Coach Evaluation Endpoints ────────────────────────────────────────
+
+
+@app.get("/api/coaches/compare")
+async def compare_coaches_endpoint(
+    ids: str = Query(..., description="Comma-separated coach IDs (max 3)"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Compare up to 3 coaches side by side."""
+    from services.coach_analysis import compare_coaches
+    id_list = [i.strip() for i in ids.split(",") if i.strip()]
+    if len(id_list) > 3:
+        raise HTTPException(status_code=400, detail="Máximo 3 treinadores para comparação")
+    coaches = compare_coaches(id_list)
+    return {"total": len(coaches), "coaches": coaches}
+
+
+@app.get("/api/coaches/ranking")
+async def coach_ranking_endpoint(
+    w_aproveitamento: float = Query(0.30, ge=0, le=1),
+    w_tatico: float = Query(0.25, ge=0, le=1),
+    w_gestao: float = Query(0.15, ge=0, le=1),
+    w_uso_base: float = Query(0.10, ge=0, le=1),
+    w_estabilidade: float = Query(0.10, ge=0, le=1),
+    w_flexibilidade: float = Query(0.10, ge=0, le=1),
+    status: Optional[str] = Query(None),
+    nacionalidade: Optional[str] = Query(None),
+    licenca: Optional[str] = Query(None),
+    formacao: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Rank coaches by configurable composite score."""
+    from services.coach_analysis import get_coach_ranking
+    weights = {
+        "aproveitamento_ponderado": w_aproveitamento,
+        "perfil_tatico": w_tatico,
+        "gestao": w_gestao,
+        "uso_base": w_uso_base,
+        "estabilidade": w_estabilidade,
+        "flexibilidade": w_flexibilidade,
+    }
+    coaches = get_coach_ranking(
+        weights=weights,
+        status=status,
+        nacionalidade=nacionalidade,
+        licenca=licenca,
+        formacao=formacao,
+    )
+    return {"total": len(coaches), "coaches": coaches, "weights": weights}
+
+
+@app.get("/api/coaches")
+async def list_coaches(
+    status: Optional[str] = Query(None),
+    nacionalidade: Optional[str] = Query(None),
+    licenca: Optional[str] = Query(None),
+    formacao: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """List all coaches with optional filters."""
+    from services.coach_analysis import get_all_coaches
+    coaches = get_all_coaches(
+        status=status,
+        nacionalidade=nacionalidade,
+        licenca=licenca,
+        formacao=formacao,
+    )
+    return {"total": len(coaches), "coaches": coaches}
+
+
+@app.get("/api/coaches/{coach_id}/history")
+async def get_coach_history_endpoint(
+    coach_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get detailed season history for a coach."""
+    from services.coach_analysis import get_coach_history
+    history = get_coach_history(coach_id)
+    return {"id_treinador": coach_id, "total": len(history), "seasons": history}
+
+
+@app.get("/api/coaches/{coach_id}")
+async def get_coach(
+    coach_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get full coach profile with history and metrics."""
+    from services.coach_analysis import get_coach_by_id
+    coach = get_coach_by_id(coach_id)
+    if not coach:
+        raise HTTPException(status_code=404, detail="Treinador não encontrado")
+    return coach
+
+
+@app.post("/api/sync/coaches")
+async def sync_coaches_endpoint(
+    current_user: dict = Depends(require_admin),
+):
+    """Trigger sync of coach sheets from Google Sheets."""
+    from services.sync_sheets import sync_coach_sheets
+    from services.coach_analysis import load_coaches_data
+    results = sync_coach_sheets()
+    load_coaches_data(force=True)
+    return {"status": "ok", "results": results}
+
+
 @app.get("/api/league_powers")
 async def get_league_powers(current_user: dict = Depends(get_current_user)):
     """Return all Opta Power Ranking league coefficients.
