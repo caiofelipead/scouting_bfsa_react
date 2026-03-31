@@ -44,7 +44,8 @@ export type TabId =
   | 'replacements'
   | 'contract_impact'
   | 'scouting_report'
-  | 'apifootball';
+  | 'apifootball'
+  | 'coaches';
 
 interface LayoutProps {
   user: User;
@@ -81,6 +82,12 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
       { id: 'similarity', label: 'Similaridade', icon: <Search size={18} strokeWidth={1.5} /> },
       { id: 'replacements', label: 'Substitutos', icon: <Users size={18} strokeWidth={1.5} /> },
       { id: 'clusters', label: 'Clusters', icon: <Dna size={18} strokeWidth={1.5} /> },
+    ],
+  },
+  {
+    title: 'GESTÃO',
+    items: [
+      { id: 'coaches', label: 'Treinadores', icon: <Users size={18} strokeWidth={1.5} /> },
     ],
   },
   {
