@@ -388,10 +388,37 @@ class PlayeRankEngine:
     @staticmethod
     def _resolve_features(df: pd.DataFrame, features_pt: List[str],
                           features_en: List[str]) -> List[str]:
-        """Resolve available features, trying Portuguese first then English."""
-        available = [f for f in features_pt if f in df.columns]
+        """Resolve available features, trying Portuguese first then English.
+
+        Uses accent-stripping to match columns (Google Sheets data may have
+        accents while code references may not, or vice versa).
+        """
+        import unicodedata
+
+        def strip_acc(s: str) -> str:
+            return ''.join(c for c in unicodedata.normalize('NFD', s)
+                           if unicodedata.category(c) != 'Mn')
+
+        col_map = {}  # stripped -> original column name
+        for col in df.columns:
+            col_map[strip_acc(col)] = col
+
+        available = []
+        for f in features_pt:
+            if f in df.columns:
+                available.append(f)
+            else:
+                stripped = strip_acc(f)
+                if stripped in col_map:
+                    available.append(col_map[stripped])
         if not available:
-            available = [f for f in features_en if f in df.columns]
+            for f in features_en:
+                if f in df.columns:
+                    available.append(f)
+                else:
+                    stripped = strip_acc(f)
+                    if stripped in col_map:
+                        available.append(col_map[stripped])
         return available
 
     @staticmethod
