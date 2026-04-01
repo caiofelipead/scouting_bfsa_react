@@ -3,7 +3,7 @@
 import logging
 import os
 from typing import Dict
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ _ALLOWED_IMAGE_DOMAINS = {
     "logodetimes.com",
     "www.logodetimes.com",
     "upload.wikimedia.org",
+    "images.fotmob.com",
 }
 
 
@@ -71,6 +72,7 @@ async def image_proxy(request: Request, url: str):
 
     # Build domain-specific header strategies
     is_api_sports = "api-sports.io" in (parsed.hostname or "") or "api-football-v1" in (parsed.hostname or "")
+    is_wikimedia = "wikimedia.org" in (parsed.hostname or "")
 
     if is_api_sports:
         header_strategies = []
@@ -99,6 +101,20 @@ async def image_proxy(request: Request, url: str):
             "Accept": "image/*,*/*;q=0.8",
             "Referer": "https://dashboard.api-football.com/",
         })
+    elif is_wikimedia:
+        # Wikimedia requires a proper User-Agent with contact info per their policy
+        header_strategies = [
+            {
+                "User-Agent": "ScoutingBFSA/1.0 (https://scouting-bfsa-react.vercel.app; bot) Python/aiohttp",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Referer": "https://en.wikipedia.org/",
+            },
+        ]
     else:
         header_strategies = [
             {
@@ -231,7 +247,7 @@ async def get_team_logo(team_name_norm: str):
         cdn_url = get_team_cdn_url(team_name_norm)
         if cdn_url:
             from starlette.responses import RedirectResponse
-            proxy_url = f"/api/image-proxy?url={cdn_url}"
+            proxy_url = f"/api/image-proxy?url={quote(cdn_url, safe='')}"
             return RedirectResponse(url=proxy_url, status_code=307)
     except Exception as e:
         logger.debug("CDN fallback failed for %s: %s", team_name_norm, e)
@@ -249,7 +265,7 @@ async def get_team_logo(team_name_norm: str):
             norm_key = " ".join(norm_key.split())
             if norm_key == team_name_norm:
                 from starlette.responses import RedirectResponse
-                proxy_url = f"/api/image-proxy?url={logo_url}"
+                proxy_url = f"/api/image-proxy?url={quote(logo_url, safe='')}"
                 return RedirectResponse(url=proxy_url, status_code=307)
     except Exception:
         pass

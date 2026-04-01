@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import type {
   VAEPPipelineResponse,
@@ -19,10 +19,21 @@ export const vaepKeys = {
 };
 
 export function useRunVaepPipeline() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (params?: { season?: string; competition_id?: number }) => {
       const res = await api.post('/vaep/run-pipeline', params ?? {});
       return res.data as VAEPPipelineResponse;
+    },
+    onSuccess: () => {
+      // Pipeline runs in background on the server — poll for results
+      const delays = [5000, 10000, 20000, 30000];
+      delays.forEach((ms) => {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['vaep'] });
+          queryClient.invalidateQueries({ queryKey: ['playerank'] });
+        }, ms);
+      });
     },
   });
 }

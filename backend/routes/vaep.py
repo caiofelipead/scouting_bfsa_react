@@ -6,9 +6,10 @@ multi-dimensional player evaluation system.
 """
 
 import logging
+import asyncio
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from auth import get_current_user
@@ -69,62 +70,69 @@ async def run_vaep_pipeline(req: VAEPPipelineRequest,
                             _=Depends(get_current_user)):
     """Execute VAEP pipeline. Computes action values and player ratings.
 
-    Uses heuristic VAEP (from aggregate Wyscout stats) when event-level
-    data is not available, or full VAEP (via socceraction) when it is.
+    Runs the computation in a background thread to avoid Vercel/Render
+    proxy timeouts, then persists results to the database. The frontend
+    should poll GET /vaep/ratings to check for results.
     """
     df_wyscout = _get_wyscout_data()
     if df_wyscout is None or len(df_wyscout) == 0:
         raise HTTPException(status_code=404, detail="Dados Wyscout não disponíveis")
 
-    engine = _get_vaep_engine()
-    try:
-        result = engine.run_pipeline(
-            df_events=df_wyscout,
-            season=req.season,
-            competition_id=req.competition_id,
-            df_wyscout=df_wyscout,
-        )
-    except Exception as e:
-        logger.error("VAEP pipeline error: %s", e)
-        raise HTTPException(status_code=500, detail=f"Erro no pipeline VAEP: {str(e)}")
+    season = req.season
+    competition_id = req.competition_id
 
-    # Persist results
-    try:
-        from services.database import (
-            init_vaep_tables, save_vaep_ratings, save_vaep_actions,
-        )
-        init_vaep_tables()
-        save_vaep_ratings(result["player_ratings"], req.season, req.competition_id)
-        if result.get("action_records"):
-            save_vaep_actions(result["action_records"], req.season, req.competition_id)
-    except Exception as e:
-        logger.warning("Could not persist VAEP results: %s", e)
+    async def _run_pipeline_bg():
+        try:
+            engine = _get_vaep_engine()
+            result = engine.run_pipeline(
+                df_events=df_wyscout,
+                season=season,
+                competition_id=competition_id,
+                df_wyscout=df_wyscout,
+            )
 
-    # Build response
-    top_players = [
-        VAEPRating(
-            player_name=r["player_name"],
-            team=r.get("team"),
-            league=r.get("league"),
-            position=r.get("position"),
-            minutes_played=r.get("minutes_played", 0),
-            total_vaep=r.get("total_vaep", 0),
-            vaep_per90=r.get("vaep_per90", 0),
-            offensive_vaep=r.get("offensive_vaep", 0),
-            defensive_vaep=r.get("defensive_vaep", 0),
-            actions_count=r.get("actions_count", 0),
-            season=req.season,
-        )
-        for r in result["player_ratings"][:50]
-    ]
+            # Persist VAEP results
+            try:
+                from services.database import (
+                    init_vaep_tables, save_vaep_ratings, save_vaep_actions,
+                )
+                init_vaep_tables()
+                save_vaep_ratings(result["player_ratings"], season, competition_id)
+                if result.get("action_records"):
+                    save_vaep_actions(result["action_records"], season, competition_id)
+            except Exception as e:
+                logger.warning("Could not persist VAEP results: %s", e)
+
+            # Also compute and persist PlayeRank scores
+            try:
+                playerank_engine = _get_playerank_engine()
+                scores = playerank_engine.compute_rankings(
+                    df_wyscout, result["player_ratings"], season or "current",
+                )
+                from services.database import save_playerank_scores, init_vaep_tables
+                init_vaep_tables()
+                save_playerank_scores(scores, season or "current")
+                logger.info("PlayeRank computed and saved: %d scores", len(scores))
+            except Exception as e:
+                logger.warning("Could not compute/persist PlayeRank: %s", e)
+
+            logger.info(
+                "VAEP pipeline complete: %d players, method=%s",
+                len(result["player_ratings"]),
+                result.get("method", "unknown"),
+            )
+        except Exception as e:
+            logger.error("VAEP background pipeline error: %s", e)
+
+    asyncio.create_task(_run_pipeline_bg())
 
     return VAEPPipelineResponse(
-        season=req.season,
-        method=result.get("method", "unknown"),
-        total_players=len(result["player_ratings"]),
-        total_actions=result.get("total_actions", 0),
-        total_games=result.get("total_games", 0),
-        top_players=top_players,
+        season=season,
+        method="heuristic_vaep",
+        total_players=len(df_wyscout),
+        total_actions=0,
+        total_games=0,
+        top_players=[],
     )
 
 
@@ -136,8 +144,11 @@ async def get_vaep_ratings(
     league: Optional[str] = Query(None),
     _=Depends(get_current_user),
 ):
-    """Get pre-calculated VAEP ratings with optional filters."""
-    # Try database first
+    """Get pre-calculated VAEP ratings with optional filters.
+
+    Returns ratings from the database only. Use POST /vaep/run-pipeline
+    to compute and persist ratings first.
+    """
     try:
         from services.database import load_vaep_ratings, init_vaep_tables
         init_vaep_tables()
@@ -163,49 +174,7 @@ async def get_vaep_ratings(
     except Exception as e:
         logger.debug("No VAEP ratings in DB: %s", e)
 
-    # Compute on-the-fly from Wyscout data
-    df_wyscout = _get_wyscout_data()
-    if df_wyscout is None or len(df_wyscout) == 0:
-        return VAEPRatingsResponse(total=0, season=season, ratings=[])
-
-    engine = _get_vaep_engine()
-    try:
-        result = engine.run_pipeline(
-            df_events=df_wyscout,
-            season=season or "current",
-            df_wyscout=df_wyscout,
-        )
-        all_ratings = result["player_ratings"]
-
-        # Apply filters
-        if position:
-            all_ratings = [r for r in all_ratings
-                          if r.get("position") and position.lower() in r["position"].lower()]
-        if min_minutes > 0:
-            all_ratings = [r for r in all_ratings if r.get("minutes_played", 0) >= min_minutes]
-        if league:
-            all_ratings = [r for r in all_ratings
-                          if r.get("league") and league.lower() in r["league"].lower()]
-
-        ratings = [
-            VAEPRating(
-                player_name=r["player_name"],
-                team=r.get("team"),
-                league=r.get("league"),
-                position=r.get("position"),
-                minutes_played=r.get("minutes_played", 0),
-                total_vaep=r.get("total_vaep", 0),
-                vaep_per90=r.get("vaep_per90", 0),
-                offensive_vaep=r.get("offensive_vaep", 0),
-                defensive_vaep=r.get("defensive_vaep", 0),
-                season=season,
-            )
-            for r in all_ratings
-        ]
-        return VAEPRatingsResponse(total=len(ratings), season=season, ratings=ratings)
-    except Exception as e:
-        logger.error("Error computing VAEP ratings: %s", e)
-        return VAEPRatingsResponse(total=0, season=season, ratings=[])
+    return VAEPRatingsResponse(total=0, season=season, ratings=[])
 
 
 @router.get("/vaep/player/{player_name}", response_model=VAEPPlayerDetail)
@@ -344,77 +313,8 @@ async def get_playerank_rankings(
     except Exception as e:
         logger.debug("No PlayeRank scores in DB: %s", e)
 
-    # Compute on-the-fly
-    df_wyscout = _get_wyscout_data()
-    if df_wyscout is None or len(df_wyscout) == 0:
-        return PlayeRankRankingsResponse(total=0, role_cluster=role_cluster,
-                                          season=season, rankings=[])
-
-    engine = _get_playerank_engine()
-
-    # Get VAEP ratings if available
-    vaep_ratings = None
-    try:
-        vaep_engine = _get_vaep_engine()
-        vaep_result = vaep_engine.run_pipeline(
-            df_events=df_wyscout,
-            season=season or "current",
-            df_wyscout=df_wyscout,
-        )
-        vaep_ratings = vaep_result.get("player_ratings")
-    except Exception:
-        pass
-
-    try:
-        scores = engine.compute_rankings(df_wyscout, vaep_ratings, season or "current")
-
-        # Apply filters
-        if role_cluster:
-            scores = [s for s in scores if s["role_cluster"] == role_cluster]
-        if league:
-            scores = [s for s in scores
-                     if s.get("league") and league.lower() in s["league"].lower()]
-
-        # Persist results
-        try:
-            from services.database import save_playerank_scores, init_vaep_tables
-            init_vaep_tables()
-            save_playerank_scores(scores, season or "current")
-        except Exception as e:
-            logger.warning("Could not persist PlayeRank scores: %s", e)
-
-        rankings = [
-            PlayeRankScore(
-                player_name=s["player_name"],
-                team=s.get("team"),
-                league=s.get("league"),
-                position=s.get("position"),
-                role_cluster=s.get("role_cluster", "unknown"),
-                composite_score=s.get("composite_score", 0),
-                dimensions={
-                    "scoring": s.get("scoring_dim", 0),
-                    "playmaking": s.get("playmaking_dim", 0),
-                    "defending": s.get("defending_dim", 0),
-                    "physical": s.get("physical_dim", 0),
-                    "possession": s.get("possession_dim", 0),
-                },
-                percentile_in_cluster=s.get("percentile_in_cluster", 0),
-                cluster_size=s.get("cluster_size", 0),
-                season=season,
-            )
-            for s in scores
-        ]
-
-        return PlayeRankRankingsResponse(
-            total=len(rankings),
-            role_cluster=role_cluster,
-            season=season,
-            rankings=rankings,
-        )
-    except Exception as e:
-        logger.error("Error computing PlayeRank: %s", e)
-        return PlayeRankRankingsResponse(total=0, role_cluster=role_cluster,
-                                          season=season, rankings=[])
+    return PlayeRankRankingsResponse(total=0, role_cluster=role_cluster,
+                                      season=season, rankings=[])
 
 
 # ══════════════════════════════════════════════════════════════════════
