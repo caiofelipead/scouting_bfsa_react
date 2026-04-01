@@ -423,7 +423,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 _allowed_origins = os.environ.get(
     "CORS_ORIGINS",
-    "https://botafogo-sp.vercel.app,https://scouting-bfsa-react.onrender.com,http://localhost:5173",
+    "https://botafogo-sp.vercel.app,https://scouting-bfsa-react.vercel.app,https://scouting-bfsa-react.onrender.com,http://localhost:5173",
 ).split(",")
 
 app.add_middleware(
