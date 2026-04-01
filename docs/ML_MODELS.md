@@ -214,6 +214,186 @@ Impact Score                 100%     Score final (0-100)
 
 ---
 
+## VAEP Engine — Valuing Actions by Estimating Probabilities
+
+### Objetivo
+Calcular o valor individual de cada acao de um jogador em campo, baseado na variacao de probabilidade de marcar e sofrer golos.
+
+### Formula
+```
+VAEP(acao) = ΔP(scoring) − ΔP(conceding)
+```
+Onde `ΔP(scoring)` e a variacao na probabilidade de gol apos a acao, e `ΔP(conceding)` e a variacao na probabilidade de sofrer gol.
+
+### Pipeline
+
+```
+Eventos Wyscout (PostgreSQL)
+  → Conversao para SPADL (socceraction)
+  → Feature Engineering (action + game state features)
+  → Label Generation (scoring/conceding em proximas 10 acoes)
+  → Treino: XGBoost Classifier (scoring model + conceding model)
+  → Predicao: P(scoring), P(conceding) por game state
+  → VAEP value = ΔP(scoring) − ΔP(conceding) por acao
+  → Agregacao: VAEP/90 por jogador
+  → Persistencia: PostgreSQL (vaep_ratings + vaep_actions)
+```
+
+### Dual Mode
+1. **Full mode** (socceraction instalado + event data): Pipeline completo com conversao SPADL, feature engineering e XGBoost
+2. **Heuristic mode** (fallback): Estima VAEP a partir de estatisticas agregadas Wyscout usando pesos calibrados
+
+### Heuristic VAEP — Pesos de Aproximacao
+```
+Ofensivo:
+  Goals/90 × 0.30 + xG/90 × 0.15 + Assists/90 × 0.15 + xA/90 × 0.10
+  + Key passes/90 × 0.08 + Progressive passes/90 × 0.06
+  + Dribbles/90 × 0.04 + Shots/90 × 0.04 + Crosses/90 × 0.04 + Touches box/90 × 0.04
+
+Defensivo:
+  Defensive actions/90 × 0.25 + Interceptions/90 × 0.25
+  + Tackles/90 × 0.20 + Aerial wins % × 0.15 + Clearances/90 × 0.15
+
+Scaling: offensive × 0.35, defensive × 0.08
+(Calibrado: top 10 jogadores ≈ 0.5-0.8 VAEP/90 — Decroos et al., 2019)
+```
+
+### Integracao com Modelos Existentes
+- **M1 (Trajectory):** `vaep_per90` disponivel como feature para previsao
+- **M3 (Opportunity):** Performance percentile enriquecido com VAEP (70% metric + 30% VAEP)
+- **M4 (Replacement):** Resultados de similaridade enriquecidos com `vaep_per90` e `playerank_score`
+
+### Saidas
+- `vaep_per90` — VAEP total por 90 minutos
+- `offensive_vaep` — Componente ofensivo
+- `defensive_vaep` — Componente defensivo
+- `total_vaep` — VAEP total acumulado na temporada
+- `actions_count` — Numero de acoes avaliadas
+
+### Tabelas PostgreSQL
+```sql
+vaep_ratings   — Ratings agregados por jogador/temporada
+vaep_actions   — Valores VAEP por acao individual (com coordenadas x,y)
+```
+
+### Base Cientifica
+| Referencia | Contribuicao |
+|---|---|
+| Decroos et al. (KDD 2019) — VAEP | Framework original: acoes como shifts de probabilidade |
+| Bransen & Van Haaren (2020) | Contribuicao de passes on-the-ball |
+| SciSports Labs — fot-valuing-actions | Implementacao de referencia (4 notebooks Jupyter) |
+| socceraction (ML-KULeuven) | Biblioteca open-source para conversao SPADL e VAEP |
+
+### Endpoints
+- `POST /api/vaep/run-pipeline` — Executa pipeline completo
+- `GET /api/vaep/ratings` — Ratings pre-calculados com filtros
+- `GET /api/vaep/player/{name}` — VAEP detalhado + top acoes
+- `GET /api/vaep/compare` — Comparacao entre jogadores
+
+---
+
+## PlayeRank Engine — Multi-dimensional Role-Aware Evaluation
+
+### Objetivo
+Avaliar jogadores em multiplas dimensoes de performance, considerando seu papel tatico real (nao apenas posicao nominal), e produzir rankings dentro de clusters posicionais.
+
+### Pipeline
+```
+VAEP ratings + Metricas Wyscout
+  → K-Means Clustering (6 roles taticos)
+  → 5 Dimensoes de Score (percentile-based)
+  → Composite Score (pesos role-specific)
+  → Percentile dentro do Cluster
+  → Persistencia: PostgreSQL (playerank_scores)
+```
+
+### Roles Taticos (6 clusters)
+| Cluster | Role | Perfil |
+|---|---|---|
+| 0 | Goal Scorer | Finalizacao, xG, toques na area |
+| 1 | Playmaker | Assistencias, passes decisivos, xA |
+| 2 | Box-to-Box | Equilibrio ofensivo/defensivo |
+| 3 | Defensive Anchor | Intercecoes, tackles, duelos aereos |
+| 4 | Wide Player | Cruzamentos, corridas progressivas, dribles |
+| 5 | Ball-Playing Defender | Passes progressivos, intercecoes, construcao |
+
+### 5 Dimensoes de Score
+```
+                      Scoring    Playmaking    Defending    Physical    Possession
+Goal Scorer           40%        15%           5%           15%         25%
+Playmaker             10%        40%           5%           10%         35%
+Box-to-Box            15%        20%           20%          25%         20%
+Defensive Anchor      5%         10%           40%          25%         20%
+Wide Player           15%        25%           10%          20%         30%
+Ball-Playing Defender  5%        15%           35%          20%         25%
+```
+
+### Metricas por Dimensao
+- **Scoring:** Goals/90, xG/90, Shots/90, Shot accuracy, Touches in box, Conversion rate
+- **Playmaking:** Assists/90, xA/90, Key passes, Progressive passes, Final third passes, Smart passes
+- **Defending:** Defensive actions/90, Interceptions, Tackles, Defensive duel win %, Aerial wins, Clearances
+- **Physical:** Duels/90, Duel win %, Aerial duels, Accelerations, Progressive runs
+- **Possession:** Pass accuracy, Passes/90, Forward passes, Dribbles, Dribble success %, Receptions
+
+### VAEP Boost
+Quando VAEP ratings estao disponiveis, o composite score recebe boost:
+```
+composite_final = composite_base × 0.85 + vaep_bonus × 0.15
+vaep_bonus = min(vaep_per90 / 0.8 × 100, 100)
+```
+
+### Saidas
+- `composite_score` — Score composto (0-100) ponderado por role
+- `role_cluster` — Role tatico atribuido pelo clustering
+- `dimensions` — Scores individuais por dimensao (0-100)
+- `percentile_in_cluster` — Percentil dentro do cluster
+- `cluster_size` — Tamanho do cluster
+
+### Base Cientifica
+| Referencia | Contribuicao |
+|---|---|
+| Pappalardo & Cintia (ACM TIST, 2019) — PlayeRank | Framework original: avaliacao role-aware multi-dimensional |
+| Decroos et al. (KDD 2019) — VAEP | VAEP ratings como input para composite score |
+| Frederico Ferra (NOVA IMS, 2025) | PCA + K-Means + RF para clustering tatico |
+
+### Endpoint
+- `GET /api/playerank/rankings` — Rankings filtrados por cluster, dimensao, liga
+
+---
+
+## Mapa de Referencias Cientificas (Atualizado)
+
+```
+                    M1        M2        M3        M4        M5        M6        M7        LBP       VAEP      PLR
+Referencia          Traj.     Value     Opport.   Replace.  Trend     League    Impact    LineBrk   Engine    Engine
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+VAEP (KDD 2019)     ●                   ●                                                           ●
+Bransen 2020        ●                                                                               ●
+SciSkill (2025)     ●                   ●
+ICSPORTS 2025       ●
+Age Curves 2.0      ●                                       ●                   ●
+Khalife (2025)                ●
+CIES 2021                     ●                                                  ●
+Gyarmati 2016                 ●
+GDA TransferLab     ●                   ●
+Brighton/Starlizard                     ●
+KickClone 2025                                    ●
+Spatial Sim. 2025                                 ●
+FPSRec 2024                                      ●
+Opta Power 2025                                                       ●
+PlayeRank 2019                                                                   ●                             ●
+Soccernomics 2009                                                                ●
+Frost & Groom 2025                                                               ●
+StatsBomb 360 2021                                                                         ●
+PDI Griffis 2022                                                                           ●
+PIM ScienceDirect25                                                                        ●
+Analytics FC 2022                                                                          ●
+xT vs VAEP 2020                                                                           ●
+socceraction        ●                   ●                                                           ●
+```
+
+---
+
 ## Motor Preditivo Original (predictive_engine v3.0)
 
 ### Scout Score Preditivo (SSP)
@@ -248,38 +428,6 @@ Mahalanobis Distance + Random Forest Proximity
 Predicao de probabilidade de sucesso com ajuste por forca de liga:
 ```
 P(success) = base_prediction × league_adjustment_factor
-```
-
----
-
-## Mapa de Referencias Cientificas
-
-```
-                    M1        M2        M3        M4        M5        M6        M7        LBP
-Referencia          Traj.     Value     Opport.   Replace.  Trend     League    Impact    LineBrk
-────────────────────────────────────────────────────────────────────────────────────────────────
-VAEP (KDD 2019)     ●                   ●
-Bransen 2020        ●
-SciSkill (2025)     ●                   ●
-ICSPORTS 2025       ●
-Age Curves 2.0      ●                                       ●                   ●
-Khalife (2025)                ●
-CIES 2021                     ●                                                  ●
-Gyarmati 2016                 ●
-GDA TransferLab     ●                   ●
-Brighton/Starlizard                     ●
-KickClone 2025                                    ●
-Spatial Sim. 2025                                 ●
-FPSRec 2024                                      ●
-Opta Power 2025                                                       ●
-PlayeRank 2019                                                                   ●        ●
-Soccernomics 2009                                                                ●
-Frost & Groom 2025                                                               ●
-StatsBomb 360 2021                                                                         ●
-PDI Griffis 2022                                                                           ●
-PIM ScienceDirect25                                                                        ●
-Analytics FC 2022                                                                          ●
-xT vs VAEP 2020                                                                           ●
 ```
 
 ---

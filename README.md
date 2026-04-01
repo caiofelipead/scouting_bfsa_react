@@ -14,6 +14,8 @@ PostgreSQL
 FastAPI Backend
      ├── predictive_engine.py    (Scout Score Preditivo, clustering, similaridade)
      ├── scouting_intelligence.py (7 modelos de ML — Scouting Intelligence Engine)
+     ├── vaep_engine.py          (VAEP — Valuing Actions by Estimating Probabilities)
+     ├── playerank_engine.py     (PlayeRank — avaliação multi-dimensional role-aware)
      ├── league_power_model.py   (Opta Power Ranking, ajuste por liga)
      ├── calibration.py          (coeficientes calibrados por literatura acadêmica)
      └── similarity.py           (índices compostos, percentis, ranking)
@@ -76,6 +78,24 @@ Análise de impacto de contratação no elenco do Botafogo-SP.
 - **Saída:** `impact_score` (0-100), classificação, recomendação, detalhamento por componente
 - **Endpoint:** `POST /api/contract_impact`
 
+### VAEP Engine — Valuing Actions by Estimating Probabilities
+Implementação do framework VAEP (Decroos et al., KDD 2019) para valoração de ações individuais.
+
+- **Pipeline:** Wyscout events → SPADL (socceraction) → features + labels → XGBoost → ΔP(scoring) − ΔP(conceding) → VAEP/90
+- **Dual mode:** Pipeline completo (com socceraction + event data) ou heurístico (aggregate Wyscout stats)
+- **Integração:** Enriquece M1 (trajetória), M3 (oportunidades) e M4 (substitutos) com VAEP ratings
+- **Saída:** `vaep_per90`, `offensive_vaep`, `defensive_vaep`, `total_vaep`
+- **Endpoints:** `POST /api/vaep/run-pipeline`, `GET /api/vaep/ratings`, `GET /api/vaep/player/{name}`, `GET /api/vaep/compare`
+
+### PlayeRank Engine — Multi-dimensional Role-Aware Evaluation
+Implementação do framework PlayeRank (Pappalardo & Cintia, ACM TIST 2019).
+
+- **Pipeline:** VAEP ratings + Wyscout metrics → K-Means tactical clustering (6 roles) → 5 scoring dimensions → percentile within cluster
+- **Roles:** Goal Scorer, Playmaker, Box-to-Box, Defensive Anchor, Wide Player, Ball-Playing Defender
+- **Dimensões:** Scoring, Playmaking, Defending, Physical, Possession (pesos role-specific)
+- **Saída:** `composite_score`, `role_cluster`, `dimensions`, `percentile_in_cluster`
+- **Endpoint:** `GET /api/playerank/rankings`
+
 ---
 
 ## Motor Preditivo Original (predictive_engine v3.0)
@@ -92,7 +112,7 @@ Análise de impacto de contratação no elenco do Botafogo-SP.
 
 | Referência | Modelo(s) |
 |-----------|-----------|
-| Decroos et al. (KDD 2019) — VAEP | M1 Trajectory, M3 Opportunity |
+| Decroos et al. (KDD 2019) — VAEP | M1 Trajectory, M3 Opportunity, VAEP Engine |
 | Bransen & Van Haaren (2020) | M1 Trajectory |
 | SciSkill Forecasting (MDPI 2025) | M1 Trajectory + M3 Opportunity |
 | Can We Predict Success? (ICSPORTS 2025) | M1 Trajectory |
@@ -111,7 +131,7 @@ Análise de impacto de contratação no elenco do Botafogo-SP.
 | Frost & Groom (2025) | Processo de integração |
 | StatsBomb 360 — Line-Breaking Passes (2021) | Passes Quebrando Linhas |
 | Griffis — Passing Danger Index (Café Tactiques, 2022) | Passes Quebrando Linhas |
-| Pappalardo et al. (ACM TIST, 2019) — PlayeRank | Passes Quebrando Linhas + M7 |
+| Pappalardo et al. (ACM TIST, 2019) — PlayeRank | Passes Quebrando Linhas + M7 + PlayeRank Engine |
 | PIM — Player Impact Metric (ScienceDirect, 2025) | Passes Quebrando Linhas |
 | Analytics FC (2022) — Breaking the First Line | Passes Quebrando Linhas |
 | StatsBomb Radars (2023 Update) — PAdj metrics | Calibracao de Pesos |
@@ -162,7 +182,7 @@ Análise de impacto de contratação no elenco do Botafogo-SP.
 
 ## Endpoints API
 
-### Scouting Intelligence (novos)
+### Scouting Intelligence
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
 | POST | `/api/trajectory` | Previsão de evolução de carreira |
@@ -171,6 +191,15 @@ Análise de impacto de contratação no elenco do Botafogo-SP.
 | POST | `/api/replacements` | Busca de substitutos |
 | POST | `/api/contract_impact` | Análise de impacto de contratação |
 | GET | `/api/league_powers` | Coeficientes Opta Power por liga |
+
+### VAEP & PlayeRank
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| POST | `/api/vaep/run-pipeline` | Executa pipeline VAEP completo |
+| GET | `/api/vaep/ratings` | Ratings VAEP com filtros (posição, minutos, liga) |
+| GET | `/api/vaep/player/{name}` | VAEP detalhado do jogador + top ações |
+| GET | `/api/vaep/compare` | Comparação VAEP entre jogadores |
+| GET | `/api/playerank/rankings` | Rankings PlayeRank por cluster/dimensão |
 
 ### Core (existentes)
 | Método | Endpoint | Descrição |

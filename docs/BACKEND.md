@@ -17,6 +17,7 @@ backend/
 ├── routes/                        # Rotas HTTP
 │   ├── auth.py                    # Endpoints de login/logout
 │   ├── apifootball.py             # Integracao API-Football v3
+│   ├── vaep.py                    # Endpoints VAEP + PlayeRank (5 rotas)
 │   └── proxy.py                   # Proxy de imagens e logos
 │
 ├── services/                      # Logica de negocio
@@ -25,8 +26,10 @@ backend/
 │   ├── similarity.py              # Similaridade multi-metodo (~22KB)
 │   ├── calibration.py             # Coeficientes academicos (~22KB)
 │   ├── league_power_model.py      # Opta Power Rankings
+│   ├── vaep_engine.py             # VAEP — Valuing Actions (Decroos et al. 2019)
+│   ├── playerank_engine.py        # PlayeRank — avaliacao multi-dimensional
 │   ├── enrichment.py              # Pipeline de enriquecimento (~29KB)
-│   ├── database.py                # PostgreSQL + Google Sheets sync
+│   ├── database.py                # PostgreSQL + Google Sheets sync + VAEP tables
 │   ├── data_loader.py             # Carregamento CSV/Google Sheets
 │   ├── sync_sheets.py             # Job de sincronizacao em background
 │   ├── fuzzy_match.py             # Matching SkillCorner (RapidFuzz)
@@ -34,7 +37,8 @@ backend/
 │   └── api_football.py            # Servico API-Football
 │
 ├── schemas/                       # Modelos de dados
-│   └── models.py                  # Pydantic request/response (~40+ classes)
+│   ├── models.py                  # Pydantic request/response (~40+ classes)
+│   └── vaep.py                    # Schemas VAEP + PlayeRank (10 classes)
 │
 ├── config/                        # Configuracao estatica
 │   └── mappings.py                # Dicionarios (logos, flags, indices)
