@@ -46,31 +46,31 @@ except ImportError:
 # Mapped to common Wyscout column names (Portuguese)
 DIMENSION_METRICS = {
     "scoring": [
-        "Golos per 90", "xG per 90", "Remates per 90",
-        "Remates ao alvo, %", "Toques na área per 90",
-        "Conversão de golos, %",
+        "Golos/90", "Golos esperados/90", "Remates/90",
+        "Remates a baliza, %", "Toques na area/90",
+        "Golos marcados, %",
     ],
     "playmaking": [
-        "Assistências per 90", "xA per 90", "Passes decisivos per 90",
-        "Passes progressivos per 90", "Passes para o último terço per 90",
-        "Passes inteligentes per 90", "Cruzamentos precisas, %",
+        "Assistencias/90", "Assistencias esperadas/90", "Passes chave/90",
+        "Passes progressivos/90", "Passes para terco final/90",
+        "Passes inteligentes/90", "Cruzamentos certos, %",
     ],
     "defending": [
-        "Ações defensivas per 90", "Interceções per 90",
-        "Tackles deslizantes per 90", "Duelos defensivos ganhos, %",
-        "Duelos aéreos ganhos, %", "Cortes per 90",
-        "Bolas recuperadas per 90",
+        "Acoes defensivas com exito/90", "Intersecoes/90",
+        "Cortes/90", "Duelos defensivos ganhos, %",
+        "Duelos aereos ganhos, %", "Remates intercetados/90",
+        "Duelos defensivos/90",
     ],
     "physical": [
-        "Duelos per 90", "Duelos ganhos, %",
-        "Duelos aéreos per 90", "Acelerações per 90",
-        "Corridas progressivas per 90",
+        "Duelos/90", "Duelos ganhos, %",
+        "Duelos aerios/90", "Aceleracoes/90",
+        "Corridas progressivas/90",
     ],
     "possession": [
-        "Precisão de passes, %", "Passes per 90",
-        "Passes para a frente per 90", "Dribles per 90",
-        "Dribles bem sucedidos, %", "Perdas de bola per 90",
-        "Recepções per 90",
+        "Passes certos, %", "Passes/90",
+        "Passes para a frente/90", "Dribles/90",
+        "Dribles com sucesso, %", "Perdas/90",
+        "Passes recebidos/90",
     ],
 }
 
@@ -107,11 +107,11 @@ DIMENSION_METRICS_EN = {
 
 # Clustering features — used to determine tactical role
 CLUSTERING_FEATURES_PT = [
-    "Golos per 90", "Assistências per 90", "xG per 90",
-    "Ações defensivas per 90", "Passes progressivos per 90",
-    "Dribles per 90", "Cruzamentos per 90", "Remates per 90",
-    "Interceções per 90", "Duelos aéreos per 90",
-    "Corridas progressivas per 90", "Toques na área per 90",
+    "Golos/90", "Assistencias/90", "Golos esperados/90",
+    "Acoes defensivas com exito/90", "Passes progressivos/90",
+    "Dribles/90", "Cruzamentos/90", "Remates/90",
+    "Intersecoes/90", "Duelos aerios/90",
+    "Corridas progressivas/90", "Toques na area/90",
 ]
 
 CLUSTERING_FEATURES_EN = [
@@ -289,9 +289,9 @@ class PlayeRankEngine:
             for col in dim_df.columns:
                 dim_df[col] = pd.to_numeric(dim_df[col], errors="coerce")
 
-            # Invert metrics where lower is better (e.g., losses_per90)
+            # Invert metrics where lower is better (e.g., losses, fouls)
             invert_cols = [c for c in available if any(inv in c.lower() for inv in
-                           ["perdas", "losses", "erros", "errors"])]
+                           ["perdas", "losses", "erros", "errors", "faltas"])]
             for col in invert_cols:
                 dim_df[col] = -dim_df[col]
 
@@ -366,11 +366,17 @@ class PlayeRankEngine:
         for role, indices in cluster_groups.items():
             scores = [results[i]["composite_score"] for i in indices]
             size = len(indices)
+            if size <= 1:
+                for i in indices:
+                    results[i]["percentile_in_cluster"] = 50.0
+                    results[i]["cluster_size"] = size
+                continue
             sorted_scores = sorted(scores)
             for i in indices:
                 s = results[i]["composite_score"]
-                rank = sorted_scores.index(s) + 1
-                results[i]["percentile_in_cluster"] = round(rank / size * 100, 1)
+                # Count how many scores are strictly below this one
+                count_below = sum(1 for x in sorted_scores if x < s)
+                results[i]["percentile_in_cluster"] = round(count_below / (size - 1) * 100, 1)
                 results[i]["cluster_size"] = size
 
         # Sort by composite score descending
@@ -382,10 +388,37 @@ class PlayeRankEngine:
     @staticmethod
     def _resolve_features(df: pd.DataFrame, features_pt: List[str],
                           features_en: List[str]) -> List[str]:
-        """Resolve available features, trying Portuguese first then English."""
-        available = [f for f in features_pt if f in df.columns]
+        """Resolve available features, trying Portuguese first then English.
+
+        Uses accent-stripping to match columns (Google Sheets data may have
+        accents while code references may not, or vice versa).
+        """
+        import unicodedata
+
+        def strip_acc(s: str) -> str:
+            return ''.join(c for c in unicodedata.normalize('NFD', s)
+                           if unicodedata.category(c) != 'Mn')
+
+        col_map = {}  # stripped -> original column name
+        for col in df.columns:
+            col_map[strip_acc(col)] = col
+
+        available = []
+        for f in features_pt:
+            if f in df.columns:
+                available.append(f)
+            else:
+                stripped = strip_acc(f)
+                if stripped in col_map:
+                    available.append(col_map[stripped])
         if not available:
-            available = [f for f in features_en if f in df.columns]
+            for f in features_en:
+                if f in df.columns:
+                    available.append(f)
+                else:
+                    stripped = strip_acc(f)
+                    if stripped in col_map:
+                        available.append(col_map[stripped])
         return available
 
     @staticmethod

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 class VAEPPipelineRequest(BaseModel):
     competition_id: Optional[int] = None
-    season: str = Field(min_length=1, max_length=20)
+    season: str = Field(default="current", max_length=20)
 
 
 class VAEPRating(BaseModel):

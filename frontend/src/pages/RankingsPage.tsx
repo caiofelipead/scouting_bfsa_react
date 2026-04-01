@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Trophy, ArrowUpDown, AlertCircle, Target, User } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy, ArrowUpDown, AlertCircle, Target, User, ExternalLink, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useRankings, usePositions, useLeagues } from '../hooks/usePlayers';
 import { getScoreColor, formatNumber } from '../lib/utils';
 import api, { proxyImageUrl } from '../lib/api';
 import type { RankingsQueryParams } from '../types/api';
+import PlayerProfile from '../components/PlayerProfile';
 
 interface PredictionRankingEntry {
   rank: number;
@@ -47,6 +48,23 @@ export default function RankingsPage() {
   const [league, setLeague] = useState('');
   const [topN, setTopN] = useState(50);
   const [leagueTarget, setLeagueTarget] = useState('Serie B Brasil');
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('player') || null;
+  });
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (window.location.search.includes('player=')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedPlayer && profileRef.current) {
+      profileRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedPlayer]);
 
   const { data: positions = [], error: posErr } = usePositions();
   const { data: leagues = [], error: leagueErr } = useLeagues();
@@ -216,7 +234,7 @@ export default function RankingsPage() {
                   ))
                 ) : rankings && rankings.players.length > 0 ? (
                   rankings.players.map((entry, i) => (
-                    <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="transition-colors hover:bg-white/[0.02]">
+                    <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="group transition-colors hover:bg-white/[0.02] cursor-pointer" onClick={() => setSelectedPlayer(entry.display_name || entry.name)}>
                       <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs" style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>{entry.rank}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
@@ -225,7 +243,14 @@ export default function RankingsPage() {
                           ) : (
                             <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}><User size={14} style={{ color: 'var(--color-text-muted)' }} /></div>
                           )}
-                          <span className="font-medium whitespace-nowrap">{entry.name}</span>
+                          <span className="font-medium whitespace-nowrap group-hover:text-blue-400 transition-colors">{entry.name}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); window.open(`${window.location.origin}${window.location.pathname}?tab=rankings&player=${encodeURIComponent(entry.display_name || entry.name)}`, '_blank'); }}
+                            className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-gray-400 hover:text-blue-400 shrink-0"
+                            title="Abrir perfil em nova aba"
+                          >
+                            <ExternalLink size={12} />
+                          </button>
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
@@ -295,7 +320,7 @@ export default function RankingsPage() {
                     const prob = entry.p_success * 100;
                     const riskColor = RISK_COLORS[entry.risk_level] || '#6b7280';
                     return (
-                      <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="transition-colors hover:bg-white/[0.02]">
+                      <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="group transition-colors hover:bg-white/[0.02] cursor-pointer" onClick={() => setSelectedPlayer(entry.display_name || entry.name)}>
                         <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs" style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>{entry.rank}</td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">
@@ -304,7 +329,14 @@ export default function RankingsPage() {
                             ) : (
                               <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}><User size={14} style={{ color: 'var(--color-text-muted)' }} /></div>
                             )}
-                            <span className="font-medium whitespace-nowrap">{entry.name}</span>
+                            <span className="font-medium whitespace-nowrap group-hover:text-blue-400 transition-colors">{entry.name}</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); window.open(`${window.location.origin}${window.location.pathname}?tab=rankings&player=${encodeURIComponent(entry.display_name || entry.name)}`, '_blank'); }}
+                              className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-gray-400 hover:text-blue-400 shrink-0"
+                              title="Abrir perfil em nova aba"
+                            >
+                              <ExternalLink size={12} />
+                            </button>
                           </div>
                         </td>
                         <td className="px-3 py-2.5">
@@ -346,6 +378,50 @@ export default function RankingsPage() {
           )}
         </div>
       </div>
+
+      {/* Inline Player Profile */}
+      <AnimatePresence>
+        {selectedPlayer && (
+          <motion.div
+            ref={profileRef}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="relative"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
+                <User size={16} style={{ color: 'var(--color-accent)' }} />
+                Perfil do Jogador
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.open(`${window.location.origin}${window.location.pathname}?tab=rankings&player=${encodeURIComponent(selectedPlayer)}`, '_blank')}
+                  className="flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded"
+                  style={{ color: 'var(--color-text-muted)' }}
+                  title="Abrir perfil em nova aba"
+                >
+                  <ExternalLink size={12} />
+                  Nova aba
+                </button>
+                <button
+                  onClick={() => setSelectedPlayer(null)}
+                  className="flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded hover:bg-gray-800"
+                  style={{ color: 'var(--color-text-muted)' }}
+                >
+                  <X size={12} />
+                  Fechar
+                </button>
+              </div>
+            </div>
+            <PlayerProfile
+              playerDisplayName={selectedPlayer}
+              onClose={() => setSelectedPlayer(null)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

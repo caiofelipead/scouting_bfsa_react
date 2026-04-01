@@ -6,9 +6,10 @@ multi-dimensional player evaluation system.
 """
 
 import logging
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from auth import get_current_user
 from schemas.vaep import (
@@ -414,3 +415,95 @@ async def get_playerank_rankings(
         logger.error("Error computing PlayeRank: %s", e)
         return PlayeRankRankingsResponse(total=0, role_cluster=role_cluster,
                                           season=season, rankings=[])
+
+
+# ══════════════════════════════════════════════════════════════════════
+# ENRICHMENT (API-Football photos/logos)
+# ══════════════════════════════════════════════════════════════════════
+
+class EnrichmentStatusResponse(BaseModel):
+    total_players: int = 0
+    players_with_photo: int = 0
+    total_teams: int = 0
+    teams_with_logo: int = 0
+    coverage_pct: float = 0.0
+
+
+class EnrichmentTriggerResponse(BaseModel):
+    message: str
+    teams_queued: int = 0
+    players_queued: int = 0
+
+
+@router.get("/vaep/enrichment-status", response_model=EnrichmentStatusResponse)
+async def vaep_enrichment_status(_=Depends(get_current_user)):
+    """Check how many players/teams have photos from API-Football."""
+    try:
+        from services.enrichment import get_enrichment_stats
+        stats = get_enrichment_stats()
+        total_p = stats.get("total_players", 0)
+        with_photo = stats.get("players_with_photo", 0)
+        return EnrichmentStatusResponse(
+            total_players=total_p,
+            players_with_photo=with_photo,
+            total_teams=stats.get("total_teams", 0),
+            teams_with_logo=stats.get("teams_with_logo", 0),
+            coverage_pct=round(with_photo / total_p * 100, 1) if total_p > 0 else 0,
+        )
+    except Exception as e:
+        logger.error("Error getting enrichment stats: %s", e)
+        return EnrichmentStatusResponse()
+
+
+@router.post("/vaep/sync-photos", response_model=EnrichmentTriggerResponse)
+async def sync_photos(
+    max_api_calls: int = Query(default=90, le=100),
+    _=Depends(get_current_user),
+):
+    """Trigger photo/logo enrichment from API-Football for all players in Wyscout data."""
+    import asyncio
+    df_wyscout = _get_wyscout_data()
+    if df_wyscout is None or len(df_wyscout) == 0:
+        raise HTTPException(status_code=404, detail="Dados Wyscout não disponíveis")
+
+    # Build teams → players mapping
+    teams_with_players: Dict[str, List[str]] = {}
+    name_col = None
+    team_col = None
+    for c in df_wyscout.columns:
+        cl = c.lower().strip()
+        if cl in ("jogadordisplay", "jogador"):
+            name_col = c
+        if cl in ("equipa", "equipe", "team"):
+            team_col = c
+
+    if not name_col or not team_col:
+        raise HTTPException(status_code=400, detail="Colunas de jogador/equipa não encontradas")
+
+    for _, row in df_wyscout.iterrows():
+        player = str(row.get(name_col, "")).strip()
+        team = str(row.get(team_col, "")).strip()
+        if player and team and player != "nan" and team != "nan":
+            teams_with_players.setdefault(team, []).append(player)
+
+    total_teams = len(teams_with_players)
+    total_players = sum(len(v) for v in teams_with_players.values())
+
+    # Run enrichment in background
+    async def _run():
+        try:
+            from services.enrichment import run_bulk_enrichment
+            result = await run_bulk_enrichment(
+                teams_with_players, max_api_calls=max_api_calls,
+            )
+            logger.info("Photo sync complete: %s", result)
+        except Exception as e:
+            logger.error("Photo sync error: %s", e)
+
+    asyncio.create_task(_run())
+
+    return EnrichmentTriggerResponse(
+        message=f"Sincronização de fotos iniciada para {total_teams} equipes e {total_players} jogadores",
+        teams_queued=total_teams,
+        players_queued=total_players,
+    )

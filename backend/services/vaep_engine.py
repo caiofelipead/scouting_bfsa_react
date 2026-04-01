@@ -360,44 +360,33 @@ class VAEPEngine:
 
         player_ratings = []
         for _, row in df_wyscout.iterrows():
-            player_name = str(row.get("Jogador", row.get("player_name", "Unknown")))
-            team = str(row.get("Equipa", row.get("team", "")))
-            position = str(row.get("Posição", row.get("position", "")))
-            league = str(row.get("liga_tier", row.get("league", "")))
-            minutes = self._safe_float(row.get("Minutos jogados", row.get("minutes_played", 0)))
+            player_name = str(self._get_col(row, "Jogador", "player_name", default="Unknown"))
+            team = str(self._get_col(row, "Equipa", "team", default=""))
+            position = str(self._get_col(row, "Posição", "Posicao", "position", default=""))
+            league = str(self._get_col(row, "liga_tier", "league", default=""))
+            minutes = self._safe_float(self._get_col(row, "Minutos jogados:", "minutes_played"))
 
             if minutes < 1:
                 continue
 
             # Offensive VAEP approximation
-            goals_p90 = self._safe_float(row.get("Golos per 90", row.get("goals_per90", 0)))
-            xg_p90 = self._safe_float(row.get("xG per 90", row.get("xg_per90", 0)))
-            assists_p90 = self._safe_float(row.get("Assistências per 90", row.get("assists_per90", 0)))
-            xa_p90 = self._safe_float(row.get("xA per 90", row.get("xa_per90", 0)))
-            key_passes = self._safe_float(row.get("Passes decisivos per 90",
-                                                    row.get("key_passes_per90", 0)))
-            prog_passes = self._safe_float(row.get("Passes progressivos per 90",
-                                                     row.get("progressive_passes_per90", 0)))
-            dribbles = self._safe_float(row.get("Dribles per 90",
-                                                  row.get("dribbles_per90", 0)))
-            shots_p90 = self._safe_float(row.get("Remates per 90",
-                                                   row.get("shots_per90", 0)))
-            crosses_p90 = self._safe_float(row.get("Cruzamentos per 90",
-                                                     row.get("crosses_per90", 0)))
-            touches_box = self._safe_float(row.get("Toques na área per 90",
-                                                     row.get("touches_in_box_per90", 0)))
+            goals_p90 = self._safe_float(self._get_col(row, "Golos/90", "goals_per90"))
+            xg_p90 = self._safe_float(self._get_col(row, "Golos esperados/90", "xg_per90"))
+            assists_p90 = self._safe_float(self._get_col(row, "Assistências/90", "Assistencias/90", "assists_per90"))
+            xa_p90 = self._safe_float(self._get_col(row, "Assistências esperadas/90", "Assistencias esperadas/90", "xa_per90"))
+            key_passes = self._safe_float(self._get_col(row, "Passes chave/90", "key_passes_per90"))
+            prog_passes = self._safe_float(self._get_col(row, "Passes progressivos/90", "progressive_passes_per90"))
+            dribbles = self._safe_float(self._get_col(row, "Dribles/90", "dribbles_per90"))
+            shots_p90 = self._safe_float(self._get_col(row, "Remates/90", "shots_per90"))
+            crosses_p90 = self._safe_float(self._get_col(row, "Cruzamentos/90", "crosses_per90"))
+            touches_box = self._safe_float(self._get_col(row, "Toques na área/90", "Toques na area/90", "touches_in_box_per90"))
 
             # Defensive VAEP approximation
-            def_actions = self._safe_float(row.get("Ações defensivas per 90",
-                                                     row.get("defensive_actions_per90", 0)))
-            interceptions = self._safe_float(row.get("Interceções per 90",
-                                                       row.get("interceptions_per90", 0)))
-            tackles = self._safe_float(row.get("Tackles deslizantes per 90",
-                                                 row.get("tackles_per90", 0)))
-            aerial_wins = self._safe_float(row.get("Duelos aéreos ganhos, %",
-                                                     row.get("aerial_win_pct", 0))) / 100.0
-            clearances = self._safe_float(row.get("Cortes per 90",
-                                                    row.get("clearances_per90", 0)))
+            def_actions = self._safe_float(self._get_col(row, "Ações defensivas com êxito/90", "Acoes defensivas com exito/90", "defensive_actions_per90"))
+            interceptions = self._safe_float(self._get_col(row, "Interseções/90", "Intersecoes/90", "interceptions_per90"))
+            tackles = self._safe_float(self._get_col(row, "Cortes/90", "tackles_per90"))
+            aerial_wins = self._safe_float(self._get_col(row, "Duelos aereos ganhos, %", "aerial_win_pct")) / 100.0
+            clearances = self._safe_float(self._get_col(row, "Remates intercetados/90", "clearances_per90"))
 
             # VAEP approximation formula
             # Offensive value: weighted sum of goal-contributing actions
@@ -574,3 +563,25 @@ class VAEPEngine:
             return float(val)
         except (ValueError, TypeError):
             return default
+
+    @staticmethod
+    def _get_col(row, *candidates, default=0):
+        """Get a value from a row trying multiple column name variants.
+
+        Handles accent differences between code and actual DataFrame columns.
+        """
+        import unicodedata
+
+        def strip_acc(s: str) -> str:
+            return ''.join(c for c in unicodedata.normalize('NFD', s)
+                           if unicodedata.category(c) != 'Mn')
+
+        for name in candidates:
+            if name in row.index:
+                return row[name]
+            # Try accent-stripped match
+            stripped = strip_acc(name)
+            for col in row.index:
+                if strip_acc(col) == stripped:
+                    return row[col]
+        return default
