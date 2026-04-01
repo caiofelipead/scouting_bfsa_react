@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3,
   TrendingUp,
@@ -7,8 +7,12 @@ import {
   Target,
   Zap,
   Users,
+  User,
   Search,
   ChevronDown,
+  ExternalLink,
+  X,
+  Camera,
 } from 'lucide-react';
 import {
   RadarChart as RechartsRadar,
@@ -32,9 +36,12 @@ import {
   useVaepRatings,
   useRunVaepPipeline,
   usePlayerankRankings,
+  useEnrichmentStatus,
+  useSyncPhotos,
 } from '../hooks/useVaep';
 import type { VAEPRating, PlayeRankScore } from '../types/vaep';
 import { getScoreColor } from '../lib/utils';
+import PlayerProfile from '../components/PlayerProfile';
 
 // ── VAEPRadar Component ──────────────────────────────────────────────
 
@@ -69,7 +76,7 @@ function VAEPRadar({ player, leagueAvg }: { player: VAEPRating; leagueAvg: { off
 
 // ── PlayeRankCard Component ──────────────────────────────────────────
 
-function PlayeRankCard({ score }: { score: PlayeRankScore }) {
+function PlayeRankCard({ score, onSelect }: { score: PlayeRankScore; onSelect: (name: string) => void }) {
   const dims = score.dimensions;
   const bars = [
     { label: 'Scoring', value: dims.scoring ?? 0, color: '#ef4444' },
@@ -83,11 +90,12 @@ function PlayeRankCard({ score }: { score: PlayeRankScore }) {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="card p-4"
+      className="card p-4 cursor-pointer hover:ring-1 hover:ring-blue-500/30 transition-all"
+      onClick={() => onSelect(score.player_name)}
     >
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h4 className="font-semibold text-sm">{score.player_name}</h4>
+          <h4 className="font-semibold text-sm hover:text-blue-400 transition-colors">{score.player_name}</h4>
           <p className="text-xs text-gray-400">
             {score.team} · {score.role_cluster}
           </p>
@@ -191,12 +199,67 @@ function VAEPScatter({ ratings }: { ratings: VAEPRating[] }) {
   );
 }
 
+// ── Clickable Player Name ────────────────────────────────────────────
+
+function PlayerNameCell({
+  name,
+  onSelect,
+}: {
+  name: string;
+  onSelect: (name: string) => void;
+}) {
+  const openInNewTab = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}${window.location.pathname}?tab=vaep&player=${encodeURIComponent(name)}`;
+    window.open(url, '_blank');
+  };
+
+  return (
+    <td className="py-2 px-3 font-medium">
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => onSelect(name)}
+          className="hover:underline cursor-pointer text-left transition-colors hover:text-blue-400"
+        >
+          {name}
+        </button>
+        <button
+          onClick={openInNewTab}
+          className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-gray-400 hover:text-blue-400 shrink-0"
+          title="Abrir perfil em nova aba"
+        >
+          <ExternalLink size={12} />
+        </button>
+      </div>
+    </td>
+  );
+}
+
 // ── Main VAEP Page ───────────────────────────────────────────────────
 
 export default function VAEPPage() {
   const [position, setPosition] = useState('');
   const [minMinutes, setMinMinutes] = useState(0);
   const [activeTab, setActiveTab] = useState<'vaep' | 'playerank'>('vaep');
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('player') || null;
+  });
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Clean URL params after reading player
+  useEffect(() => {
+    if (window.location.search.includes('player=')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  // Scroll to profile when player is selected
+  useEffect(() => {
+    if (selectedPlayer && profileRef.current) {
+      profileRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedPlayer]);
 
   const ratingsQuery = useVaepRatings({
     position: position || undefined,
@@ -205,6 +268,8 @@ export default function VAEPPage() {
 
   const playerankQuery = usePlayerankRankings({});
   const runPipeline = useRunVaepPipeline();
+  const enrichmentStatus = useEnrichmentStatus();
+  const syncPhotos = useSyncPhotos();
 
   const ratings = ratingsQuery.data?.ratings ?? [];
   const playerankScores = playerankQuery.data?.rankings ?? [];
@@ -235,6 +300,23 @@ export default function VAEPPage() {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => syncPhotos.mutate()}
+            disabled={syncPhotos.isPending}
+            className="text-xs px-3 py-1.5 rounded flex items-center gap-1 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition-colors"
+          >
+            {syncPhotos.isPending ? (
+              <div className="animate-spin h-3 w-3 border border-white border-t-transparent rounded-full" />
+            ) : (
+              <Camera size={14} />
+            )}
+            Sincronizar Fotos
+            {enrichmentStatus.data && (
+              <span className="text-[10px] text-gray-500 ml-1">
+                ({enrichmentStatus.data.coverage_pct}%)
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => runPipeline.mutate()}
             disabled={runPipeline.isPending}
             className="btn-primary text-xs px-3 py-1.5 rounded flex items-center gap-1"
@@ -259,6 +341,20 @@ export default function VAEPPage() {
           <p className="text-xs text-green-300">
             Pipeline {runPipeline.data.method} concluido: {runPipeline.data.total_players} jogadores processados
             {runPipeline.data.total_games > 0 && ` · ${runPipeline.data.total_games} jogos`}
+          </p>
+        </motion.div>
+      )}
+
+      {/* Photo sync result banner */}
+      {syncPhotos.data && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card p-3 border-blue-800 bg-blue-900/20"
+        >
+          <p className="text-xs text-blue-300">
+            <Camera size={12} className="inline mr-1" />
+            {syncPhotos.data.message}
           </p>
         </motion.div>
       )}
@@ -402,10 +498,11 @@ export default function VAEPPage() {
                   {ratings.map((r, i) => (
                     <tr
                       key={r.player_name}
-                      className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors"
+                      className="group border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors cursor-pointer"
+                      onClick={() => setSelectedPlayer(r.player_name)}
                     >
                       <td className="py-2 px-3 text-gray-500">{i + 1}</td>
-                      <td className="py-2 px-3 font-medium">{r.player_name}</td>
+                      <PlayerNameCell name={r.player_name} onSelect={setSelectedPlayer} />
                       <td className="py-2 px-3 text-gray-400">{r.team ?? '-'}</td>
                       <td className="py-2 px-3 text-gray-400">{r.position ?? '-'}</td>
                       <td className="py-2 px-3 text-right text-gray-300">{r.minutes_played}</td>
@@ -439,7 +536,7 @@ export default function VAEPPage() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {playerankScores.slice(0, 12).map((s) => (
-                  <PlayeRankCard key={s.player_name} score={s} />
+                  <PlayeRankCard key={s.player_name} score={s} onSelect={setSelectedPlayer} />
                 ))}
               </div>
 
@@ -472,10 +569,11 @@ export default function VAEPPage() {
                       {playerankScores.map((s, i) => (
                         <tr
                           key={s.player_name}
-                          className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors"
+                          className="group border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors cursor-pointer"
+                          onClick={() => setSelectedPlayer(s.player_name)}
                         >
                           <td className="py-2 px-3 text-gray-500">{i + 1}</td>
-                          <td className="py-2 px-3 font-medium">{s.player_name}</td>
+                          <PlayerNameCell name={s.player_name} onSelect={setSelectedPlayer} />
                           <td className="py-2 px-3 text-gray-400">{s.team ?? '-'}</td>
                           <td className="py-2 px-3">
                             <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-800 text-gray-300">
@@ -516,6 +614,51 @@ export default function VAEPPage() {
           )}
         </div>
       )}
+
+      {/* Inline Player Profile */}
+      <AnimatePresence>
+        {selectedPlayer && (
+          <motion.div
+            ref={profileRef}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="relative"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <User size={16} className="text-blue-400" />
+                Perfil do Jogador
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}${window.location.pathname}?tab=vaep&player=${encodeURIComponent(selectedPlayer)}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-blue-400 transition-colors px-2 py-1 rounded hover:bg-gray-800"
+                  title="Abrir perfil em nova aba"
+                >
+                  <ExternalLink size={12} />
+                  Nova aba
+                </button>
+                <button
+                  onClick={() => setSelectedPlayer(null)}
+                  className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-400 transition-colors px-2 py-1 rounded hover:bg-gray-800"
+                >
+                  <X size={12} />
+                  Fechar
+                </button>
+              </div>
+            </div>
+            <PlayerProfile
+              playerDisplayName={selectedPlayer}
+              onClose={() => setSelectedPlayer(null)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

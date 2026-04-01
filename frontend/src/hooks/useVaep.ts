@@ -91,3 +91,42 @@ export function usePlayerankRankings(params: {
     gcTime: GC_TIME,
   });
 }
+
+// ── Enrichment (API-Football photos) ────────────────────────────────
+
+interface EnrichmentStatus {
+  total_players: number;
+  players_with_photo: number;
+  total_teams: number;
+  teams_with_logo: number;
+  coverage_pct: number;
+}
+
+interface EnrichmentTriggerResponse {
+  message: string;
+  teams_queued: number;
+  players_queued: number;
+}
+
+export function useEnrichmentStatus() {
+  return useQuery({
+    queryKey: ['enrichment', 'status'],
+    queryFn: async () => {
+      const res = await api.get('/vaep/enrichment-status');
+      return res.data as EnrichmentStatus;
+    },
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+}
+
+export function useSyncPhotos() {
+  return useMutation({
+    mutationFn: async (maxCalls?: number) => {
+      const res = await api.post('/vaep/sync-photos', null, {
+        params: maxCalls ? { max_api_calls: maxCalls } : {},
+      });
+      return res.data as EnrichmentTriggerResponse;
+    },
+  });
+}

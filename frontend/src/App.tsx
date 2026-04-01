@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -58,9 +58,23 @@ function PageLoader() {
   );
 }
 
+function getInitialTab(): TabId {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get('tab');
+  if (tab && tab in PAGE_MAP) return tab as TabId;
+  return 'dashboard';
+}
+
 function App() {
   const { user, isAuthenticated, loading, error, login, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabId>(getInitialTab);
+
+  // Clean URL params after reading (keep clean URL)
+  useEffect(() => {
+    if (window.location.search && !window.location.search.includes('player=')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   if (!isAuthenticated || !user) {
     return <LoginPage onLogin={login} loading={loading} error={error} />;
