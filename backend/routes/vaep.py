@@ -122,7 +122,7 @@ async def run_vaep_pipeline(req: VAEPPipelineRequest,
                 result.get("method", "unknown"),
             )
         except Exception as e:
-            logger.error("VAEP background pipeline error: %s", e)
+            logger.error("VAEP background pipeline error: %s", e, exc_info=True)
 
     asyncio.create_task(_run_pipeline_bg())
 
@@ -341,13 +341,13 @@ async def vaep_enrichment_status(_=Depends(get_current_user)):
     try:
         from services.enrichment import get_enrichment_stats
         stats = get_enrichment_stats()
-        total_p = stats.get("total_players", 0)
+        total_p = stats.get("players_total", 0)
         with_photo = stats.get("players_with_photo", 0)
         return EnrichmentStatusResponse(
             total_players=total_p,
             players_with_photo=with_photo,
-            total_teams=stats.get("total_teams", 0),
-            teams_with_logo=stats.get("teams_with_logo", 0),
+            total_teams=stats.get("teams_total", 0),
+            teams_with_logo=stats.get("teams_found", 0),
             coverage_pct=round(with_photo / total_p * 100, 1) if total_p > 0 else 0,
         )
     except Exception as e:
@@ -396,9 +396,15 @@ async def sync_photos(
             result = await run_bulk_enrichment(
                 teams_with_players, max_api_calls=max_api_calls,
             )
-            logger.info("Photo sync complete: %s", result)
+            logger.info(
+                "Photo sync complete: %d teams processed, %d players matched, %d unmatched, %d API calls",
+                result.get("teams_processed", 0),
+                result.get("players_matched", 0),
+                result.get("players_unmatched", 0),
+                result.get("api_calls_used", 0),
+            )
         except Exception as e:
-            logger.error("Photo sync error: %s", e)
+            logger.error("Photo sync error: %s", e, exc_info=True)
 
     asyncio.create_task(_run())
 
