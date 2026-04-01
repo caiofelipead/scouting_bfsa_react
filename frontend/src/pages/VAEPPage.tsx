@@ -194,18 +194,16 @@ function VAEPScatter({ ratings }: { ratings: VAEPRating[] }) {
 // ── Main VAEP Page ───────────────────────────────────────────────────
 
 export default function VAEPPage() {
-  const [season, setSeason] = useState('2024/25');
   const [position, setPosition] = useState('');
-  const [minMinutes, setMinMinutes] = useState(400);
+  const [minMinutes, setMinMinutes] = useState(0);
   const [activeTab, setActiveTab] = useState<'vaep' | 'playerank'>('vaep');
 
   const ratingsQuery = useVaepRatings({
-    season,
     position: position || undefined,
     min_minutes: minMinutes,
   });
 
-  const playerankQuery = usePlayerankRankings({ season });
+  const playerankQuery = usePlayerankRankings({});
   const runPipeline = useRunVaepPipeline();
 
   const ratings = ratingsQuery.data?.ratings ?? [];
@@ -237,7 +235,7 @@ export default function VAEPPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => runPipeline.mutate({ season })}
+            onClick={() => runPipeline.mutate()}
             disabled={runPipeline.isPending}
             className="btn-primary text-xs px-3 py-1.5 rounded flex items-center gap-1"
           >
@@ -287,16 +285,6 @@ export default function VAEPPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-400">Temporada</label>
-          <input
-            type="text"
-            value={season}
-            onChange={(e) => setSeason(e.target.value)}
-            className="input-field text-xs w-24"
-            placeholder="2024/25"
-          />
-        </div>
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-400">Posicao</label>
           <select

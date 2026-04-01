@@ -20,8 +20,8 @@ export const vaepKeys = {
 
 export function useRunVaepPipeline() {
   return useMutation({
-    mutationFn: async (params: { season: string; competition_id?: number }) => {
-      const res = await api.post('/vaep/run-pipeline', params);
+    mutationFn: async (params?: { season?: string; competition_id?: number }) => {
+      const res = await api.post('/vaep/run-pipeline', params ?? {});
       return res.data as VAEPPipelineResponse;
     },
   });

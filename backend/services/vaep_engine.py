@@ -364,39 +364,39 @@ class VAEPEngine:
             team = str(row.get("Equipa", row.get("team", "")))
             position = str(row.get("Posição", row.get("position", "")))
             league = str(row.get("liga_tier", row.get("league", "")))
-            minutes = self._safe_float(row.get("Minutos jogados", row.get("minutes_played", 0)))
+            minutes = self._safe_float(row.get("Minutos jogados:", row.get("minutes_played", 0)))
 
             if minutes < 1:
                 continue
 
             # Offensive VAEP approximation
-            goals_p90 = self._safe_float(row.get("Golos per 90", row.get("goals_per90", 0)))
-            xg_p90 = self._safe_float(row.get("xG per 90", row.get("xg_per90", 0)))
-            assists_p90 = self._safe_float(row.get("Assistências per 90", row.get("assists_per90", 0)))
-            xa_p90 = self._safe_float(row.get("xA per 90", row.get("xa_per90", 0)))
-            key_passes = self._safe_float(row.get("Passes decisivos per 90",
+            goals_p90 = self._safe_float(row.get("Golos/90", row.get("goals_per90", 0)))
+            xg_p90 = self._safe_float(row.get("Golos esperados/90", row.get("xg_per90", 0)))
+            assists_p90 = self._safe_float(row.get("Assistencias/90", row.get("assists_per90", 0)))
+            xa_p90 = self._safe_float(row.get("Assistencias esperadas/90", row.get("xa_per90", 0)))
+            key_passes = self._safe_float(row.get("Passes chave/90",
                                                     row.get("key_passes_per90", 0)))
-            prog_passes = self._safe_float(row.get("Passes progressivos per 90",
+            prog_passes = self._safe_float(row.get("Passes progressivos/90",
                                                      row.get("progressive_passes_per90", 0)))
-            dribbles = self._safe_float(row.get("Dribles per 90",
+            dribbles = self._safe_float(row.get("Dribles/90",
                                                   row.get("dribbles_per90", 0)))
-            shots_p90 = self._safe_float(row.get("Remates per 90",
+            shots_p90 = self._safe_float(row.get("Remates/90",
                                                    row.get("shots_per90", 0)))
-            crosses_p90 = self._safe_float(row.get("Cruzamentos per 90",
+            crosses_p90 = self._safe_float(row.get("Cruzamentos/90",
                                                      row.get("crosses_per90", 0)))
-            touches_box = self._safe_float(row.get("Toques na área per 90",
+            touches_box = self._safe_float(row.get("Toques na area/90",
                                                      row.get("touches_in_box_per90", 0)))
 
             # Defensive VAEP approximation
-            def_actions = self._safe_float(row.get("Ações defensivas per 90",
+            def_actions = self._safe_float(row.get("Acoes defensivas com exito/90",
                                                      row.get("defensive_actions_per90", 0)))
-            interceptions = self._safe_float(row.get("Interceções per 90",
+            interceptions = self._safe_float(row.get("Intersecoes/90",
                                                        row.get("interceptions_per90", 0)))
-            tackles = self._safe_float(row.get("Tackles deslizantes per 90",
+            tackles = self._safe_float(row.get("Cortes/90",
                                                  row.get("tackles_per90", 0)))
-            aerial_wins = self._safe_float(row.get("Duelos aéreos ganhos, %",
+            aerial_wins = self._safe_float(row.get("Duelos aereos ganhos, %",
                                                      row.get("aerial_win_pct", 0))) / 100.0
-            clearances = self._safe_float(row.get("Cortes per 90",
+            clearances = self._safe_float(row.get("Remates intercetados/90",
                                                     row.get("clearances_per90", 0)))
 
             # VAEP approximation formula
