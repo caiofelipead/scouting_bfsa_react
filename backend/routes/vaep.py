@@ -82,7 +82,11 @@ async def run_vaep_pipeline(req: VAEPPipelineRequest,
     competition_id = req.competition_id
 
     async def _run_pipeline_bg():
+        import time as _time
+        t0 = _time.monotonic()
         try:
+            logger.info("VAEP pipeline starting: season=%s, competition=%s, rows=%d",
+                        season, competition_id, len(df_wyscout))
             engine = _get_vaep_engine()
             result = engine.run_pipeline(
                 df_events=df_wyscout,
@@ -100,8 +104,11 @@ async def run_vaep_pipeline(req: VAEPPipelineRequest,
                 save_vaep_ratings(result["player_ratings"], season, competition_id)
                 if result.get("action_records"):
                     save_vaep_actions(result["action_records"], season, competition_id)
+                logger.info("VAEP results persisted: %d ratings, %d actions",
+                            len(result["player_ratings"]),
+                            len(result.get("action_records", [])))
             except Exception as e:
-                logger.warning("Could not persist VAEP results: %s", e)
+                logger.error("Failed to persist VAEP results: %s", e, exc_info=True)
 
             # Also compute and persist PlayeRank scores
             try:
@@ -114,15 +121,18 @@ async def run_vaep_pipeline(req: VAEPPipelineRequest,
                 save_playerank_scores(scores, season or "current")
                 logger.info("PlayeRank computed and saved: %d scores", len(scores))
             except Exception as e:
-                logger.warning("Could not compute/persist PlayeRank: %s", e)
+                logger.error("Failed to compute/persist PlayeRank: %s", e, exc_info=True)
 
+            elapsed = _time.monotonic() - t0
             logger.info(
-                "VAEP pipeline complete: %d players, method=%s",
+                "VAEP pipeline complete in %.1fs: %d players, method=%s",
+                elapsed,
                 len(result["player_ratings"]),
                 result.get("method", "unknown"),
             )
         except Exception as e:
-            logger.error("VAEP background pipeline error: %s", e, exc_info=True)
+            elapsed = _time.monotonic() - t0
+            logger.error("VAEP pipeline failed after %.1fs: %s", elapsed, e, exc_info=True)
 
     asyncio.create_task(_run_pipeline_bg())
 
@@ -391,20 +401,28 @@ async def sync_photos(
 
     # Run enrichment in background
     async def _run():
+        import time as _time
+        t0 = _time.monotonic()
         try:
+            logger.info("Photo sync starting: %d teams, %d players, max_calls=%d",
+                        total_teams, total_players, max_api_calls)
             from services.enrichment import run_bulk_enrichment
             result = await run_bulk_enrichment(
                 teams_with_players, max_api_calls=max_api_calls,
             )
+            elapsed = _time.monotonic() - t0
             logger.info(
-                "Photo sync complete: %d teams processed, %d players matched, %d unmatched, %d API calls",
+                "Photo sync complete in %.1fs: %d teams, %d matched, %d unmatched, %d API calls, stop=%s",
+                elapsed,
                 result.get("teams_processed", 0),
                 result.get("players_matched", 0),
                 result.get("players_unmatched", 0),
                 result.get("api_calls_used", 0),
+                result.get("stopped_reason", "done"),
             )
         except Exception as e:
-            logger.error("Photo sync error: %s", e, exc_info=True)
+            elapsed = _time.monotonic() - t0
+            logger.error("Photo sync failed after %.1fs: %s", elapsed, e, exc_info=True)
 
     asyncio.create_task(_run())
 

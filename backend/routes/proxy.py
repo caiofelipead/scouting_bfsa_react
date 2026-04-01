@@ -68,7 +68,11 @@ async def image_proxy(request: Request, url: str):
 
     # Skip URLs known to be broken (avoids spamming upstream)
     if url in _failed_cache:
-        raise HTTPException(status_code=404, detail="Image not available (cached failure)")
+        return Response(
+            content=b"",
+            status_code=404,
+            headers={"Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"},
+        )
 
     # Build domain-specific header strategies
     is_api_sports = "api-sports.io" in (parsed.hostname or "") or "api-football-v1" in (parsed.hostname or "")
@@ -174,10 +178,13 @@ async def image_proxy(request: Request, url: str):
     # client auth failures.  Map them to 502 so the frontend's 401 interceptor
     # doesn't mistakenly clear the user session.
     if last_status in (401, 403):
-        logger.warning("Image proxy: upstream returned %d for %s (mapped to 502)", last_status, url)
+        logger.info("Image proxy: upstream %d for %s (mapped to 502)", last_status, parsed.hostname)
         last_status = 502
+    elif last_status == 404:
+        # Upstream 404 is normal for missing images — log at debug, not warning
+        logger.debug("Image proxy: 404 for %s%s", parsed.hostname, parsed.path)
     else:
-        logger.warning("Image proxy: all strategies failed for %s (last status: %d)", url, last_status)
+        logger.warning("Image proxy: all strategies failed for %s (status: %d)", parsed.hostname, last_status)
     raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
 
 
