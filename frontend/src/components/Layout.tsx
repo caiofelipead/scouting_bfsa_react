@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield,
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import type { User } from '../types/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { onColdStartChange } from '../lib/api';
 
 export type TabId =
   | 'dashboard'
@@ -109,7 +110,12 @@ const ALL_NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 
 export default function Layout({ user, activeTab, onTabChange, onLogout, children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [coldStart, setColdStart] = useState(false);
   const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    return onColdStartChange(setColdStart);
+  }, []);
 
   return (
     <div className="min-h-screen flex relative">
@@ -347,6 +353,29 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
       {/* ── Main content ──────────────────────────────────────────── */}
       <main className="flex-1 pt-14 lg:pt-0 relative z-10" style={{ marginLeft: '0', paddingLeft: '0' }}>
         <div className="lg:hidden" />
+
+        {/* Cold start banner */}
+        <AnimatePresence>
+          {coldStart && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="sticky top-0 z-20 px-4 py-2 text-center text-xs font-medium"
+              style={{
+                background: 'linear-gradient(90deg, rgba(234, 179, 8, 0.15), rgba(234, 179, 8, 0.08))',
+                borderBottom: '1px solid rgba(234, 179, 8, 0.3)',
+                color: '#eab308',
+              }}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <div className="animate-spin h-3 w-3 border border-yellow-500 border-t-transparent rounded-full" />
+                Servidor iniciando... as requisicoes serao retentadas automaticamente.
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6" style={{ marginLeft: '0' }}>
           {children}
         </div>

@@ -17,8 +17,35 @@ api.interceptors.request.use((config) => {
 // Status codes that indicate cold start / transient backend issues
 const RETRYABLE_STATUSES = new Set([502, 503, 504]);
 
+// Endpoints that should NOT be retried (fire-and-forget or non-critical)
+const NO_RETRY_PATHS = ['/image-proxy'];
+
+// Track cold-start state so UI can show a banner
+let _coldStartActive = false;
+let _coldStartListeners: Array<(active: boolean) => void> = [];
+
+export function onColdStartChange(listener: (active: boolean) => void) {
+  _coldStartListeners.push(listener);
+  // Immediately notify current state
+  listener(_coldStartActive);
+  return () => {
+    _coldStartListeners = _coldStartListeners.filter((l) => l !== listener);
+  };
+}
+
+function _setColdStart(active: boolean) {
+  if (_coldStartActive !== active) {
+    _coldStartActive = active;
+    _coldStartListeners.forEach((l) => l(active));
+  }
+}
+
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    // Successful response means backend is up — clear cold start
+    _setColdStart(false);
+    return res;
+  },
   async (err) => {
     const config = err.config;
     if (!config) return Promise.reject(err);
@@ -26,19 +53,38 @@ api.interceptors.response.use(
     // Initialize retry state
     config._retryCount = config._retryCount || 0;
 
-    // Retry on network errors OR 502/503/504 (cold start) up to 3 times
     const isNetworkError = !err.response;
     const isColdStartError = RETRYABLE_STATUSES.has(err.response?.status);
+    const isRetryable = isNetworkError || isColdStartError;
+    const shouldSkipRetry = NO_RETRY_PATHS.some((p) => config.url?.includes(p));
 
-    if ((isNetworkError || isColdStartError) && config._retryCount < 6) {
+    if (isRetryable && !shouldSkipRetry && config._retryCount < 6) {
       config._retryCount += 1;
       // Exponential backoff: 3s, 6s, 12s, 24s, 30s, 30s (total ~105s)
       const delay = Math.min(3000 * Math.pow(2, config._retryCount - 1), 30000);
-      console.warn(
-        `[api] ${isNetworkError ? 'Network error' : err.response?.status} on ${config.url} — retry ${config._retryCount}/6 in ${delay}ms`,
-      );
+
+      // Signal cold start state on first retry
+      if (config._retryCount === 1) {
+        _setColdStart(true);
+      }
+
+      // Only log first and last retries to reduce console noise
+      if (config._retryCount === 1 || config._retryCount >= 5) {
+        const reason = isNetworkError ? 'Network error' : `HTTP ${err.response?.status}`;
+        console.warn(
+          `[api] ${reason} on ${config.url} — retry ${config._retryCount}/6 in ${delay}ms`,
+        );
+      }
       await new Promise((r) => setTimeout(r, delay));
       return api(config);
+    }
+
+    // Log final failure (all retries exhausted)
+    if (isRetryable && config._retryCount >= 6) {
+      console.error(
+        `[api] All retries exhausted for ${config.url} — request failed`,
+      );
+      _setColdStart(false);
     }
 
     if (

@@ -346,6 +346,23 @@ export default function VAEPPage() {
         </motion.div>
       )}
 
+      {/* Pipeline error banner */}
+      {runPipeline.isError && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card p-3 border-red-800 bg-red-900/20"
+        >
+          <p className="text-xs text-red-300">
+            <Zap size={12} className="inline mr-1" />
+            Erro ao executar pipeline VAEP:{' '}
+            {(runPipeline.error as any)?.response?.data?.detail
+              || (runPipeline.error as any)?.message
+              || 'Servidor indisponivel. Tente novamente em alguns segundos.'}
+          </p>
+        </motion.div>
+      )}
+
       {/* Photo sync result banner */}
       {syncPhotos.data && (
         <motion.div
@@ -356,6 +373,23 @@ export default function VAEPPage() {
           <p className="text-xs text-blue-300">
             <Camera size={12} className="inline mr-1" />
             {syncPhotos.data.message}
+          </p>
+        </motion.div>
+      )}
+
+      {/* Photo sync error banner */}
+      {syncPhotos.isError && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card p-3 border-red-800 bg-red-900/20"
+        >
+          <p className="text-xs text-red-300">
+            <Camera size={12} className="inline mr-1" />
+            Erro ao sincronizar fotos:{' '}
+            {(syncPhotos.error as any)?.response?.data?.detail
+              || (syncPhotos.error as any)?.message
+              || 'Servidor indisponivel. Tente novamente em alguns segundos.'}
           </p>
         </motion.div>
       )}
