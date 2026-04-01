@@ -81,7 +81,8 @@ async def run_vaep_pipeline(req: VAEPPipelineRequest,
     season = req.season
     competition_id = req.competition_id
 
-    async def _run_pipeline_bg():
+    def _run_pipeline_sync():
+        """Run the heavy VAEP pipeline in a thread so the event loop stays free."""
         import time as _time
         t0 = _time.monotonic()
         try:
@@ -116,8 +117,7 @@ async def run_vaep_pipeline(req: VAEPPipelineRequest,
                 scores = playerank_engine.compute_rankings(
                     df_wyscout, result["player_ratings"], season or "current",
                 )
-                from services.database import save_playerank_scores, init_vaep_tables
-                init_vaep_tables()
+                from services.database import save_playerank_scores
                 save_playerank_scores(scores, season or "current")
                 logger.info("PlayeRank computed and saved: %d scores", len(scores))
             except Exception as e:
@@ -134,7 +134,8 @@ async def run_vaep_pipeline(req: VAEPPipelineRequest,
             elapsed = _time.monotonic() - t0
             logger.error("VAEP pipeline failed after %.1fs: %s", elapsed, e, exc_info=True)
 
-    asyncio.create_task(_run_pipeline_bg())
+    # Run in a thread to avoid blocking the async event loop
+    asyncio.get_event_loop().run_in_executor(None, _run_pipeline_sync)
 
     return VAEPPipelineResponse(
         season=season,
@@ -159,10 +160,13 @@ async def get_vaep_ratings(
     Returns ratings from the database only. Use POST /vaep/run-pipeline
     to compute and persist ratings first.
     """
-    try:
+    def _load():
         from services.database import load_vaep_ratings, init_vaep_tables
         init_vaep_tables()
-        df = load_vaep_ratings(season, position, min_minutes, league)
+        return load_vaep_ratings(season, position, min_minutes, league)
+
+    try:
+        df = await asyncio.to_thread(_load)
         if len(df) > 0:
             ratings = [
                 VAEPRating(
@@ -289,9 +293,12 @@ async def get_playerank_rankings(
     """Get PlayeRank rankings, optionally filtered by role cluster and dimension."""
     # Try database first
     try:
-        from services.database import load_playerank_scores_db, init_vaep_tables
-        init_vaep_tables()
-        df = load_playerank_scores_db(season, role_cluster, dimension, league)
+        def _load():
+            from services.database import load_playerank_scores_db, init_vaep_tables
+            init_vaep_tables()
+            return load_playerank_scores_db(season, role_cluster, dimension, league)
+
+        df = await asyncio.to_thread(_load)
         if len(df) > 0:
             rankings = [
                 PlayeRankScore(
@@ -350,7 +357,7 @@ async def vaep_enrichment_status(_=Depends(get_current_user)):
     """Check how many players/teams have photos from API-Football."""
     try:
         from services.enrichment import get_enrichment_stats
-        stats = get_enrichment_stats()
+        stats = await asyncio.to_thread(get_enrichment_stats)
         total_p = stats.get("players_total", 0)
         with_photo = stats.get("players_with_photo", 0)
         return EnrichmentStatusResponse(
@@ -399,7 +406,7 @@ async def sync_photos(
     total_teams = len(teams_with_players)
     total_players = sum(len(v) for v in teams_with_players.values())
 
-    # Run enrichment in background
+    # Run enrichment in background (async task — uses aiohttp so OK on event loop)
     async def _run():
         import time as _time
         t0 = _time.monotonic()
@@ -424,7 +431,7 @@ async def sync_photos(
             elapsed = _time.monotonic() - t0
             logger.error("Photo sync failed after %.1fs: %s", elapsed, e, exc_info=True)
 
-    asyncio.create_task(_run())
+    asyncio.create_task(_run())  # OK: run_bulk_enrichment is async (aiohttp)
 
     return EnrichmentTriggerResponse(
         message=f"Sincronização de fotos iniciada para {total_teams} equipes e {total_players} jogadores",
