@@ -23,6 +23,7 @@ import {
   Users,
   UserPlus,
   Globe,
+  Zap,
 } from 'lucide-react';
 import type { User } from '../types/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -45,7 +46,8 @@ export type TabId =
   | 'contract_impact'
   | 'scouting_report'
   | 'apifootball'
-  | 'coaches';
+  | 'coaches'
+  | 'vaep';
 
 interface LayoutProps {
   user: User;
@@ -73,6 +75,7 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
       { id: 'trajectory', label: 'Trajetoria', icon: <TrendingUp size={18} strokeWidth={1.5} /> },
       { id: 'opportunities', label: 'Oportunidades', icon: <Gem size={18} strokeWidth={1.5} /> },
       { id: 'contract_impact', label: 'Impacto Contratação', icon: <UserPlus size={18} strokeWidth={1.5} /> },
+      { id: 'vaep', label: 'VAEP & PlayeRank', icon: <Zap size={18} strokeWidth={1.5} /> },
     ],
   },
   {

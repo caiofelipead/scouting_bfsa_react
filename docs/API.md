@@ -368,6 +368,158 @@ Analise de impacto de contratacao no elenco.
 
 ---
 
+## VAEP & PlayeRank
+
+### `POST /vaep/run-pipeline`
+Executa o pipeline VAEP completo. Calcula valores de acao e ratings por jogador.
+
+**Request:**
+```json
+{
+  "season": "2024/25",
+  "competition_id": null
+}
+```
+
+**Response (200):**
+```json
+{
+  "season": "2024/25",
+  "method": "heuristic_vaep",
+  "total_players": 450,
+  "total_actions": 0,
+  "total_games": 0,
+  "top_players": [
+    {
+      "player_name": "Jogador Exemplo",
+      "team": "Botafogo SP",
+      "league": "Serie B",
+      "position": "Atacante",
+      "minutes_played": 2340,
+      "total_vaep": 12.45,
+      "vaep_per90": 0.478,
+      "offensive_vaep": 0.385,
+      "defensive_vaep": 0.093,
+      "actions_count": 0,
+      "season": "2024/25"
+    }
+  ]
+}
+```
+
+### `GET /vaep/ratings`
+Retorna ratings VAEP pre-calculados com filtros opcionais.
+
+**Query Parameters:**
+| Parametro | Tipo | Descricao |
+|---|---|---|
+| `position` | string | Filtrar por posicao |
+| `min_minutes` | int | Minutos minimos (default: 0) |
+| `season` | string | Temporada |
+| `league` | string | Liga |
+
+**Response (200):**
+```json
+{
+  "total": 450,
+  "season": "2024/25",
+  "ratings": [
+    {
+      "player_name": "Jogador Exemplo",
+      "team": "Botafogo SP",
+      "vaep_per90": 0.478,
+      "offensive_vaep": 0.385,
+      "defensive_vaep": 0.093
+    }
+  ]
+}
+```
+
+### `GET /vaep/player/{player_name}`
+Retorna VAEP detalhado de um jogador com top acoes valoradas.
+
+**Response (200):**
+```json
+{
+  "player_name": "Jogador Exemplo",
+  "vaep_per90": 0.478,
+  "offensive_vaep": 0.385,
+  "defensive_vaep": 0.093,
+  "top_actions": [
+    {
+      "action_type": "pass",
+      "vaep_value": 0.045,
+      "offensive_value": 0.038,
+      "defensive_value": 0.007,
+      "x_start": 45.2,
+      "y_start": 30.1,
+      "x_end": 78.5,
+      "y_end": 42.3,
+      "minute": 67,
+      "second": 23
+    }
+  ]
+}
+```
+
+### `GET /vaep/compare`
+Comparacao VAEP entre jogadores selecionados.
+
+**Query Parameters:**
+| Parametro | Tipo | Descricao |
+|---|---|---|
+| `player_names` | string[] | Nomes dos jogadores (2-10) |
+| `season` | string | Temporada (opcional) |
+
+**Response (200):**
+```json
+{
+  "players": [
+    { "player_name": "Jogador A", "vaep_per90": 0.478, "offensive_vaep": 0.385, "defensive_vaep": 0.093 },
+    { "player_name": "Jogador B", "vaep_per90": 0.352, "offensive_vaep": 0.210, "defensive_vaep": 0.142 }
+  ]
+}
+```
+
+### `GET /playerank/rankings`
+Rankings PlayeRank multi-dimensional filtrados por cluster e dimensao.
+
+**Query Parameters:**
+| Parametro | Tipo | Descricao |
+|---|---|---|
+| `role_cluster` | string | Filtrar por role tatico (ex: "Goal Scorer", "Playmaker") |
+| `dimension` | string | Ordenar por dimensao (scoring_dim, playmaking_dim, etc.) |
+| `league` | string | Filtrar por liga |
+| `season` | string | Temporada |
+
+**Response (200):**
+```json
+{
+  "total": 120,
+  "role_cluster": "Goal Scorer",
+  "season": "2024/25",
+  "rankings": [
+    {
+      "player_name": "Jogador Exemplo",
+      "team": "Botafogo SP",
+      "role_cluster": "Goal Scorer",
+      "composite_score": 78.5,
+      "dimensions": {
+        "scoring": 92,
+        "playmaking": 45,
+        "defending": 20,
+        "physical": 68,
+        "possession": 55
+      },
+      "percentile_in_cluster": 95.2,
+      "cluster_size": 42
+    }
+  ]
+}
+```
+
+---
+
 ## Clustering Tatico
 
 ### `POST /clusters`

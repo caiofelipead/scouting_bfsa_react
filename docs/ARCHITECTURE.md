@@ -32,12 +32,18 @@ O Scouting BFSA é uma plataforma profissional de análise e avaliação de joga
 │  └─────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │                Motor Analítico (7 Modelos ML)                   │    │
+│  │           Motor Analítico (7 Modelos ML + VAEP + PlayeRank)      │    │
 │  │                                                                  │    │
 │  │  ┌──────────────────┐  ┌──────────────────┐                     │    │
 │  │  │ scouting_         │  │ predictive_       │                    │    │
 │  │  │ intelligence.py   │  │ engine.py         │                    │    │
 │  │  │ (M1-M7)           │  │ (SSP, WP, Cluster)│                   │    │
+│  │  └──────────────────┘  └──────────────────┘                     │    │
+│  │                                                                  │    │
+│  │  ┌──────────────────┐  ┌──────────────────┐                     │    │
+│  │  │ vaep_engine.py    │  │ playerank_        │                    │    │
+│  │  │ (VAEP: action     │  │ engine.py         │                    │    │
+│  │  │  valuation)       │  │ (Multi-dim rank)  │                    │    │
 │  │  └──────────────────┘  └──────────────────┘                     │    │
 │  │                                                                  │    │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐      │    │

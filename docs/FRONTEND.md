@@ -48,12 +48,14 @@ frontend/
 │   │   ├── ContractImpactPage.tsx # Impacto de contratacao (M7)
 │   │   ├── ScoutingReportPage.tsx # Relatorio completo com export PDF
 │   │   ├── ApiFootballPage.tsx    # Dados API-Football ao vivo
+│   │   ├── VAEPPage.tsx           # VAEP ratings + PlayeRank (radar, scatter, tables)
 │   │   ├── OfferedPage.tsx        # Jogadores oferecidos
 │   │   └── scoutingReportStyles.ts # Estilos do relatorio
 │   │
 │   ├── hooks/                     # Custom hooks
 │   │   ├── useAuth.ts             # Autenticacao (login/logout/token)
 │   │   ├── usePlayers.ts          # Queries de jogadores e rankings
+│   │   ├── useVaep.ts             # Queries VAEP + PlayeRank (5 hooks)
 │   │   ├── useScoutingReport.ts   # Agregacao de queries do relatorio
 │   │   └── useApiFootball.ts      # Queries da API-Football
 │   │
@@ -66,7 +68,8 @@ frontend/
 │   │   └── countryFlags.ts        # Mapeamento pais → emoji bandeira
 │   │
 │   ├── types/                     # Tipos TypeScript
-│   │   └── api.ts                 # Interfaces da API
+│   │   ├── api.ts                 # Interfaces da API
+│   │   └── vaep.ts                # Interfaces VAEP + PlayeRank
 │   │
 │   ├── test/                      # Testes
 │   │   └── setup.ts               # Configuracao do Vitest
