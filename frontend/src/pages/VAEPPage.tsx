@@ -339,8 +339,9 @@ export default function VAEPPage() {
           className="card p-3 border-green-800 bg-green-900/20"
         >
           <p className="text-xs text-green-300">
-            Pipeline {runPipeline.data.method} concluido: {runPipeline.data.total_players} jogadores processados
-            {runPipeline.data.total_games > 0 && ` · ${runPipeline.data.total_games} jogos`}
+            {ratings.length > 0
+              ? `Pipeline concluido: ${ratings.length} jogadores com ratings VAEP`
+              : `Pipeline iniciado para ${runPipeline.data.total_players} jogadores. Calculando em segundo plano...`}
           </p>
         </motion.div>
       )}

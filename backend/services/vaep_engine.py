@@ -358,6 +358,9 @@ class VAEPEngine:
         logger.info("Running heuristic VAEP pipeline for season %s (%d players)",
                      season, len(df_wyscout))
 
+        # Pre-build accent-stripped column mapping for fast lookups
+        self._col_map = self._build_col_map(df_wyscout.columns)
+
         player_ratings = []
         for _, row in df_wyscout.iterrows():
             player_name = str(self._get_col(row, "Jogador", "player_name", default="Unknown"))
@@ -565,23 +568,42 @@ class VAEPEngine:
             return default
 
     @staticmethod
-    def _get_col(row, *candidates, default=0):
+    def _build_col_map(columns) -> Dict[str, str]:
+        """Pre-compute accent-stripped column name → actual column name mapping."""
+        import unicodedata
+        col_map: Dict[str, str] = {}
+        for col in columns:
+            stripped = ''.join(c for c in unicodedata.normalize('NFD', col)
+                               if unicodedata.category(c) != 'Mn')
+            col_map[stripped] = col
+            col_map[col] = col  # exact match too
+        return col_map
+
+    def _get_col(self, row, *candidates, default=0):
         """Get a value from a row trying multiple column name variants.
 
         Handles accent differences between code and actual DataFrame columns.
+        Uses pre-built _col_map for O(1) lookups instead of scanning all columns.
         """
         import unicodedata
-
-        def strip_acc(s: str) -> str:
-            return ''.join(c for c in unicodedata.normalize('NFD', s)
-                           if unicodedata.category(c) != 'Mn')
+        col_map = getattr(self, '_col_map', None)
 
         for name in candidates:
             if name in row.index:
                 return row[name]
-            # Try accent-stripped match
-            stripped = strip_acc(name)
-            for col in row.index:
-                if strip_acc(col) == stripped:
-                    return row[col]
+            if col_map:
+                stripped = ''.join(c for c in unicodedata.normalize('NFD', name)
+                                   if unicodedata.category(c) != 'Mn')
+                actual = col_map.get(stripped)
+                if actual and actual in row.index:
+                    return row[actual]
+            else:
+                # Fallback: scan columns (slow path, used when _col_map not built)
+                stripped = ''.join(c for c in unicodedata.normalize('NFD', name)
+                                   if unicodedata.category(c) != 'Mn')
+                for col in row.index:
+                    col_stripped = ''.join(c for c in unicodedata.normalize('NFD', col)
+                                           if unicodedata.category(c) != 'Mn')
+                    if col_stripped == stripped:
+                        return row[col]
         return default
