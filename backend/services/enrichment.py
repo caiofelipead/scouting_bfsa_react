@@ -342,10 +342,22 @@ def get_team_cdn_url(team_name_norm: str) -> Optional[str]:
     return None
 
 
+_enrichment_stats_cache: dict = {}
+_enrichment_stats_ts: float = 0
+
+
 def get_enrichment_stats() -> dict:
-    """Return counts for enrichment status."""
+    """Return counts for enrichment status (cached for 5 minutes)."""
+    import time
+    global _enrichment_stats_cache, _enrichment_stats_ts
+
+    # Return cached result if fresh (5 min TTL)
+    if _enrichment_stats_cache and (time.monotonic() - _enrichment_stats_ts) < 300:
+        return _enrichment_stats_cache
+
     from services.database import get_connection, release_connection
     stats = {"teams_total": 0, "teams_found": 0, "players_total": 0, "players_with_photo": 0, "players_not_found": 0}
+    conn = None
     try:
         conn = get_connection()
         with conn.cursor() as cur:
@@ -358,9 +370,13 @@ def get_enrichment_stats() -> dict:
             stats["players_total"] = row[0]
             stats["players_with_photo"] = row[1]
             stats["players_not_found"] = row[2]
-        release_connection(conn)
+        _enrichment_stats_cache = stats
+        _enrichment_stats_ts = time.monotonic()
     except Exception as e:
         logger.warning("Could not get enrichment stats: %s", e)
+    finally:
+        if conn is not None:
+            release_connection(conn)
     return stats
 
 

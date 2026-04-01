@@ -35,9 +35,10 @@ def _get_pool() -> pg_pool.SimpleConnectionPool:
         if not url:
             raise RuntimeError("DATABASE_URL not set — cannot connect to Neon PostgreSQL")
         _pool = pg_pool.SimpleConnectionPool(
-            minconn=2, maxconn=15, dsn=url, connect_timeout=10
+            minconn=2, maxconn=30, dsn=url, connect_timeout=10,
+            options="-c statement_timeout=30000",  # 30s query timeout
         )
-        logger.info("PostgreSQL connection pool created (min=2, max=15)")
+        logger.info("PostgreSQL connection pool created (min=2, max=30)")
     return _pool
 
 
@@ -54,7 +55,11 @@ def release_connection(conn):
         if _pool and not _pool.closed:
             _pool.putconn(conn)
     except Exception:
-        pass
+        # If putconn fails, close the connection to avoid leaks
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 # ── Schema ────────────────────────────────────────────────────────────
@@ -273,13 +278,20 @@ CREATE INDEX IF NOT EXISTS idx_playerank_season
 """
 
 
+_vaep_tables_initialized = False
+
+
 def init_vaep_tables():
-    """Create VAEP and PlayeRank tables if they don't exist."""
+    """Create VAEP and PlayeRank tables if they don't exist (runs once)."""
+    global _vaep_tables_initialized
+    if _vaep_tables_initialized:
+        return
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(_CREATE_VAEP_TABLES_SQL)
         conn.commit()
+        _vaep_tables_initialized = True
         logger.info("VAEP/PlayeRank tables initialized")
     except Exception:
         conn.rollback()
