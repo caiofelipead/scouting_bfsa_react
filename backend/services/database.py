@@ -192,6 +192,314 @@ def get_sync_status() -> Dict[str, Optional[str]]:
         release_connection(conn)
 
 
+# ── VAEP / PlayeRank Tables ────────────────────────────────────────────
+
+_CREATE_VAEP_TABLES_SQL = """
+CREATE TABLE IF NOT EXISTS vaep_ratings (
+    id SERIAL PRIMARY KEY,
+    player_id INTEGER,
+    player_name TEXT NOT NULL,
+    team TEXT,
+    league TEXT,
+    position TEXT,
+    competition_id INTEGER,
+    season VARCHAR(10),
+    minutes_played INTEGER DEFAULT 0,
+    total_vaep FLOAT DEFAULT 0,
+    vaep_per90 FLOAT DEFAULT 0,
+    offensive_vaep FLOAT DEFAULT 0,
+    defensive_vaep FLOAT DEFAULT 0,
+    actions_count INTEGER DEFAULT 0,
+    calculated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_vaep_ratings_player
+    ON vaep_ratings (player_name);
+CREATE INDEX IF NOT EXISTS idx_vaep_ratings_season
+    ON vaep_ratings (season);
+CREATE INDEX IF NOT EXISTS idx_vaep_ratings_position
+    ON vaep_ratings (position);
+
+CREATE TABLE IF NOT EXISTS vaep_actions (
+    id SERIAL PRIMARY KEY,
+    player_id INTEGER,
+    player_name TEXT NOT NULL,
+    match_id INTEGER,
+    action_type VARCHAR(50),
+    vaep_value FLOAT DEFAULT 0,
+    offensive_value FLOAT DEFAULT 0,
+    defensive_value FLOAT DEFAULT 0,
+    x_start FLOAT,
+    y_start FLOAT,
+    x_end FLOAT,
+    y_end FLOAT,
+    minute INTEGER,
+    second INTEGER,
+    season VARCHAR(10),
+    competition_id INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_vaep_actions_player
+    ON vaep_actions (player_name);
+CREATE INDEX IF NOT EXISTS idx_vaep_actions_match
+    ON vaep_actions (match_id);
+
+CREATE TABLE IF NOT EXISTS playerank_scores (
+    id SERIAL PRIMARY KEY,
+    player_id INTEGER,
+    player_name TEXT NOT NULL,
+    team TEXT,
+    league TEXT,
+    position TEXT,
+    season VARCHAR(10),
+    role_cluster VARCHAR(50),
+    composite_score FLOAT DEFAULT 0,
+    scoring_dim FLOAT DEFAULT 0,
+    playmaking_dim FLOAT DEFAULT 0,
+    defending_dim FLOAT DEFAULT 0,
+    physical_dim FLOAT DEFAULT 0,
+    possession_dim FLOAT DEFAULT 0,
+    percentile_in_cluster FLOAT DEFAULT 0,
+    cluster_size INTEGER DEFAULT 0,
+    calculated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_playerank_player
+    ON playerank_scores (player_name);
+CREATE INDEX IF NOT EXISTS idx_playerank_cluster
+    ON playerank_scores (role_cluster);
+CREATE INDEX IF NOT EXISTS idx_playerank_season
+    ON playerank_scores (season);
+"""
+
+
+def init_vaep_tables():
+    """Create VAEP and PlayeRank tables if they don't exist."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_CREATE_VAEP_TABLES_SQL)
+        conn.commit()
+        logger.info("VAEP/PlayeRank tables initialized")
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        release_connection(conn)
+
+
+def save_vaep_ratings(ratings: list, season: str, competition_id: int = None):
+    """Save VAEP ratings to PostgreSQL, replacing existing for the same season."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Delete old ratings for this season
+            cur.execute(
+                "DELETE FROM vaep_ratings WHERE season = %s",
+                (season,),
+            )
+            if ratings:
+                execute_values(
+                    cur,
+                    """INSERT INTO vaep_ratings
+                       (player_name, team, league, position, competition_id, season,
+                        minutes_played, total_vaep, vaep_per90, offensive_vaep,
+                        defensive_vaep, actions_count)
+                       VALUES %s""",
+                    [
+                        (
+                            r["player_name"], r.get("team"), r.get("league"),
+                            r.get("position"), competition_id, season,
+                            r.get("minutes_played", 0), r.get("total_vaep", 0),
+                            r.get("vaep_per90", 0), r.get("offensive_vaep", 0),
+                            r.get("defensive_vaep", 0), r.get("actions_count", 0),
+                        )
+                        for r in ratings
+                    ],
+                    page_size=200,
+                )
+        conn.commit()
+        logger.info("Saved %d VAEP ratings for season %s", len(ratings), season)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        release_connection(conn)
+
+
+def save_vaep_actions(actions: list, season: str, competition_id: int = None):
+    """Save individual VAEP action values to PostgreSQL."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM vaep_actions WHERE season = %s",
+                (season,),
+            )
+            if actions:
+                execute_values(
+                    cur,
+                    """INSERT INTO vaep_actions
+                       (player_name, match_id, action_type, vaep_value,
+                        offensive_value, defensive_value,
+                        x_start, y_start, x_end, y_end,
+                        minute, second, season, competition_id)
+                       VALUES %s""",
+                    [
+                        (
+                            a["player_name"], a.get("match_id"),
+                            a.get("action_type"), a.get("vaep_value", 0),
+                            a.get("offensive_value", 0), a.get("defensive_value", 0),
+                            a.get("x_start"), a.get("y_start"),
+                            a.get("x_end"), a.get("y_end"),
+                            a.get("minute"), a.get("second"),
+                            season, competition_id,
+                        )
+                        for a in actions
+                    ],
+                    page_size=500,
+                )
+        conn.commit()
+        logger.info("Saved %d VAEP actions for season %s", len(actions), season)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        release_connection(conn)
+
+
+def save_playerank_scores(scores: list, season: str):
+    """Save PlayeRank scores to PostgreSQL."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM playerank_scores WHERE season = %s",
+                (season,),
+            )
+            if scores:
+                execute_values(
+                    cur,
+                    """INSERT INTO playerank_scores
+                       (player_name, team, league, position, season,
+                        role_cluster, composite_score,
+                        scoring_dim, playmaking_dim, defending_dim,
+                        physical_dim, possession_dim,
+                        percentile_in_cluster, cluster_size)
+                       VALUES %s""",
+                    [
+                        (
+                            s["player_name"], s.get("team"), s.get("league"),
+                            s.get("position"), season,
+                            s.get("role_cluster", "unknown"),
+                            s.get("composite_score", 0),
+                            s.get("scoring_dim", 0), s.get("playmaking_dim", 0),
+                            s.get("defending_dim", 0), s.get("physical_dim", 0),
+                            s.get("possession_dim", 0),
+                            s.get("percentile_in_cluster", 0),
+                            s.get("cluster_size", 0),
+                        )
+                        for s in scores
+                    ],
+                    page_size=200,
+                )
+        conn.commit()
+        logger.info("Saved %d PlayeRank scores for season %s", len(scores), season)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        release_connection(conn)
+
+
+def load_vaep_ratings(season: str = None, position: str = None,
+                      min_minutes: int = 0, league: str = None) -> pd.DataFrame:
+    """Load VAEP ratings from PostgreSQL with optional filters."""
+    conn = get_connection()
+    try:
+        query = "SELECT * FROM vaep_ratings WHERE 1=1"
+        params = []
+        if season:
+            query += " AND season = %s"
+            params.append(season)
+        if position:
+            query += " AND position = %s"
+            params.append(position)
+        if min_minutes > 0:
+            query += " AND minutes_played >= %s"
+            params.append(min_minutes)
+        if league:
+            query += " AND league = %s"
+            params.append(league)
+        query += " ORDER BY vaep_per90 DESC"
+        df = pd.read_sql(query, conn, params=params)
+        return df
+    finally:
+        release_connection(conn)
+
+
+def load_vaep_player(player_name: str, season: str = None) -> dict:
+    """Load VAEP rating for a specific player."""
+    conn = get_connection()
+    try:
+        query = "SELECT * FROM vaep_ratings WHERE player_name = %s"
+        params = [player_name]
+        if season:
+            query += " AND season = %s"
+            params.append(season)
+        query += " ORDER BY calculated_at DESC LIMIT 1"
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            row = cur.fetchone()
+            if not row:
+                return {}
+            cols = [desc[0] for desc in cur.description]
+            return dict(zip(cols, row))
+    finally:
+        release_connection(conn)
+
+
+def load_vaep_actions_for_player(player_name: str, season: str = None) -> pd.DataFrame:
+    """Load VAEP actions for a specific player."""
+    conn = get_connection()
+    try:
+        query = "SELECT * FROM vaep_actions WHERE player_name = %s"
+        params = [player_name]
+        if season:
+            query += " AND season = %s"
+            params.append(season)
+        query += " ORDER BY match_id, minute, second"
+        return pd.read_sql(query, conn, params=params)
+    finally:
+        release_connection(conn)
+
+
+def load_playerank_scores_db(season: str = None, role_cluster: str = None,
+                             dimension: str = None, league: str = None) -> pd.DataFrame:
+    """Load PlayeRank scores from PostgreSQL with optional filters."""
+    conn = get_connection()
+    try:
+        query = "SELECT * FROM playerank_scores WHERE 1=1"
+        params = []
+        if season:
+            query += " AND season = %s"
+            params.append(season)
+        if role_cluster:
+            query += " AND role_cluster = %s"
+            params.append(role_cluster)
+        if league:
+            query += " AND league = %s"
+            params.append(league)
+        order_col = "composite_score"
+        if dimension and dimension in ("scoring_dim", "playmaking_dim", "defending_dim",
+                                        "physical_dim", "possession_dim"):
+            order_col = dimension
+        query += f" ORDER BY {order_col} DESC"
+        return pd.read_sql(query, conn, params=params)
+    finally:
+        release_connection(conn)
+
+
 def has_data() -> bool:
     """Check if there's any scouting data in the database."""
     conn = get_connection()

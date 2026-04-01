@@ -2264,6 +2264,7 @@ class ScoutingIntelligenceEngine:
     """Motor integrador que combina todos os 7 modelos.
 
     Expõe interface unificada para o backend FastAPI.
+    Integra VAEP ratings e PlayeRank scores quando disponíveis.
     """
 
     def __init__(self):
@@ -2276,6 +2277,8 @@ class ScoutingIntelligenceEngine:
         self.contract_impact = ContractImpactAnalyzer()
         self._df_pool = None
         self._fitted = False
+        self._vaep_ratings = {}  # player_name -> vaep_per90
+        self._playerank_scores = {}  # player_name -> {dimensions}
 
     def fit(self, df: pd.DataFrame) -> 'ScoutingIntelligenceEngine':
         """Treina modelos sobre o dataset disponível."""
@@ -2295,8 +2298,58 @@ class ScoutingIntelligenceEngine:
             import logging
             logging.getLogger(__name__).warning("Market value model fit failed: %s", e)
 
+        # Load VAEP ratings if available (enriches M1, M3, M4)
+        self._load_vaep_data(df)
+
         self._fitted = True
         return self
+
+    def _load_vaep_data(self, df: pd.DataFrame):
+        """Load VAEP and PlayeRank data to enrich existing models."""
+        import logging
+        log = logging.getLogger(__name__)
+
+        # Try to compute heuristic VAEP for all players in the pool
+        try:
+            from services.vaep_engine import VAEPEngine
+            vaep_engine = VAEPEngine()
+            result = vaep_engine.run_pipeline(
+                df_events=df, season="current", df_wyscout=df,
+            )
+            for r in result.get("player_ratings", []):
+                self._vaep_ratings[r["player_name"]] = r.get("vaep_per90", 0)
+            log.info("Loaded VAEP ratings for %d players", len(self._vaep_ratings))
+        except Exception as e:
+            log.debug("VAEP data not available for integration: %s", e)
+
+        # Try to compute PlayeRank scores
+        try:
+            from services.playerank_engine import PlayeRankEngine
+            pr_engine = PlayeRankEngine()
+            vaep_list = [{"player_name": k, "vaep_per90": v}
+                         for k, v in self._vaep_ratings.items()]
+            scores = pr_engine.compute_rankings(df, vaep_list if vaep_list else None)
+            for s in scores:
+                self._playerank_scores[s["player_name"]] = {
+                    "composite_score": s.get("composite_score", 0),
+                    "role_cluster": s.get("role_cluster", "unknown"),
+                    "scoring_dim": s.get("scoring_dim", 50),
+                    "playmaking_dim": s.get("playmaking_dim", 50),
+                    "defending_dim": s.get("defending_dim", 50),
+                    "physical_dim": s.get("physical_dim", 50),
+                    "possession_dim": s.get("possession_dim", 50),
+                }
+            log.info("Loaded PlayeRank scores for %d players", len(self._playerank_scores))
+        except Exception as e:
+            log.debug("PlayeRank data not available for integration: %s", e)
+
+    def get_vaep_rating(self, player_name: str) -> float:
+        """Get VAEP per90 rating for a player (0 if not available)."""
+        return self._vaep_ratings.get(player_name, 0.0)
+
+    def get_playerank_data(self, player_name: str) -> Optional[Dict[str, Any]]:
+        """Get PlayeRank dimensions for a player (None if not available)."""
+        return self._playerank_scores.get(player_name)
 
     def analyze_player(self, player_row, df_all: pd.DataFrame,
                         position: str, league: Optional[str] = None,
@@ -2329,9 +2382,17 @@ class ScoutingIntelligenceEngine:
         )
         result['trend'] = trend
 
-        # 4. Market Opportunity
+        # 4. Market Opportunity (enhanced with VAEP)
+        player_name = str(player_row.get('Jogador', ''))
+        vaep_per90 = self.get_vaep_rating(player_name)
+        perf_percentile = traj.get('predicted_rating_next_season', 50)
+        # Boost performance percentile with VAEP if available
+        if vaep_per90 > 0:
+            vaep_percentile = min(vaep_per90 / 0.8 * 100, 100)
+            perf_percentile = perf_percentile * 0.7 + vaep_percentile * 0.3
+
         opportunity = self.opportunity_detector.calculate_opportunity_score(
-            performance_percentile=traj.get('predicted_rating_next_season', 50),
+            performance_percentile=perf_percentile,
             trajectory_score=traj.get('trajectory_score', 0),
             value_gap=mv.get('market_value_gap'),
             age=age,
@@ -2343,13 +2404,25 @@ class ScoutingIntelligenceEngine:
         # 5. League adjustment info
         result['league_info'] = self.league_adjuster.get_league_info(league or '')
 
+        # 6. VAEP & PlayeRank data
+        result['vaep'] = {
+            'vaep_per90': vaep_per90,
+            'has_vaep': vaep_per90 > 0,
+        }
+        playerank = self.get_playerank_data(player_name)
+        if playerank:
+            result['playerank'] = playerank
+
         return result
 
     def find_replacements(self, target_player_row, df_pool: pd.DataFrame,
                            position: str, top_n: int = 20,
                            **filters) -> List[Dict[str, Any]]:
-        """Busca substitutos para um jogador."""
-        return self.replacement_engine.find_replacement_players(
+        """Busca substitutos para um jogador.
+
+        Enriches results with VAEP ratings and PlayeRank dimensions when available.
+        """
+        results = self.replacement_engine.find_replacement_players(
             target_player_row=target_player_row,
             df_pool=df_pool,
             position=position,
@@ -2358,6 +2431,19 @@ class ScoutingIntelligenceEngine:
             market_model=self.market_model,
             **filters,
         )
+
+        # Enrich with VAEP and PlayeRank data
+        for r in results:
+            name = r.get('player', r.get('name', ''))
+            vaep = self.get_vaep_rating(name)
+            if vaep > 0:
+                r['vaep_per90'] = round(vaep, 4)
+            pr = self.get_playerank_data(name)
+            if pr:
+                r['playerank_score'] = round(pr.get('composite_score', 0), 2)
+                r['role_cluster'] = pr.get('role_cluster', 'unknown')
+
+        return results
 
     def detect_opportunities(self, df: pd.DataFrame,
                                position: Optional[str] = None,
@@ -2382,11 +2468,16 @@ class ScoutingIntelligenceEngine:
             # Get market value
             mv = self.market_model.predict_market_value(row, league)
 
-            # Calculate percentile approximation from score
+            # Calculate percentile approximation from score, enhanced with VAEP
             perf_percentile = traj.get('predicted_rating_next_season', 50)
+            player_name = str(row.get('Jogador', ''))
+            vaep_per90 = self.get_vaep_rating(player_name)
+            if vaep_per90 > 0:
+                vaep_pct = min(vaep_per90 / 0.8 * 100, 100)
+                perf_percentile = perf_percentile * 0.7 + vaep_pct * 0.3
 
             players.append({
-                'name': str(row.get('Jogador', '')),
+                'name': player_name,
                 'display_name': str(row.get('JogadorDisplay', row.get('Jogador', ''))),
                 'team': str(row.get('Equipa', '')) if pd.notna(row.get('Equipa')) else None,
                 'performance_percentile': perf_percentile,

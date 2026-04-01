@@ -79,7 +79,7 @@ from services.scouting_intelligence import (
 from services.league_power_model import get_opta_league_power, get_all_league_powers
 from services.fuzzy_match import build_skillcorner_index, find_skillcorner_player
 from services.player_assets import load_player_assets_csv, get_player_assets
-from services.database import init_scouting_tables, load_sheet_dataframe, has_data, get_sync_status
+from services.database import init_scouting_tables, init_vaep_tables, load_sheet_dataframe, has_data, get_sync_status
 from services.sync_sheets import sync_all_sheets
 # API-Football imports moved to routes/apifootball.py
 from config.mappings import (
@@ -239,6 +239,12 @@ def _load_all_data():
         init_scouting_tables()
     except Exception as e:
         logger.warning("Could not init scouting tables: %s", e)
+
+    # Ensure VAEP/PlayeRank tables exist
+    try:
+        init_vaep_tables()
+    except Exception as e:
+        logger.warning("Could not init VAEP tables: %s", e)
 
     # Check if PostgreSQL has data
     pg_has_data = False
@@ -488,10 +494,12 @@ app.add_middleware(RequestLoggingMiddleware)
 from routes.auth import router as auth_router
 from routes.apifootball import router as apifootball_router
 from routes.proxy import router as proxy_router
+from routes.vaep import router as vaep_router
 
 app.include_router(auth_router)
 app.include_router(apifootball_router)
 app.include_router(proxy_router)
+app.include_router(vaep_router)
 
 
 # ══════════════════════════════════════════════════════════════════════
