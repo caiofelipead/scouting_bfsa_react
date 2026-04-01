@@ -665,6 +665,9 @@ async def run_bulk_enrichment(
             logger.error("Error enriching team '%s': %s", team_name, e)
             results.append({"team": team_name, "error": str(e)})
 
+    # Reload in-memory cache so subsequent requests see updated photos
+    load_asset_cache()
+
     return {
         "teams_processed": teams_processed,
         "teams_total": len(teams_with_players),

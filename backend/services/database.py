@@ -293,9 +293,9 @@ def save_vaep_ratings(ratings: list, season: str, competition_id: int = None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            # Delete old ratings for this season
+            # Delete old ratings for this season (IS NOT DISTINCT FROM handles NULL)
             cur.execute(
-                "DELETE FROM vaep_ratings WHERE season = %s",
+                "DELETE FROM vaep_ratings WHERE season IS NOT DISTINCT FROM %s",
                 (season,),
             )
             if ratings:
@@ -333,7 +333,7 @@ def save_vaep_actions(actions: list, season: str, competition_id: int = None):
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "DELETE FROM vaep_actions WHERE season = %s",
+                "DELETE FROM vaep_actions WHERE season IS NOT DISTINCT FROM %s",
                 (season,),
             )
             if actions:
@@ -374,7 +374,7 @@ def save_playerank_scores(scores: list, season: str):
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "DELETE FROM playerank_scores WHERE season = %s",
+                "DELETE FROM playerank_scores WHERE season IS NOT DISTINCT FROM %s",
                 (season,),
             )
             if scores:

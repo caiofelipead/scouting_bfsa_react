@@ -132,12 +132,22 @@ export function useEnrichmentStatus() {
 }
 
 export function useSyncPhotos() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (maxCalls?: number) => {
       const res = await api.post('/vaep/sync-photos', null, {
         params: maxCalls ? { max_api_calls: maxCalls } : {},
       });
       return res.data as EnrichmentTriggerResponse;
+    },
+    onSuccess: () => {
+      // Photo sync runs in background — poll enrichment status to track progress
+      const delays = [5000, 15000, 30000, 60000, 120000];
+      delays.forEach((ms) => {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['enrichment'] });
+        }, ms);
+      });
     },
   });
 }
