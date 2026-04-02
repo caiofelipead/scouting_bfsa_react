@@ -431,23 +431,45 @@ async def _enrich_team_via_thesportsdb(
     or None if team not found.
     """
     try:
-        from services.thesportsdb import get_team_badge_and_players, extract_player_photo
+        from services.thesportsdb import (
+            search_team_multi_strategy, get_players_in_team,
+            extract_team_badge, extract_player_photo,
+        )
     except ImportError:
         logger.debug("thesportsdb module not available")
         return None
 
+    api_calls = 0
     try:
-        result = await get_team_badge_and_players(team_name)
+        # Use multi-strategy search for better SA club coverage
+        team = await search_team_multi_strategy(team_name)
+        api_calls += 1
     except Exception as e:
         logger.warning("TheSportsDB lookup failed for '%s': %s", team_name, e)
         return None
 
-    if not result.get("team_id") and not result.get("badge_url"):
+    if not team:
         return None
 
-    badge_url = result.get("badge_url")
-    tsdb_players = result.get("players", {})  # {name_lower: photo_url}
-    api_calls = result.get("api_calls", 0)
+    team_id = team.get("idTeam")
+    badge_url = extract_team_badge(team)
+
+    # Fetch squad players if we have a team ID
+    tsdb_players: Dict[str, str] = {}
+    if team_id:
+        try:
+            players = await get_players_in_team(team_id)
+            api_calls += 1
+            for p in players:
+                name = p.get("strPlayer", "")
+                photo = extract_player_photo(p)
+                if name and photo:
+                    tsdb_players[name.lower().strip()] = photo
+        except Exception as e:
+            logger.warning("TheSportsDB player lookup failed for team '%s': %s", team_name, e)
+
+    if not team_id and not badge_url:
+        return None
 
     # Match WyScout player names against TheSportsDB squad
     matched: Dict[str, str] = {}
