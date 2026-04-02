@@ -4,13 +4,16 @@ Soccer Data API routes.
 Exposes the Soccer Data RapidAPI endpoints for the frontend,
 providing access to xG, player predictions, team data, fixtures,
 rankings, and advanced analytics.
+
+The API uses Opta-style IDs and a `tmcl` (tournament calendar) parameter
+for most team/tournament-scoped queries.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from auth import get_current_user
 
@@ -66,12 +69,16 @@ async def soccer_data_health(_=Depends(get_current_user)):
 # TEAMS
 # ══════════════════════════════════════════════════════════════════════
 
-@router.get("/squads/{team_id}")
-async def get_squads(team_id: str, detailed: bool = Query(True),
-                     _=Depends(get_current_user)):
-    """Get squad/roster for a team."""
+@router.get("/squads/{contestant_id}")
+async def get_squads(
+    contestant_id: str,
+    tmcl: Optional[str] = Query(None, description="Tournament calendar ID"),
+    detailed: bool = Query(True),
+    _=Depends(get_current_user),
+):
+    """Get squad/roster for a team. Pass tmcl for tournament-specific squad."""
     svc = _get_service()
-    data = await svc.get_squads(team_id, detailed=detailed)
+    data = await svc.get_squads(contestant_id, tmcl=tmcl, detailed=detailed)
     return SoccerDataResponse(endpoint="squads", data=data)
 
 
@@ -83,29 +90,35 @@ async def get_team(team_id: str, _=Depends(get_current_user)):
     return SoccerDataResponse(endpoint="team", data=data)
 
 
-@router.get("/season-playtime/{team_id}/{tournament_id}")
-async def get_season_playtime(team_id: str, tournament_id: str,
-                              _=Depends(get_current_user)):
+@router.get("/season-playtime/{contestant_id}")
+async def get_season_playtime(
+    contestant_id: str,
+    tmcl: Optional[str] = Query(None, description="Tournament calendar ID"),
+    _=Depends(get_current_user),
+):
     """Get season playtime data for a team."""
     svc = _get_service()
-    data = await svc.get_season_playtime(team_id, tournament_id)
+    data = await svc.get_season_playtime(contestant_id, tmcl=tmcl)
     return SoccerDataResponse(endpoint="season-playtime", data=data)
 
 
-@router.get("/manager-preview/{team_id}")
-async def get_manager_preview(team_id: str, _=Depends(get_current_user)):
+@router.get("/manager-preview/{contestant_id}")
+async def get_manager_preview(contestant_id: str, _=Depends(get_current_user)):
     """Get manager/coach preview for a team."""
     svc = _get_service()
-    data = await svc.get_manager_preview(team_id)
+    data = await svc.get_manager_preview(contestant_id)
     return SoccerDataResponse(endpoint="manager-preview", data=data)
 
 
-@router.get("/contestant-participation/{team_id}/{tournament_id}")
-async def get_contestant_participation(team_id: str, tournament_id: str,
-                                       _=Depends(get_current_user)):
+@router.get("/contestant-participation/{contestant_id}")
+async def get_contestant_participation(
+    contestant_id: str,
+    tmcl: Optional[str] = Query(None, description="Tournament calendar ID"),
+    _=Depends(get_current_user),
+):
     """Get team's participation in a tournament."""
     svc = _get_service()
-    data = await svc.get_contestant_participation(team_id, tournament_id)
+    data = await svc.get_contestant_participation(contestant_id, tmcl=tmcl)
     return SoccerDataResponse(endpoint="contestant-participation", data=data)
 
 
@@ -121,17 +134,27 @@ async def get_player(player_id: str, _=Depends(get_current_user)):
     return SoccerDataResponse(endpoint="player", data=data)
 
 
+@router.get("/player-stats/{player_id}")
+async def get_player_stats(
+    player_id: str,
+    tmcl: Optional[str] = Query(None, description="Tournament calendar ID"),
+    _=Depends(get_current_user),
+):
+    """Get player statistics for a tournament."""
+    svc = _get_service()
+    data = await svc.get_player_stats(player_id, tmcl=tmcl)
+    return SoccerDataResponse(endpoint="player-stats", data=data)
+
+
 # ══════════════════════════════════════════════════════════════════════
 # FIXTURES
 # ══════════════════════════════════════════════════════════════════════
 
-@router.get("/fixtures/{tournament_id}")
-async def get_fixtures(tournament_id: str,
-                       season_id: Optional[str] = Query(None),
-                       _=Depends(get_current_user)):
-    """Get fixtures for a tournament."""
+@router.get("/fixtures/{tmcl}")
+async def get_fixtures(tmcl: str, _=Depends(get_current_user)):
+    """Get fixtures for a tournament calendar."""
     svc = _get_service()
-    data = await svc.get_fixtures(tournament_id, season_id)
+    data = await svc.get_fixtures(tmcl)
     return SoccerDataResponse(endpoint="fixtures", data=data)
 
 
@@ -147,33 +170,27 @@ async def get_fixture_details(match_id: str, _=Depends(get_current_user)):
 # STATS
 # ══════════════════════════════════════════════════════════════════════
 
-@router.get("/team-stats/{team_id}/{tournament_id}")
-async def get_team_stats(team_id: str, tournament_id: str,
-                         _=Depends(get_current_user)):
+@router.get("/team-stats/{contestant_id}")
+async def get_team_stats(
+    contestant_id: str,
+    tmcl: Optional[str] = Query(None, description="Tournament calendar ID"),
+    _=Depends(get_current_user),
+):
     """Get team statistics for a tournament."""
     svc = _get_service()
-    data = await svc.get_team_stats(team_id, tournament_id)
+    data = await svc.get_team_stats(contestant_id, tmcl=tmcl)
     return SoccerDataResponse(endpoint="team-stats", data=data)
-
-
-@router.get("/player-stats/{player_id}/{tournament_id}")
-async def get_player_stats(player_id: str, tournament_id: str,
-                           _=Depends(get_current_user)):
-    """Get player statistics for a tournament."""
-    svc = _get_service()
-    data = await svc.get_player_stats(player_id, tournament_id)
-    return SoccerDataResponse(endpoint="player-stats", data=data)
 
 
 # ══════════════════════════════════════════════════════════════════════
 # RANKINGS
 # ══════════════════════════════════════════════════════════════════════
 
-@router.get("/rankings/{tournament_id}")
-async def get_rankings(tournament_id: str, _=Depends(get_current_user)):
-    """Get rankings/standings for a tournament."""
+@router.get("/rankings/{tmcl}")
+async def get_rankings(tmcl: str, _=Depends(get_current_user)):
+    """Get rankings/standings for a tournament calendar."""
     svc = _get_service()
-    data = await svc.get_rankings(tournament_id)
+    data = await svc.get_rankings(tmcl)
     return SoccerDataResponse(endpoint="rankings", data=data)
 
 
@@ -193,35 +210,31 @@ async def get_tournament(tournament_id: str, _=Depends(get_current_user)):
 # ADVANCED ANALYTICS
 # ══════════════════════════════════════════════════════════════════════
 
-@router.get("/season-xg/{tournament_id}")
-async def get_season_expected_goals(tournament_id: str,
-                                    season_id: Optional[str] = Query(None),
-                                    _=Depends(get_current_user)):
-    """Get Season Expected Goals (xG) data.
-
-    Real xG metrics from the Soccer Data API — replaces heuristic
-    VAEP approximations with proper expected goals data.
-    """
+@router.get("/season-xg/{tmcl}")
+async def get_season_expected_goals(tmcl: str, _=Depends(get_current_user)):
+    """Get Season Expected Goals (xG) data for a tournament calendar."""
     svc = _get_service()
-    data = await svc.get_season_expected_goals(tournament_id, season_id)
+    data = await svc.get_season_expected_goals(tmcl)
     return SoccerDataResponse(endpoint="season-xg", data=data)
 
 
-@router.get("/player-predictions/{team_id}/{tournament_id}")
-async def get_player_predictions(team_id: str, tournament_id: str,
-                                 _=Depends(get_current_user)):
+@router.get("/player-predictions/{contestant_id}")
+async def get_player_predictions(
+    contestant_id: str,
+    tmcl: Optional[str] = Query(None, description="Tournament calendar ID"),
+    _=Depends(get_current_user),
+):
     """Get ML-based player performance predictions."""
     svc = _get_service()
-    data = await svc.get_team_player_predictions(team_id, tournament_id)
+    data = await svc.get_team_player_predictions(contestant_id, tmcl=tmcl)
     return SoccerDataResponse(endpoint="player-predictions", data=data)
 
 
-@router.get("/season-simulation/{tournament_id}")
-async def get_season_simulation(tournament_id: str,
-                                _=Depends(get_current_user)):
+@router.get("/season-simulation/{tmcl}")
+async def get_season_simulation(tmcl: str, _=Depends(get_current_user)):
     """Get season/tournament simulation results."""
     svc = _get_service()
-    data = await svc.get_season_simulation(tournament_id)
+    data = await svc.get_season_simulation(tmcl)
     return SoccerDataResponse(endpoint="season-simulation", data=data)
 
 
@@ -234,8 +247,7 @@ async def get_match_facts(match_id: str, _=Depends(get_current_user)):
 
 
 @router.get("/match-win-probability/{match_id}")
-async def get_match_win_probability(match_id: str,
-                                    _=Depends(get_current_user)):
+async def get_match_win_probability(match_id: str, _=Depends(get_current_user)):
     """Get match win probability predictions."""
     svc = _get_service()
     data = await svc.get_match_win_probability(match_id)
@@ -248,16 +260,16 @@ async def get_match_win_probability(match_id: str,
 
 @router.get("/explore")
 async def explore_endpoint(
-    path: str = Query(..., description="API path after /soccerdata/"),
+    path: str = Query(..., description="API path after /soccerdata/ (supports inline ?params)"),
     _=Depends(get_current_user),
 ):
     """Generic endpoint explorer for testing any Soccer Data API path.
 
-    Pass the path after /soccerdata/ as query parameter.
-    Example: /api/soccer-data/explore?path=tournament/1
+    Pass the full path after /soccerdata/ as query parameter.
+    Supports inline query params: path=squads/abc123?tmcl=xyz&detailed=yes
+
+    Example: /api/soccer-data/explore?path=squads/abc?tmcl=xyz%26detailed=yes
     """
     svc = _get_service()
-    # Sanitize path
-    clean_path = path.strip("/")
-    data = await svc._get(f"/soccerdata/{clean_path}", use_cache=True)
-    return SoccerDataResponse(endpoint=f"explore/{clean_path}", data=data)
+    data = await svc.explore(path)
+    return SoccerDataResponse(endpoint=f"explore/{path.split('?')[0]}", data=data)
