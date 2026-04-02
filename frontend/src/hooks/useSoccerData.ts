@@ -7,27 +7,31 @@ const GC_TIME = 30 * 60 * 1000;    // 30 min
 
 export const soccerDataKeys = {
   health: ['soccer-data', 'health'] as const,
-  squads: (teamId: string) => ['soccer-data', 'squads', teamId] as const,
+  squads: (contestantId: string, tmcl?: string) =>
+    ['soccer-data', 'squads', contestantId, tmcl] as const,
   team: (teamId: string) => ['soccer-data', 'team', teamId] as const,
-  seasonPlaytime: (teamId: string, tournamentId: string) =>
-    ['soccer-data', 'season-playtime', teamId, tournamentId] as const,
-  managerPreview: (teamId: string) => ['soccer-data', 'manager', teamId] as const,
+  seasonPlaytime: (contestantId: string, tmcl?: string) =>
+    ['soccer-data', 'season-playtime', contestantId, tmcl] as const,
+  managerPreview: (contestantId: string) =>
+    ['soccer-data', 'manager', contestantId] as const,
   player: (playerId: string) => ['soccer-data', 'player', playerId] as const,
-  fixtures: (tournamentId: string) => ['soccer-data', 'fixtures', tournamentId] as const,
+  playerStats: (playerId: string, tmcl?: string) =>
+    ['soccer-data', 'player-stats', playerId, tmcl] as const,
+  fixtures: (tmcl: string) => ['soccer-data', 'fixtures', tmcl] as const,
   fixture: (matchId: string) => ['soccer-data', 'fixture', matchId] as const,
-  teamStats: (teamId: string, tournamentId: string) =>
-    ['soccer-data', 'team-stats', teamId, tournamentId] as const,
-  playerStats: (playerId: string, tournamentId: string) =>
-    ['soccer-data', 'player-stats', playerId, tournamentId] as const,
-  rankings: (tournamentId: string) => ['soccer-data', 'rankings', tournamentId] as const,
-  tournament: (tournamentId: string) => ['soccer-data', 'tournament', tournamentId] as const,
-  seasonXg: (tournamentId: string) => ['soccer-data', 'season-xg', tournamentId] as const,
-  playerPredictions: (teamId: string, tournamentId: string) =>
-    ['soccer-data', 'player-predictions', teamId, tournamentId] as const,
-  seasonSimulation: (tournamentId: string) =>
-    ['soccer-data', 'season-sim', tournamentId] as const,
+  teamStats: (contestantId: string, tmcl?: string) =>
+    ['soccer-data', 'team-stats', contestantId, tmcl] as const,
+  rankings: (tmcl: string) => ['soccer-data', 'rankings', tmcl] as const,
+  tournament: (tournamentId: string) =>
+    ['soccer-data', 'tournament', tournamentId] as const,
+  seasonXg: (tmcl: string) => ['soccer-data', 'season-xg', tmcl] as const,
+  playerPredictions: (contestantId: string, tmcl?: string) =>
+    ['soccer-data', 'player-predictions', contestantId, tmcl] as const,
+  seasonSimulation: (tmcl: string) =>
+    ['soccer-data', 'season-sim', tmcl] as const,
   matchFacts: (matchId: string) => ['soccer-data', 'match-facts', matchId] as const,
-  matchWinProb: (matchId: string) => ['soccer-data', 'match-win-prob', matchId] as const,
+  matchWinProb: (matchId: string) =>
+    ['soccer-data', 'match-win-prob', matchId] as const,
   explore: (path: string) => ['soccer-data', 'explore', path] as const,
 };
 
@@ -62,14 +66,16 @@ export function useSoccerDataExplore(path: string, enabled = true) {
 
 // ── Teams ───────────────────────────────────────────────────────────
 
-export function useSquads(teamId: string, enabled = true) {
+export function useSquads(contestantId: string, tmcl?: string, enabled = true) {
   return useQuery({
-    queryKey: soccerDataKeys.squads(teamId),
+    queryKey: soccerDataKeys.squads(contestantId, tmcl),
     queryFn: async () => {
-      const res = await api.get(`/soccer-data/squads/${teamId}`);
+      const params: Record<string, string> = {};
+      if (tmcl) params.tmcl = tmcl;
+      const res = await api.get(`/soccer-data/squads/${contestantId}`, { params });
       return res.data as SoccerDataResponse;
     },
-    enabled: enabled && !!teamId,
+    enabled: enabled && !!contestantId,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
@@ -88,27 +94,29 @@ export function useTeam(teamId: string, enabled = true) {
   });
 }
 
-export function useSeasonPlaytime(teamId: string, tournamentId: string, enabled = true) {
+export function useSeasonPlaytime(contestantId: string, tmcl?: string, enabled = true) {
   return useQuery({
-    queryKey: soccerDataKeys.seasonPlaytime(teamId, tournamentId),
+    queryKey: soccerDataKeys.seasonPlaytime(contestantId, tmcl),
     queryFn: async () => {
-      const res = await api.get(`/soccer-data/season-playtime/${teamId}/${tournamentId}`);
+      const params: Record<string, string> = {};
+      if (tmcl) params.tmcl = tmcl;
+      const res = await api.get(`/soccer-data/season-playtime/${contestantId}`, { params });
       return res.data as SoccerDataResponse;
     },
-    enabled: enabled && !!teamId && !!tournamentId,
+    enabled: enabled && !!contestantId,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
 }
 
-export function useManagerPreview(teamId: string, enabled = true) {
+export function useManagerPreview(contestantId: string, enabled = true) {
   return useQuery({
-    queryKey: soccerDataKeys.managerPreview(teamId),
+    queryKey: soccerDataKeys.managerPreview(contestantId),
     queryFn: async () => {
-      const res = await api.get(`/soccer-data/manager-preview/${teamId}`);
+      const res = await api.get(`/soccer-data/manager-preview/${contestantId}`);
       return res.data as SoccerDataResponse;
     },
-    enabled: enabled && !!teamId,
+    enabled: enabled && !!contestantId,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
@@ -129,16 +137,31 @@ export function usePlayer(playerId: string, enabled = true) {
   });
 }
 
-// ── Fixtures ────────────────────────────────────────────────────────
-
-export function useFixtures(tournamentId: string, enabled = true) {
+export function usePlayerStats(playerId: string, tmcl?: string, enabled = true) {
   return useQuery({
-    queryKey: soccerDataKeys.fixtures(tournamentId),
+    queryKey: soccerDataKeys.playerStats(playerId, tmcl),
     queryFn: async () => {
-      const res = await api.get(`/soccer-data/fixtures/${tournamentId}`);
+      const params: Record<string, string> = {};
+      if (tmcl) params.tmcl = tmcl;
+      const res = await api.get(`/soccer-data/player-stats/${playerId}`, { params });
       return res.data as SoccerDataResponse;
     },
-    enabled: enabled && !!tournamentId,
+    enabled: enabled && !!playerId,
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+}
+
+// ── Fixtures ────────────────────────────────────────────────────────
+
+export function useFixtures(tmcl: string, enabled = true) {
+  return useQuery({
+    queryKey: soccerDataKeys.fixtures(tmcl),
+    queryFn: async () => {
+      const res = await api.get(`/soccer-data/fixtures/${tmcl}`);
+      return res.data as SoccerDataResponse;
+    },
+    enabled: enabled && !!tmcl,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
@@ -146,27 +169,16 @@ export function useFixtures(tournamentId: string, enabled = true) {
 
 // ── Stats ───────────────────────────────────────────────────────────
 
-export function useTeamStats(teamId: string, tournamentId: string, enabled = true) {
+export function useTeamStats(contestantId: string, tmcl?: string, enabled = true) {
   return useQuery({
-    queryKey: soccerDataKeys.teamStats(teamId, tournamentId),
+    queryKey: soccerDataKeys.teamStats(contestantId, tmcl),
     queryFn: async () => {
-      const res = await api.get(`/soccer-data/team-stats/${teamId}/${tournamentId}`);
+      const params: Record<string, string> = {};
+      if (tmcl) params.tmcl = tmcl;
+      const res = await api.get(`/soccer-data/team-stats/${contestantId}`, { params });
       return res.data as SoccerDataResponse;
     },
-    enabled: enabled && !!teamId && !!tournamentId,
-    staleTime: STALE_TIME,
-    gcTime: GC_TIME,
-  });
-}
-
-export function usePlayerStats(playerId: string, tournamentId: string, enabled = true) {
-  return useQuery({
-    queryKey: soccerDataKeys.playerStats(playerId, tournamentId),
-    queryFn: async () => {
-      const res = await api.get(`/soccer-data/player-stats/${playerId}/${tournamentId}`);
-      return res.data as SoccerDataResponse;
-    },
-    enabled: enabled && !!playerId && !!tournamentId,
+    enabled: enabled && !!contestantId,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
@@ -174,14 +186,14 @@ export function usePlayerStats(playerId: string, tournamentId: string, enabled =
 
 // ── Rankings ────────────────────────────────────────────────────────
 
-export function useRankings(tournamentId: string, enabled = true) {
+export function useRankings(tmcl: string, enabled = true) {
   return useQuery({
-    queryKey: soccerDataKeys.rankings(tournamentId),
+    queryKey: soccerDataKeys.rankings(tmcl),
     queryFn: async () => {
-      const res = await api.get(`/soccer-data/rankings/${tournamentId}`);
+      const res = await api.get(`/soccer-data/rankings/${tmcl}`);
       return res.data as SoccerDataResponse;
     },
-    enabled: enabled && !!tournamentId,
+    enabled: enabled && !!tmcl,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
@@ -204,40 +216,42 @@ export function useTournament(tournamentId: string, enabled = true) {
 
 // ── Advanced Analytics ──────────────────────────────────────────────
 
-export function useSeasonXg(tournamentId: string, enabled = true) {
+export function useSeasonXg(tmcl: string, enabled = true) {
   return useQuery({
-    queryKey: soccerDataKeys.seasonXg(tournamentId),
+    queryKey: soccerDataKeys.seasonXg(tmcl),
     queryFn: async () => {
-      const res = await api.get(`/soccer-data/season-xg/${tournamentId}`);
+      const res = await api.get(`/soccer-data/season-xg/${tmcl}`);
       return res.data as SoccerDataResponse;
     },
-    enabled: enabled && !!tournamentId,
+    enabled: enabled && !!tmcl,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
 }
 
-export function usePlayerPredictions(teamId: string, tournamentId: string, enabled = true) {
+export function usePlayerPredictions(contestantId: string, tmcl?: string, enabled = true) {
   return useQuery({
-    queryKey: soccerDataKeys.playerPredictions(teamId, tournamentId),
+    queryKey: soccerDataKeys.playerPredictions(contestantId, tmcl),
     queryFn: async () => {
-      const res = await api.get(`/soccer-data/player-predictions/${teamId}/${tournamentId}`);
+      const params: Record<string, string> = {};
+      if (tmcl) params.tmcl = tmcl;
+      const res = await api.get(`/soccer-data/player-predictions/${contestantId}`, { params });
       return res.data as SoccerDataResponse;
     },
-    enabled: enabled && !!teamId && !!tournamentId,
+    enabled: enabled && !!contestantId,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });
 }
 
-export function useSeasonSimulation(tournamentId: string, enabled = true) {
+export function useSeasonSimulation(tmcl: string, enabled = true) {
   return useQuery({
-    queryKey: soccerDataKeys.seasonSimulation(tournamentId),
+    queryKey: soccerDataKeys.seasonSimulation(tmcl),
     queryFn: async () => {
-      const res = await api.get(`/soccer-data/season-simulation/${tournamentId}`);
+      const res = await api.get(`/soccer-data/season-simulation/${tmcl}`);
       return res.data as SoccerDataResponse;
     },
-    enabled: enabled && !!tournamentId,
+    enabled: enabled && !!tmcl,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
   });

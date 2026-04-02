@@ -6,6 +6,9 @@ Client for the Soccer Data API (soccer-data6.p.rapidapi.com).
 Provides access to xG, player predictions, team squads, fixtures,
 season simulations, and more.
 
+Uses Opta-style IDs for teams, tournaments, and players.
+Key parameter: `tmcl` = tournament calendar ID (required for many endpoints).
+
 Endpoints available:
 - Season Expected Goals (xG)
 - Team Player Predictions
@@ -20,7 +23,7 @@ Endpoints available:
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import aiohttp
 from cachetools import TTLCache
@@ -61,10 +64,6 @@ async def _get(endpoint: str, params: Optional[Dict[str, Any]] = None,
 
     Returns:
         Parsed JSON response
-
-    Raises:
-        ValueError: If API key not configured
-        aiohttp.ClientError: On network errors
     """
     if not RAPIDAPI_KEY:
         raise ValueError(
@@ -73,13 +72,16 @@ async def _get(endpoint: str, params: Optional[Dict[str, Any]] = None,
         )
 
     url = f"{BASE_URL}{endpoint}"
-    cache_key = f"{endpoint}:{params}" if params else endpoint
+
+    # Build stable cache key from sorted params
+    sorted_params = sorted((params or {}).items())
+    cache_key = f"{endpoint}?{'&'.join(f'{k}={v}' for k, v in sorted_params)}"
 
     if use_cache and cache_key in _cache:
         logger.debug("Cache hit: %s", cache_key)
         return _cache[cache_key]
 
-    logger.info("Soccer Data API request: %s params=%s", endpoint, params)
+    logger.info("Soccer Data API request: GET %s params=%s", endpoint, params)
 
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=_headers(), params=params,
@@ -90,12 +92,20 @@ async def _get(endpoint: str, params: Optional[Dict[str, Any]] = None,
             if resp.status == 403:
                 logger.error("Soccer Data API forbidden (403) — check API key")
                 return {"error": "forbidden", "message": "Chave da API inválida ou sem permissão."}
+            if resp.status == 404:
+                logger.warning("Soccer Data API 404: %s", endpoint)
+                return {"error": "not_found", "message": f"Endpoint não encontrado: {endpoint}"}
             if resp.status != 200:
                 text = await resp.text()
                 logger.error("Soccer Data API error %d: %s", resp.status, text[:500])
                 return {"error": f"http_{resp.status}", "message": text[:500]}
 
-            data = await resp.json()
+            try:
+                data = await resp.json()
+            except Exception:
+                text = await resp.text()
+                data = {"raw_response": text[:2000]}
+
             if use_cache:
                 _cache[cache_key] = data
             return data
@@ -105,15 +115,19 @@ async def _get(endpoint: str, params: Optional[Dict[str, Any]] = None,
 # TEAMS endpoints
 # ══════════════════════════════════════════════════════════════════════
 
-async def get_squads(team_id: str, detailed: bool = True) -> Dict[str, Any]:
+async def get_squads(contestant_id: str, tmcl: Optional[str] = None,
+                     detailed: bool = True) -> Dict[str, Any]:
     """Get squad/roster for a team.
 
     Args:
-        team_id: Team identifier (from the API)
+        contestant_id: Team/contestant Opta ID
+        tmcl: Tournament calendar ID (usually required)
         detailed: Include detailed player info
     """
-    params = {"detailed": "yes" if detailed else "no"}
-    return await _get(f"/soccerdata/squads/{team_id}", params)
+    params: Dict[str, Any] = {"detailed": "yes" if detailed else "no"}
+    if tmcl:
+        params["tmcl"] = tmcl
+    return await _get(f"/soccerdata/squads/{contestant_id}", params)
 
 
 async def get_team(team_id: str) -> Dict[str, Any]:
@@ -121,19 +135,27 @@ async def get_team(team_id: str) -> Dict[str, Any]:
     return await _get(f"/soccerdata/team/{team_id}")
 
 
-async def get_contestant_participation(team_id: str, tournament_id: str) -> Dict[str, Any]:
-    """Get team's participation in a tournament/league."""
-    return await _get(f"/soccerdata/contestant-participation/{team_id}/{tournament_id}")
+async def get_contestant_participation(contestant_id: str,
+                                        tmcl: Optional[str] = None) -> Dict[str, Any]:
+    """Get team's participation details in a tournament."""
+    params = {}
+    if tmcl:
+        params["tmcl"] = tmcl
+    return await _get(f"/soccerdata/contestant-participation/{contestant_id}", params)
 
 
-async def get_season_playtime(team_id: str, tournament_id: str) -> Dict[str, Any]:
+async def get_season_playtime(contestant_id: str,
+                              tmcl: Optional[str] = None) -> Dict[str, Any]:
     """Get season playtime data for a team's players."""
-    return await _get(f"/soccerdata/season-playtime/{team_id}/{tournament_id}")
+    params = {}
+    if tmcl:
+        params["tmcl"] = tmcl
+    return await _get(f"/soccerdata/season-playtime/{contestant_id}", params)
 
 
-async def get_manager_preview(team_id: str) -> Dict[str, Any]:
+async def get_manager_preview(contestant_id: str) -> Dict[str, Any]:
     """Get manager/coach preview for a team."""
-    return await _get(f"/soccerdata/manager-preview/{team_id}")
+    return await _get(f"/soccerdata/manager-preview/{contestant_id}")
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -149,12 +171,9 @@ async def get_player(player_id: str) -> Dict[str, Any]:
 # FIXTURES endpoints
 # ══════════════════════════════════════════════════════════════════════
 
-async def get_fixtures(tournament_id: str, season_id: Optional[str] = None) -> Dict[str, Any]:
-    """Get fixtures for a tournament."""
-    params = {}
-    if season_id:
-        params["seasonId"] = season_id
-    return await _get(f"/soccerdata/fixtures/{tournament_id}", params)
+async def get_fixtures(tmcl: str) -> Dict[str, Any]:
+    """Get fixtures for a tournament calendar."""
+    return await _get(f"/soccerdata/fixtures/{tmcl}")
 
 
 async def get_fixture_details(match_id: str) -> Dict[str, Any]:
@@ -166,23 +185,31 @@ async def get_fixture_details(match_id: str) -> Dict[str, Any]:
 # STATS endpoints
 # ══════════════════════════════════════════════════════════════════════
 
-async def get_team_stats(team_id: str, tournament_id: str) -> Dict[str, Any]:
+async def get_team_stats(contestant_id: str,
+                         tmcl: Optional[str] = None) -> Dict[str, Any]:
     """Get team statistics for a tournament."""
-    return await _get(f"/soccerdata/team-stats/{team_id}/{tournament_id}")
+    params = {}
+    if tmcl:
+        params["tmcl"] = tmcl
+    return await _get(f"/soccerdata/team-stats/{contestant_id}", params)
 
 
-async def get_player_stats(player_id: str, tournament_id: str) -> Dict[str, Any]:
+async def get_player_stats(player_id: str,
+                           tmcl: Optional[str] = None) -> Dict[str, Any]:
     """Get player statistics for a tournament."""
-    return await _get(f"/soccerdata/player-stats/{player_id}/{tournament_id}")
+    params = {}
+    if tmcl:
+        params["tmcl"] = tmcl
+    return await _get(f"/soccerdata/player-stats/{player_id}", params)
 
 
 # ══════════════════════════════════════════════════════════════════════
 # RANKINGS endpoints
 # ══════════════════════════════════════════════════════════════════════
 
-async def get_rankings(tournament_id: str) -> Dict[str, Any]:
-    """Get rankings/standings for a tournament."""
-    return await _get(f"/soccerdata/rankings/{tournament_id}")
+async def get_rankings(tmcl: str) -> Dict[str, Any]:
+    """Get rankings/standings for a tournament calendar."""
+    return await _get(f"/soccerdata/rankings/{tmcl}")
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -198,32 +225,26 @@ async def get_tournament(tournament_id: str) -> Dict[str, Any]:
 # ADVANCED ANALYTICS endpoints
 # ══════════════════════════════════════════════════════════════════════
 
-async def get_season_expected_goals(tournament_id: str, season_id: Optional[str] = None) -> Dict[str, Any]:
-    """Get Season Expected Goals (xG) data for a tournament.
+async def get_season_expected_goals(tmcl: str) -> Dict[str, Any]:
+    """Get Season Expected Goals (xG) data.
 
-    This provides real xG metrics — much more reliable than heuristic
-    approximations.
+    Real xG metrics from the Soccer Data API.
     """
+    return await _get(f"/soccerdata/season-expected-goals/{tmcl}")
+
+
+async def get_team_player_predictions(contestant_id: str,
+                                       tmcl: Optional[str] = None) -> Dict[str, Any]:
+    """Get ML-based player performance predictions."""
     params = {}
-    if season_id:
-        params["seasonId"] = season_id
-    return await _get(f"/soccerdata/season-expected-goals/{tournament_id}", params)
+    if tmcl:
+        params["tmcl"] = tmcl
+    return await _get(f"/soccerdata/team-player-predictions/{contestant_id}", params)
 
 
-async def get_team_player_predictions(team_id: str, tournament_id: str) -> Dict[str, Any]:
-    """Get player performance predictions for a team.
-
-    ML-based predictions for player performance.
-    """
-    return await _get(f"/soccerdata/team-player-predictions/{team_id}/{tournament_id}")
-
-
-async def get_season_simulation(tournament_id: str) -> Dict[str, Any]:
-    """Get season/tournament simulation results.
-
-    Probability-based simulation of season outcomes.
-    """
-    return await _get(f"/soccerdata/season-simulation/{tournament_id}")
+async def get_season_simulation(tmcl: str) -> Dict[str, Any]:
+    """Get season/tournament simulation (probability-based)."""
+    return await _get(f"/soccerdata/season-simulation/{tmcl}")
 
 
 async def get_match_facts(match_id: str) -> Dict[str, Any]:
@@ -237,6 +258,29 @@ async def get_match_win_probability(match_id: str) -> Dict[str, Any]:
 
 
 # ══════════════════════════════════════════════════════════════════════
+# GENERIC (for explorer)
+# ══════════════════════════════════════════════════════════════════════
+
+async def explore(path: str, extra_params: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """Call any endpoint path with optional query params.
+
+    Args:
+        path: Path after /soccerdata/ (e.g., "squads/abc123?tmcl=xyz")
+        extra_params: Additional query parameters
+    """
+    clean = path.strip("/")
+    # Parse inline query params from the path
+    params = dict(extra_params or {})
+    if "?" in clean:
+        clean, qs = clean.split("?", 1)
+        for part in qs.split("&"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                params[k] = v
+    return await _get(f"/soccerdata/{clean}", params if params else None)
+
+
+# ══════════════════════════════════════════════════════════════════════
 # UTILITY
 # ══════════════════════════════════════════════════════════════════════
 
@@ -247,14 +291,13 @@ def clear_cache():
 
 
 async def health_check() -> Dict[str, Any]:
-    """Test API connectivity with a simple request."""
+    """Test API connectivity."""
     if not RAPIDAPI_KEY:
         return {
             "status": "not_configured",
             "message": "RAPIDAPI_SOCCER_DATA_KEY não configurada",
         }
     try:
-        # Use a lightweight endpoint to test connectivity
         result = await _get("/soccerdata/tournament/1", use_cache=False)
         if "error" in result:
             return {"status": "error", **result}

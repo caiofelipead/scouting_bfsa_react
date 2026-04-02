@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Database,
@@ -26,34 +26,32 @@ import {
   useSeasonSimulation,
   useSquads,
   useRankings,
-  useTeamStats,
-  useSeasonPlaytime,
 } from '../hooks/useSoccerData';
 
-// ── Known Tournament/Team IDs ───────────────────────────────────────
+// ── Known IDs (Opta-style) ─────────────────────────────────────────
+// tmcl = tournament calendar ID (used as query param or path segment)
 
 const TOURNAMENTS = [
-  { id: 'tmcl9n3sycmiqlbc6uvwkqmz9', label: 'Serie A Brasil 2025' },
-  { id: 'u2o8k2phxqftls4yvzm3j8u5c', label: 'Serie B Brasil 2025' },
-  { id: '4eot5d7lhrv9s97lp6j9nfmys', label: 'Premier League 2024/25' },
-  { id: '34pl8szyvrbwcmfkuocjm3r6t', label: 'La Liga 2024/25' },
-  { id: '1r097lpxe0xn03ihb7wi98kao', label: 'Serie A Italia 2024/25' },
-  { id: '6by3h89i2eykc341oz7lv1ddd', label: 'Bundesliga 2024/25' },
-  { id: '4s076msj76570wzkzck9xrjr5', label: 'Ligue 1 2024/25' },
+  { tmcl: 'tmcl9n3sycmiqlbc6uvwkqmz9', label: 'Serie A Brasil 2025' },
+  { tmcl: 'u2o8k2phxqftls4yvzm3j8u5c', label: 'Serie B Brasil 2025' },
+  { tmcl: '4eot5d7lhrv9s97lp6j9nfmys', label: 'Premier League 2024/25' },
+  { tmcl: '34pl8szyvrbwcmfkuocjm3r6t', label: 'La Liga 2024/25' },
+  { tmcl: '1r097lpxe0xn03ihb7wi98kao', label: 'Serie A Italia 2024/25' },
+  { tmcl: '6by3h89i2eykc341oz7lv1ddd', label: 'Bundesliga 2024/25' },
+  { tmcl: '4s076msj76570wzkzck9xrjr5', label: 'Ligue 1 2024/25' },
 ];
 
-const TEAMS_BOTAFOGO_SP = [
-  { id: '9n12waklv005j8r3zsfjj2eqc', label: 'Botafogo-SP' },
-];
-
+// contestant_id = team/club ID (from screenshot: Botafogo-SP = 1t97ffnd5cp7611ay7ucgk9qak)
 const KNOWN_TEAMS = [
-  ...TEAMS_BOTAFOGO_SP,
+  { id: '1t97ffnd5cp7611ay7ucgk9qak', label: 'Botafogo-SP' },
   { id: 'bekmuil8m1ynqfk5kgibnf0y9', label: 'Botafogo RJ' },
   { id: '85fk31okjdvs0ydsbtd1nl0k5', label: 'Palmeiras' },
   { id: '4ap2kcrxbjoa39t05j34tlmxy', label: 'Flamengo' },
   { id: '1tnk5ksq27fh7a3d7d6b85rit', label: 'Corinthians' },
   { id: 'eiv6s9ydxh4ihc8p2lnmug7v5', label: 'Sao Paulo' },
 ];
+
+const BOTAFOGO_SP = KNOWN_TEAMS[0];
 
 // ── Tab definitions ─────────────────────────────────────────────────
 
@@ -77,15 +75,12 @@ function JsonViewer({ data, depth = 0, maxDepth = 4 }: { data: unknown; depth?: 
   if (data === null || data === undefined) {
     return <span className="text-gray-500 italic">null</span>;
   }
-
   if (typeof data === 'string') {
     return <span className="text-green-400">"{data}"</span>;
   }
-
   if (typeof data === 'number') {
     return <span className="text-blue-400">{data}</span>;
   }
-
   if (typeof data === 'boolean') {
     return <span className="text-yellow-400">{data ? 'true' : 'false'}</span>;
   }
@@ -93,7 +88,6 @@ function JsonViewer({ data, depth = 0, maxDepth = 4 }: { data: unknown; depth?: 
   if (Array.isArray(data)) {
     if (data.length === 0) return <span className="text-gray-500">[]</span>;
     if (depth >= maxDepth) return <span className="text-gray-500">[...{data.length} items]</span>;
-
     return (
       <div className="ml-3">
         <button
@@ -106,14 +100,14 @@ function JsonViewer({ data, depth = 0, maxDepth = 4 }: { data: unknown; depth?: 
         </button>
         {!collapsed && (
           <div className="ml-2 border-l border-gray-800 pl-2">
-            {data.slice(0, 20).map((item, i) => (
+            {data.slice(0, 30).map((item, i) => (
               <div key={i} className="py-0.5">
                 <span className="text-gray-600 text-[10px] mr-1">{i}:</span>
                 <JsonViewer data={item} depth={depth + 1} maxDepth={maxDepth} />
               </div>
             ))}
-            {data.length > 20 && (
-              <span className="text-gray-500 text-xs">...+{data.length - 20} items</span>
+            {data.length > 30 && (
+              <span className="text-gray-500 text-xs">...+{data.length - 30} items</span>
             )}
           </div>
         )}
@@ -125,7 +119,6 @@ function JsonViewer({ data, depth = 0, maxDepth = 4 }: { data: unknown; depth?: 
     const entries = Object.entries(data as Record<string, unknown>);
     if (entries.length === 0) return <span className="text-gray-500">{'{}'}</span>;
     if (depth >= maxDepth) return <span className="text-gray-500">{'{'} ...{entries.length} keys {'}'}</span>;
-
     return (
       <div className="ml-3">
         <button
@@ -204,6 +197,34 @@ function DataPanel({
   );
 }
 
+// ── Selector Components ─────────────────────────────────────────────
+
+function TournamentSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-xs text-gray-400">Competicao (tmcl)</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="input-field text-xs">
+        {TOURNAMENTS.map((t) => (
+          <option key={t.tmcl} value={t.tmcl}>{t.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function TeamSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-xs text-gray-400">Equipe</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="input-field text-xs">
+        {KNOWN_TEAMS.map((t) => (
+          <option key={t.id} value={t.id}>{t.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 // ── Overview Tab ────────────────────────────────────────────────────
 
 function OverviewTab() {
@@ -211,7 +232,6 @@ function OverviewTab() {
 
   return (
     <div className="space-y-4">
-      {/* Connection Status */}
       <div className="card p-4">
         <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
           <Database size={16} className="text-blue-400" />
@@ -241,15 +261,20 @@ function OverviewTab() {
               ) : (
                 <AlertCircle size={14} className="text-yellow-400" />
               )}
-              <span className="text-xs">
-                Status: {health.data.status} — {health.data.message}
-              </span>
+              <span className="text-xs">Status: {health.data.status} — {health.data.message}</span>
             </div>
+          </div>
+        )}
+        {!health.data?.configured && !health.isLoading && (
+          <div className="mt-3 p-3 rounded bg-yellow-900/20 border border-yellow-800/30">
+            <p className="text-[11px] text-yellow-300">
+              Configure a variavel de ambiente <code className="bg-gray-800 px-1 rounded">RAPIDAPI_SOCCER_DATA_KEY</code> no backend
+              com sua chave do RapidAPI para ativar esta integracao.
+            </p>
           </div>
         )}
       </div>
 
-      {/* Available endpoints info */}
       <div className="card p-4">
         <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
           <Zap size={16} className="text-yellow-400" />
@@ -278,14 +303,12 @@ function OverviewTab() {
         </div>
       </div>
 
-      {/* Quick note about replacing VAEP */}
       <div className="card p-4 border-blue-800/30 bg-blue-900/10">
         <p className="text-xs text-blue-300">
           <Database size={12} className="inline mr-1" />
-          Esta pagina substitui o modulo VAEP & PlayeRank, que utilizava calculos heuristicos
-          a partir dos dados agregados do Wyscout. A Soccer Data API fornece metricas reais como
-          xG (Expected Goals), predicoes baseadas em ML, e simulacoes de temporada — dados mais
-          confiaveis do que as aproximacoes heuristicas anteriores.
+          Esta pagina substitui o modulo VAEP & PlayeRank. A Soccer Data API fornece metricas
+          reais como xG (Expected Goals), predicoes baseadas em ML, e simulacoes de temporada —
+          dados mais confiaveis do que as aproximacoes heuristicas anteriores.
         </p>
       </div>
     </div>
@@ -295,24 +318,12 @@ function OverviewTab() {
 // ── Expected Goals Tab ──────────────────────────────────────────────
 
 function XgTab() {
-  const [tournamentId, setTournamentId] = useState(TOURNAMENTS[0].id);
-  const xgQuery = useSeasonXg(tournamentId);
+  const [tmcl, setTmcl] = useState(TOURNAMENTS[0].tmcl);
+  const xgQuery = useSeasonXg(tmcl);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <label className="text-xs text-gray-400">Competicao</label>
-        <select
-          value={tournamentId}
-          onChange={(e) => setTournamentId(e.target.value)}
-          className="input-field text-xs"
-        >
-          {TOURNAMENTS.map((t) => (
-            <option key={t.id} value={t.id}>{t.label}</option>
-          ))}
-        </select>
-      </div>
-
+      <TournamentSelector value={tmcl} onChange={setTmcl} />
       <DataPanel
         title="Expected Goals (xG) da Temporada"
         icon={<Target size={16} className="text-red-400" />}
@@ -320,7 +331,6 @@ function XgTab() {
         isLoading={xgQuery.isLoading}
         isError={xgQuery.isError}
         error={xgQuery.error}
-        emptyMessage="Selecione uma competicao para ver dados de xG"
       />
     </div>
   );
@@ -329,39 +339,16 @@ function XgTab() {
 // ── Predictions Tab ─────────────────────────────────────────────────
 
 function PredictionsTab() {
-  const [teamId, setTeamId] = useState(KNOWN_TEAMS[0].id);
-  const [tournamentId, setTournamentId] = useState(TOURNAMENTS[0].id);
-  const predictionsQuery = usePlayerPredictions(teamId, tournamentId);
+  const [teamId, setTeamId] = useState(BOTAFOGO_SP.id);
+  const [tmcl, setTmcl] = useState(TOURNAMENTS[1].tmcl); // Serie B
+  const predictionsQuery = usePlayerPredictions(teamId, tmcl);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-400">Equipe</label>
-          <select
-            value={teamId}
-            onChange={(e) => setTeamId(e.target.value)}
-            className="input-field text-xs"
-          >
-            {KNOWN_TEAMS.map((t) => (
-              <option key={t.id} value={t.id}>{t.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-400">Competicao</label>
-          <select
-            value={tournamentId}
-            onChange={(e) => setTournamentId(e.target.value)}
-            className="input-field text-xs"
-          >
-            {TOURNAMENTS.map((t) => (
-              <option key={t.id} value={t.id}>{t.label}</option>
-            ))}
-          </select>
-        </div>
+        <TeamSelector value={teamId} onChange={setTeamId} />
+        <TournamentSelector value={tmcl} onChange={setTmcl} />
       </div>
-
       <DataPanel
         title="Predicoes de Desempenho (ML)"
         icon={<TrendingUp size={16} className="text-blue-400" />}
@@ -369,7 +356,6 @@ function PredictionsTab() {
         isLoading={predictionsQuery.isLoading}
         isError={predictionsQuery.isError}
         error={predictionsQuery.error}
-        emptyMessage="Selecione equipe e competicao para ver predicoes"
       />
     </div>
   );
@@ -378,24 +364,12 @@ function PredictionsTab() {
 // ── Simulation Tab ──────────────────────────────────────────────────
 
 function SimulationTab() {
-  const [tournamentId, setTournamentId] = useState(TOURNAMENTS[0].id);
-  const simQuery = useSeasonSimulation(tournamentId);
+  const [tmcl, setTmcl] = useState(TOURNAMENTS[0].tmcl);
+  const simQuery = useSeasonSimulation(tmcl);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <label className="text-xs text-gray-400">Competicao</label>
-        <select
-          value={tournamentId}
-          onChange={(e) => setTournamentId(e.target.value)}
-          className="input-field text-xs"
-        >
-          {TOURNAMENTS.map((t) => (
-            <option key={t.id} value={t.id}>{t.label}</option>
-          ))}
-        </select>
-      </div>
-
+      <TournamentSelector value={tmcl} onChange={setTmcl} />
       <DataPanel
         title="Simulacao de Temporada"
         icon={<BarChart3 size={16} className="text-purple-400" />}
@@ -403,7 +377,6 @@ function SimulationTab() {
         isLoading={simQuery.isLoading}
         isError={simQuery.isError}
         error={simQuery.error}
-        emptyMessage="Selecione uma competicao para ver a simulacao"
       />
     </div>
   );
@@ -412,24 +385,16 @@ function SimulationTab() {
 // ── Squads Tab ──────────────────────────────────────────────────────
 
 function SquadsTab() {
-  const [teamId, setTeamId] = useState(KNOWN_TEAMS[0].id);
-  const squadsQuery = useSquads(teamId);
+  const [teamId, setTeamId] = useState(BOTAFOGO_SP.id);
+  const [tmcl, setTmcl] = useState(TOURNAMENTS[1].tmcl); // Serie B
+  const squadsQuery = useSquads(teamId, tmcl);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <label className="text-xs text-gray-400">Equipe</label>
-        <select
-          value={teamId}
-          onChange={(e) => setTeamId(e.target.value)}
-          className="input-field text-xs"
-        >
-          {KNOWN_TEAMS.map((t) => (
-            <option key={t.id} value={t.id}>{t.label}</option>
-          ))}
-        </select>
+      <div className="flex flex-wrap items-center gap-3">
+        <TeamSelector value={teamId} onChange={setTeamId} />
+        <TournamentSelector value={tmcl} onChange={setTmcl} />
       </div>
-
       <DataPanel
         title="Elenco"
         icon={<Users size={16} className="text-green-400" />}
@@ -437,7 +402,6 @@ function SquadsTab() {
         isLoading={squadsQuery.isLoading}
         isError={squadsQuery.isError}
         error={squadsQuery.error}
-        emptyMessage="Selecione uma equipe para ver o elenco"
       />
     </div>
   );
@@ -446,24 +410,12 @@ function SquadsTab() {
 // ── Rankings Tab ────────────────────────────────────────────────────
 
 function RankingsTab() {
-  const [tournamentId, setTournamentId] = useState(TOURNAMENTS[0].id);
-  const rankingsQuery = useRankings(tournamentId);
+  const [tmcl, setTmcl] = useState(TOURNAMENTS[0].tmcl);
+  const rankingsQuery = useRankings(tmcl);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <label className="text-xs text-gray-400">Competicao</label>
-        <select
-          value={tournamentId}
-          onChange={(e) => setTournamentId(e.target.value)}
-          className="input-field text-xs"
-        >
-          {TOURNAMENTS.map((t) => (
-            <option key={t.id} value={t.id}>{t.label}</option>
-          ))}
-        </select>
-      </div>
-
+      <TournamentSelector value={tmcl} onChange={setTmcl} />
       <DataPanel
         title="Classificacao"
         icon={<Trophy size={16} className="text-yellow-400" />}
@@ -471,13 +423,12 @@ function RankingsTab() {
         isLoading={rankingsQuery.isLoading}
         isError={rankingsQuery.isError}
         error={rankingsQuery.error}
-        emptyMessage="Selecione uma competicao para ver a classificacao"
       />
     </div>
   );
 }
 
-// ── Explorer Tab (generic endpoint tester) ──────────────────────────
+// ── Explorer Tab ────────────────────────────────────────────────────
 
 function ExplorerTab() {
   const [path, setPath] = useState('');
@@ -489,6 +440,46 @@ function ExplorerTab() {
     setSubmittedPath(path.trim());
   };
 
+  // Quick links using correct IDs from the API docs/screenshot
+  const quickLinks = [
+    {
+      path: `squads/${BOTAFOGO_SP.id}?tmcl=${TOURNAMENTS[1].tmcl}&detailed=yes`,
+      label: 'Elenco Botafogo-SP',
+    },
+    {
+      path: `rankings/${TOURNAMENTS[0].tmcl}`,
+      label: 'Classificacao Serie A',
+    },
+    {
+      path: `season-expected-goals/${TOURNAMENTS[0].tmcl}`,
+      label: 'xG Serie A',
+    },
+    {
+      path: `season-simulation/${TOURNAMENTS[0].tmcl}`,
+      label: 'Simulacao Serie A',
+    },
+    {
+      path: `team-player-predictions/${BOTAFOGO_SP.id}?tmcl=${TOURNAMENTS[1].tmcl}`,
+      label: 'Predicoes Botafogo-SP',
+    },
+    {
+      path: `manager-preview/${BOTAFOGO_SP.id}`,
+      label: 'Treinador Botafogo-SP',
+    },
+    {
+      path: `season-playtime/${BOTAFOGO_SP.id}?tmcl=${TOURNAMENTS[1].tmcl}`,
+      label: 'Minutos Botafogo-SP',
+    },
+    {
+      path: `fixtures/${TOURNAMENTS[1].tmcl}`,
+      label: 'Jogos Serie B',
+    },
+    {
+      path: `team-stats/${BOTAFOGO_SP.id}?tmcl=${TOURNAMENTS[1].tmcl}`,
+      label: 'Stats Botafogo-SP',
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="card p-4">
@@ -497,7 +488,7 @@ function ExplorerTab() {
           API Explorer
         </h3>
         <p className="text-[10px] text-gray-500 mb-3">
-          Teste qualquer endpoint da Soccer Data API. Insira o caminho apos /soccerdata/.
+          Teste qualquer endpoint. Insira o caminho apos /soccerdata/ — suporta parametros inline (ex: squads/abc?tmcl=xyz&detailed=yes).
         </p>
         <form onSubmit={handleSubmit} className="flex gap-2">
           <div className="flex-1 flex items-center gap-1">
@@ -507,7 +498,7 @@ function ExplorerTab() {
               value={path}
               onChange={(e) => setPath(e.target.value)}
               className="input-field text-xs flex-1"
-              placeholder="tournament/1 ou squads/9n12waklv005j8r3zsfjj2eqc"
+              placeholder={`squads/${BOTAFOGO_SP.id}?tmcl=${TOURNAMENTS[1].tmcl}&detailed=yes`}
             />
           </div>
           <button
@@ -520,18 +511,8 @@ function ExplorerTab() {
           </button>
         </form>
 
-        {/* Quick links */}
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {[
-            { path: `squads/${TEAMS_BOTAFOGO_SP[0].id}`, label: 'Elenco Botafogo-SP' },
-            { path: `rankings/${TOURNAMENTS[0].id}`, label: 'Classificacao Serie A' },
-            { path: `season-expected-goals/${TOURNAMENTS[0].id}`, label: 'xG Serie A' },
-            { path: `season-simulation/${TOURNAMENTS[0].id}`, label: 'Simulacao Serie A' },
-            { path: `team-player-predictions/${TEAMS_BOTAFOGO_SP[0].id}/${TOURNAMENTS[1].id}`, label: 'Predicoes Botafogo-SP' },
-            { path: `tournament/${TOURNAMENTS[0].id}`, label: 'Info Serie A' },
-            { path: `manager-preview/${TEAMS_BOTAFOGO_SP[0].id}`, label: 'Treinador Botafogo-SP' },
-            { path: `season-playtime/${TEAMS_BOTAFOGO_SP[0].id}/${TOURNAMENTS[1].id}`, label: 'Minutos Botafogo-SP' },
-          ].map((link) => (
+          {quickLinks.map((link) => (
             <button
               key={link.path}
               onClick={() => { setPath(link.path); setSubmittedPath(link.path); }}
@@ -545,13 +526,12 @@ function ExplorerTab() {
 
       {submittedPath && (
         <DataPanel
-          title={`Resultado: /soccerdata/${submittedPath}`}
+          title={`/soccerdata/${submittedPath.split('?')[0]}`}
           icon={<Database size={16} className="text-cyan-400" />}
           data={exploreQuery.data?.data}
           isLoading={exploreQuery.isLoading}
           isError={exploreQuery.isError}
           error={exploreQuery.error}
-          emptyMessage="Nenhum resultado"
         />
       )}
     </div>
@@ -565,7 +545,6 @@ export default function SoccerDataPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-xl font-bold flex items-center gap-2">
           <Database size={22} className="text-blue-400" />
@@ -576,16 +555,13 @@ export default function SoccerDataPage() {
         </p>
       </div>
 
-      {/* Tab switch */}
       <div className="flex gap-1 bg-gray-800/50 p-1 rounded-lg overflow-x-auto">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === tab.id
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-400 hover:text-white'
+              activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
             }`}
           >
             {tab.icon}
@@ -594,7 +570,6 @@ export default function SoccerDataPage() {
         ))}
       </div>
 
-      {/* Tab content */}
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
