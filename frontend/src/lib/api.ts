@@ -3,8 +3,11 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
-  timeout: 60_000, // 60s timeout — backend may need time to load Google Sheets on cold start
+  timeout: 120_000, // 120s timeout — backend may need time to load data on cold start
 });
+
+// Pre-warm: fire a lightweight ping to wake the backend as early as possible
+axios.get('/api/ping', { timeout: 5_000 }).catch(() => {});
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
