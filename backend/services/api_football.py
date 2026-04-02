@@ -15,6 +15,12 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
+
+class APIFootballAccountError(Exception):
+    """Raised when the API-Football account is suspended, rate-limited, or denied."""
+    pass
+
+
 API_FOOTBALL_BASE = "https://v3.football.api-sports.io"
 API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
 
@@ -37,8 +43,17 @@ async def _request(endpoint: str, params: Optional[Dict[str, Any]] = None) -> Di
                 logger.error("API-Football %s returned %d: %s", endpoint, resp.status, text[:500])
                 raise ValueError(f"API-Football error {resp.status}: {text[:200]}")
             data = await resp.json()
-            if data.get("errors") and len(data["errors"]) > 0:
-                logger.warning("API-Football %s errors: %s", endpoint, data["errors"])
+            errors = data.get("errors")
+            if errors and len(errors) > 0:
+                # Detect account-level errors (suspended, rate-limited, etc.)
+                err_vals = errors.values() if isinstance(errors, dict) else errors
+                for val in err_vals:
+                    val_str = str(val).lower()
+                    if "suspend" in val_str or "limit" in val_str or "denied" in val_str:
+                        raise APIFootballAccountError(
+                            f"API-Football conta indisponível: {errors}"
+                        )
+                logger.warning("API-Football %s errors: %s", endpoint, errors)
             return data
 
 

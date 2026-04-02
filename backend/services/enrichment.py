@@ -661,6 +661,8 @@ async def run_bulk_enrichment(
     total_unmatched = 0
     stopped_reason = None
 
+    from services.api_football import APIFootballAccountError
+
     for team_name, players in teams_with_players.items():
         if total_api_calls >= max_api_calls:
             stopped_reason = "rate_limit"
@@ -677,6 +679,10 @@ async def run_bulk_enrichment(
             # Small delay between API calls to be nice
             if team_result["api_calls"] > 0:
                 await asyncio.sleep(0.5)
+        except APIFootballAccountError as e:
+            logger.error("API-Football conta suspensa/indisponível — abortando sync: %s", e)
+            stopped_reason = "account_suspended"
+            break
         except Exception as e:
             logger.error("Error enriching team '%s': %s", team_name, e)
             results.append({"team": team_name, "error": str(e)})
