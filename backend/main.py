@@ -262,8 +262,9 @@ def _load_all_data():
         except Exception as e:
             logger.error("Initial sync from Google Sheets failed: %s", e)
 
-    # Load from PostgreSQL (fast ~50-200ms per table)
-    for key in SHEET_KEYS:
+    # Load from PostgreSQL — prioritize wyscout (used by /api/players)
+    priority_order = ["wyscout"] + [k for k in SHEET_KEYS if k != "wyscout"]
+    for key in priority_order:
         try:
             df = load_sheet_dataframe(key)
             _data[key] = df
@@ -324,8 +325,8 @@ def _ensure_data_loaded():
             t = threading.Thread(target=_load_all_data, daemon=True)
             t.start()
 
-    # Wait for data with a timeout (Render free tier has 60s request limit)
-    if not _data_ready.wait(timeout=55):
+    # Wait for data with a timeout — frontend retries for up to ~105s
+    if not _data_ready.wait(timeout=120):
         raise HTTPException(
             status_code=503,
             detail="Dados ainda carregando. Tente novamente em alguns segundos.",
@@ -505,6 +506,12 @@ app.include_router(vaep_router)
 # ══════════════════════════════════════════════════════════════════════
 # HEALTH CHECK
 # ══════════════════════════════════════════════════════════════════════
+
+@app.get("/api/ping")
+async def ping():
+    """Lightweight keep-alive endpoint — no auth, no DB check."""
+    return {"status": "ok", "data_ready": _data_ready.is_set()}
+
 
 @app.get("/api/health")
 async def health_check():
