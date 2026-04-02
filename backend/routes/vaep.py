@@ -406,6 +406,14 @@ async def sync_photos(
     total_teams = len(teams_with_players)
     total_players = sum(len(v) for v in teams_with_players.values())
 
+    # Check if API-Football key is valid before starting background task
+    from services.api_football import API_FOOTBALL_KEY
+    if not API_FOOTBALL_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="API_FOOTBALL_KEY não configurada. Sincronização de fotos indisponível.",
+        )
+
     # Run enrichment in background (async task — uses aiohttp so OK on event loop)
     async def _run():
         import time as _time
@@ -418,15 +426,22 @@ async def sync_photos(
                 teams_with_players, max_api_calls=max_api_calls,
             )
             elapsed = _time.monotonic() - t0
-            logger.info(
-                "Photo sync complete in %.1fs: %d teams, %d matched, %d unmatched, %d API calls, stop=%s",
-                elapsed,
-                result.get("teams_processed", 0),
-                result.get("players_matched", 0),
-                result.get("players_unmatched", 0),
-                result.get("api_calls_used", 0),
-                result.get("stopped_reason", "done"),
-            )
+            stopped = result.get("stopped_reason")
+            if stopped == "account_suspended":
+                logger.error(
+                    "Photo sync abortado em %.1fs: conta API-Football suspensa/indisponível",
+                    elapsed,
+                )
+            else:
+                logger.info(
+                    "Photo sync complete in %.1fs: %d teams, %d matched, %d unmatched, %d API calls, stop=%s",
+                    elapsed,
+                    result.get("teams_processed", 0),
+                    result.get("players_matched", 0),
+                    result.get("players_unmatched", 0),
+                    result.get("api_calls_used", 0),
+                    stopped or "done",
+                )
         except Exception as e:
             elapsed = _time.monotonic() - t0
             logger.error("Photo sync failed after %.1fs: %s", elapsed, e, exc_info=True)

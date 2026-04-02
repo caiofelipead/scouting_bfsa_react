@@ -387,9 +387,14 @@ export default function VAEPPage() {
           <p className="text-xs text-red-300">
             <Camera size={12} className="inline mr-1" />
             Erro ao sincronizar fotos:{' '}
-            {(syncPhotos.error as any)?.response?.data?.detail
-              || (syncPhotos.error as any)?.message
-              || 'Servidor indisponivel. Tente novamente em alguns segundos.'}
+            {(() => {
+              const detail = (syncPhotos.error as any)?.response?.data?.detail || '';
+              if (detail.toLowerCase().includes('suspend') || detail.toLowerCase().includes('indispon'))
+                return 'Conta API-Football suspensa ou indisponível. Verifique o dashboard em dashboard.api-football.com.';
+              return detail
+                || (syncPhotos.error as any)?.message
+                || 'Servidor indisponivel. Tente novamente em alguns segundos.';
+            })()}
           </p>
         </motion.div>
       )}
@@ -552,7 +557,9 @@ export default function VAEPPage() {
                   {ratings.length === 0 && (
                     <tr>
                       <td colSpan={9} className="py-8 text-center text-gray-500">
-                        {ratingsQuery.isLoading ? 'Carregando...' : 'Clique "Calcular VAEP" para gerar ratings'}
+                        {ratingsQuery.isLoading || ratingsQuery.isRefetching
+                          ? 'Carregando ratings VAEP...'
+                          : 'Calculando VAEP automaticamente... Aguarde alguns segundos.'}
                       </td>
                     </tr>
                   )}

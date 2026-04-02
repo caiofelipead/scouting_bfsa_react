@@ -52,6 +52,11 @@ export function useVaepRatings(params: {
     },
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
+    // Auto-retry every 10s when table is empty (VAEP pipeline may be computing in background)
+    refetchInterval: (query) => {
+      const total = query.state.data?.total ?? 0;
+      return total === 0 ? 10_000 : false;
+    },
   });
 }
 
@@ -100,6 +105,11 @@ export function usePlayerankRankings(params: {
     },
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
+    // Auto-retry every 10s when empty (pipeline may be computing in background)
+    refetchInterval: (query) => {
+      const total = query.state.data?.total ?? 0;
+      return total === 0 ? 10_000 : false;
+    },
   });
 }
 
