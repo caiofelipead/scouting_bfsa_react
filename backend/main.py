@@ -308,46 +308,10 @@ def _load_all_data():
         except Exception as e:
             logger.warning("Could not pre-warm logo bytes cache: %s", e)
 
-        # Auto-compute VAEP ratings if Wyscout data exists but vaep_ratings is empty
-        if "wyscout" in _data and len(_data["wyscout"]) > 0:
-            try:
-                from services.database import load_vaep_ratings
-                existing_ratings = load_vaep_ratings()
-                if len(existing_ratings) == 0:
-                    logger.info("Tabela vaep_ratings vazia — calculando VAEP automaticamente a partir dos dados Wyscout...")
-                    from services.vaep_engine import VAEPEngine
-                    engine = VAEPEngine()
-                    result = engine.run_pipeline(
-                        df_events=_data["wyscout"],
-                        season="current",
-                        df_wyscout=_data["wyscout"],
-                    )
-                    from services.database import save_vaep_ratings, save_vaep_actions
-                    save_vaep_ratings(result["player_ratings"], "current")
-                    if result.get("action_records"):
-                        save_vaep_actions(result["action_records"], "current")
-                    logger.info(
-                        "VAEP auto-calculado: %d jogadores, método=%s",
-                        len(result["player_ratings"]),
-                        result.get("method", "unknown"),
-                    )
-
-                    # Also compute PlayeRank scores
-                    try:
-                        from services.playerank_engine import PlayeRankEngine
-                        playerank_engine = PlayeRankEngine()
-                        scores = playerank_engine.compute_rankings(
-                            _data["wyscout"], result["player_ratings"], "current",
-                        )
-                        from services.database import save_playerank_scores
-                        save_playerank_scores(scores, "current")
-                        logger.info("PlayeRank auto-calculado: %d scores", len(scores))
-                    except Exception as e:
-                        logger.error("Falha ao calcular PlayeRank automático: %s", e, exc_info=True)
-                else:
-                    logger.info("VAEP ratings já existem no banco: %d jogadores", len(existing_ratings))
-            except Exception as e:
-                logger.error("Falha ao auto-calcular VAEP: %s", e, exc_info=True)
+        # NOTE: VAEP auto-computation removed — the heuristic VAEP pipeline was
+        # replaced by the Soccer Data API which provides real xG and analytics.
+        # The VAEP routes still exist for backward compatibility but are no longer
+        # auto-triggered on startup.
 
         logger.info("All data loaded successfully: %s", {k: len(v) for k, v in _data.items()})
     except Exception as e:
@@ -542,11 +506,13 @@ from routes.auth import router as auth_router
 from routes.apifootball import router as apifootball_router
 from routes.proxy import router as proxy_router
 from routes.vaep import router as vaep_router
+from routes.soccer_data import router as soccer_data_router
 
 app.include_router(auth_router)
 app.include_router(apifootball_router)
 app.include_router(proxy_router)
 app.include_router(vaep_router)
+app.include_router(soccer_data_router)
 
 
 # ══════════════════════════════════════════════════════════════════════
