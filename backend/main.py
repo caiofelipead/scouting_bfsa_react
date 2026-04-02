@@ -234,86 +234,91 @@ def _load_all_data():
     """Load all data into memory — tries PostgreSQL first, syncs from Sheets if empty."""
     global _data, _data_loading
 
-    # Ensure scouting tables exist
     try:
-        init_scouting_tables()
-    except Exception as e:
-        logger.warning("Could not init scouting tables: %s", e)
-
-    # Ensure VAEP/PlayeRank tables exist
-    try:
-        init_vaep_tables()
-    except Exception as e:
-        logger.warning("Could not init VAEP tables: %s", e)
-
-    # Check if PostgreSQL has data
-    pg_has_data = False
-    try:
-        pg_has_data = has_data()
-    except Exception as e:
-        logger.warning("Could not check PostgreSQL for data: %s", e)
-
-    if not pg_has_data:
-        # First run or empty DB — sync from Google Sheets → PostgreSQL
-        logger.info("No data in PostgreSQL — syncing from Google Sheets...")
+        # Ensure scouting tables exist
         try:
-            sync_results = sync_all_sheets()
-            logger.info("Initial sync results: %s", sync_results)
+            init_scouting_tables()
         except Exception as e:
-            logger.error("Initial sync from Google Sheets failed: %s", e)
+            logger.warning("Could not init scouting tables: %s", e)
 
-    # Load from PostgreSQL — prioritize wyscout (used by /api/players)
-    priority_order = ["wyscout"] + [k for k in SHEET_KEYS if k != "wyscout"]
-    for key in priority_order:
+        # Ensure VAEP/PlayeRank tables exist
         try:
-            df = load_sheet_dataframe(key)
-            _data[key] = df
-            logger.info("Loaded '%s' from PostgreSQL: %d rows", key, len(df))
+            init_vaep_tables()
         except Exception as e:
-            logger.error("Failed to load '%s' from PostgreSQL: %s", key, e)
-            _data[key] = pd.DataFrame()
+            logger.warning("Could not init VAEP tables: %s", e)
 
-    if "wyscout" in _data and len(_data["wyscout"]) > 0:
-        _data["wyscout"] = _prepare_wyscout(_data["wyscout"])
+        # Check if PostgreSQL has data
+        pg_has_data = False
+        try:
+            pg_has_data = has_data()
+        except Exception as e:
+            logger.warning("Could not check PostgreSQL for data: %s", e)
 
-    if "skillcorner" in _data and len(_data["skillcorner"]) > 0:
-        sc_text = {"player_name", "short_name", "team_name", "position_group"}
-        _data["skillcorner"] = _coerce_numeric_columns(_data["skillcorner"], sc_text)
-        build_skillcorner_index(_data["skillcorner"])
+        if not pg_has_data:
+            # First run or empty DB — sync from Google Sheets → PostgreSQL
+            logger.info("No data in PostgreSQL — syncing from Google Sheets...")
+            try:
+                sync_results = sync_all_sheets()
+                logger.info("Initial sync results: %s", sync_results)
+            except Exception as e:
+                logger.error("Initial sync from Google Sheets failed: %s", e)
 
-    # Pre-warm percentile cache for wyscout (biggest dataset)
-    if "wyscout" in _data and len(_data["wyscout"]) > 0:
-        from services.similarity import _get_percentile_matrix
-        _get_percentile_matrix(_data["wyscout"])
+        # Load from PostgreSQL — prioritize wyscout (used by /api/players)
+        priority_order = ["wyscout"] + [k for k in SHEET_KEYS if k != "wyscout"]
+        for key in priority_order:
+            try:
+                df = load_sheet_dataframe(key)
+                _data[key] = df
+                logger.info("Loaded '%s' from PostgreSQL: %d rows", key, len(df))
+            except Exception as e:
+                logger.error("Failed to load '%s' from PostgreSQL: %s", key, e)
+                _data[key] = pd.DataFrame()
 
-    # Load player assets CSV (photos, club logos, league logos)
-    try:
-        load_player_assets_csv()
+        if "wyscout" in _data and len(_data["wyscout"]) > 0:
+            _data["wyscout"] = _prepare_wyscout(_data["wyscout"])
+
+        if "skillcorner" in _data and len(_data["skillcorner"]) > 0:
+            sc_text = {"player_name", "short_name", "team_name", "position_group"}
+            _data["skillcorner"] = _coerce_numeric_columns(_data["skillcorner"], sc_text)
+            build_skillcorner_index(_data["skillcorner"])
+
+        # Pre-warm percentile cache for wyscout (biggest dataset)
+        if "wyscout" in _data and len(_data["wyscout"]) > 0:
+            from services.similarity import _get_percentile_matrix
+            _get_percentile_matrix(_data["wyscout"])
+
+        # Load player assets CSV (photos, club logos, league logos)
+        try:
+            load_player_assets_csv()
+        except Exception as e:
+            logger.warning("Could not load player assets CSV: %s", e)
+
+        # Initialize API-Football asset enrichment cache
+        try:
+            from services.enrichment import init_asset_tables, load_asset_cache
+            init_asset_tables()
+            load_asset_cache()
+        except Exception as e:
+            logger.warning("Could not init asset enrichment cache: %s", e)
+
+        # Pre-warm team logo bytes cache for the /api/team-logo endpoint
+        try:
+            from routes.proxy import prewarm_logo_bytes_cache
+            prewarm_logo_bytes_cache()
+        except Exception as e:
+            logger.warning("Could not pre-warm logo bytes cache: %s", e)
+
+        logger.info("All data loaded successfully: %s", {k: len(v) for k, v in _data.items()})
     except Exception as e:
-        logger.warning("Could not load player assets CSV: %s", e)
-
-    # Initialize API-Football asset enrichment cache
-    try:
-        from services.enrichment import init_asset_tables, load_asset_cache
-        init_asset_tables()
-        load_asset_cache()
-    except Exception as e:
-        logger.warning("Could not init asset enrichment cache: %s", e)
-
-    # Pre-warm team logo bytes cache for the /api/team-logo endpoint
-    try:
-        from routes.proxy import prewarm_logo_bytes_cache
-        prewarm_logo_bytes_cache()
-    except Exception as e:
-        logger.warning("Could not pre-warm logo bytes cache: %s", e)
-
-    _data_ready.set()
-    _data_loading = False
-    logger.info("All data loaded successfully: %s", {k: len(v) for k, v in _data.items()})
+        logger.error("CRITICAL: _load_all_data crashed: %s", e, exc_info=True)
+    finally:
+        # ALWAYS signal readiness — even on failure — so requests don't hang forever
+        _data_ready.set()
+        _data_loading = False
 
 
 def _ensure_data_loaded():
-    """Trigger background loading if not started, wait up to 55s for data."""
+    """Trigger background loading if not started, wait up to 120s for data."""
     global _data_loading
 
     if _data_ready.is_set():
