@@ -44,7 +44,8 @@ export type TabId =
   | 'replacements'
   | 'contract_impact'
   | 'scouting_report'
-  | 'coaches';
+  | 'coaches'
+  | 'shadow_team';
 
 interface LayoutProps {
   user: User;
@@ -87,6 +88,7 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
     title: 'GESTÃO',
     items: [
       { id: 'coaches', label: 'Treinadores', icon: <Users size={18} strokeWidth={1.5} /> },
+      { id: 'shadow_team', label: 'Shadow Team', icon: <Shield size={18} strokeWidth={1.5} /> },
     ],
   },
   {
