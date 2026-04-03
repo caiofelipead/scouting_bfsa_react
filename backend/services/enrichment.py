@@ -2,11 +2,7 @@
 enrichment.py — Enrich player photos and club logos
 ====================================================
 Provides bulk and on-demand enrichment of player assets (photos, club logos)
-by matching WyScout player/team names against external APIs.
-
-Sources (in priority order):
-1. TheSportsDB (free, no key needed, 30 req/min) — primary source
-2. API-Football v3 (50 req/day free tier) — fallback
+by matching WyScout player/team names against TheSportsDB.
 
 Uses the `player_assets_cache` and `team_assets_cache` tables in PostgreSQL
 for persistent caching to avoid wasting API quota.
@@ -22,8 +18,6 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import aiohttp
 from rapidfuzz import fuzz
-
-_API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
 
 logger = logging.getLogger(__name__)
 
@@ -114,15 +108,13 @@ def init_asset_tables():
 
 
 async def _download_image(url: str) -> Optional[Tuple[bytes, str]]:
-    """Download an image from various sources (TheSportsDB, API-Football CDN, etc).
+    """Download an image from TheSportsDB or cached CDN URLs.
 
     Returns (bytes, content_type) or None if download fails.
     """
     if not url:
         return None
     headers = {"User-Agent": "Mozilla/5.0"}
-    if _API_FOOTBALL_KEY and "api-sports.io" in url:
-        headers["x-apisports-key"] = _API_FOOTBALL_KEY
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
@@ -505,102 +497,6 @@ async def _enrich_team_via_thesportsdb(
     }
 
 
-# ── API-Football matching logic (FALLBACK) ───────────────────────────────
-
-async def _search_team_in_apifootball(team_name: str) -> Optional[Dict[str, Any]]:
-    """Search for a team in API-Football by name. Returns best match or None."""
-    from services.api_football import _request
-
-    team_norm = _normalize(team_name)
-    # Try the team name as-is first
-    search_terms = [team_name]
-    # If team has multiple words, try first word (often the main name)
-    words = team_name.strip().split()
-    if len(words) > 1 and len(words[0]) >= 3:
-        search_terms.append(words[0])
-
-    for term in search_terms:
-        try:
-            data = await _request("/teams", {"search": term})
-            results = data.get("response", [])
-            if not results:
-                continue
-
-            # Find best fuzzy match
-            best_score = 0.0
-            best_match = None
-            for entry in results:
-                apif_name = entry.get("team", {}).get("name", "")
-                score = _fuzzy_score(team_norm, _normalize(apif_name))
-                if score > best_score:
-                    best_score = score
-                    best_match = entry
-
-            if best_match and best_score >= 60:
-                return best_match
-        except Exception as e:
-            logger.warning("API-Football search for '%s' failed: %s", term, e)
-
-    return None
-
-
-def _match_squad_players(
-    wyscout_players: List[str],
-    squad: List[Dict[str, Any]],
-) -> Dict[str, Dict[str, Any]]:
-    """Match WyScout player names to API-Football squad members.
-
-    Returns: {wyscout_name: {"photo": url, "id": apif_id, "quality": "exact"|"fuzzy"}}
-    """
-    matched: Dict[str, Dict[str, Any]] = {}
-
-    # Build normalized squad index
-    squad_entries = []
-    for entry in squad:
-        for player in entry.get("players", []):
-            name = player.get("name", "")
-            photo = player.get("photo", "")
-            pid = player.get("id")
-            if name:
-                squad_entries.append({
-                    "name": name,
-                    "name_norm": _normalize(name),
-                    "photo": photo,
-                    "id": pid,
-                })
-
-    if not squad_entries:
-        return matched
-
-    for ws_name in wyscout_players:
-        ws_norm = _normalize(ws_name)
-        if not ws_norm:
-            continue
-
-        # 1) Exact normalized match
-        for se in squad_entries:
-            if se["name_norm"] == ws_norm:
-                matched[ws_name] = {"photo": se["photo"], "id": se["id"], "quality": "exact"}
-                break
-
-        if ws_name in matched:
-            continue
-
-        # 2) Fuzzy match
-        best_score = 0.0
-        best_entry = None
-        for se in squad_entries:
-            score = _fuzzy_score(ws_norm, se["name_norm"])
-            if score > best_score:
-                best_score = score
-                best_entry = se
-
-        if best_entry and best_score >= 70:
-            matched[ws_name] = {"photo": best_entry["photo"], "id": best_entry["id"], "quality": "fuzzy"}
-
-    return matched
-
-
 # ── Bulk enrichment ─────────────────────────────────────────────────────
 
 async def enrich_team(
@@ -673,126 +569,36 @@ async def enrich_team(
                     )
                     result["matched"] += 1
 
-            # If TheSportsDB found badge + most players, we're done
-            unmatched_count = len(wyscout_players) - result["matched"]
-            if badge_url and result["matched"] >= len(wyscout_players) * 0.5:
-                # Good enough — save remaining as unmatched
-                for pname in wyscout_players:
-                    if pname not in matched_players:
-                        existing = _get_player_asset(_normalize(pname), team_norm)
-                        if not existing or not existing.get("photo_url"):
-                            _upsert_player_asset(pname, team_name, None, badge_url, None, None, "not_found_thesportsdb")
-                        result["unmatched"] += 1
+            # Save remaining as unmatched
+            for pname in wyscout_players:
+                if pname not in matched_players:
+                    existing = _get_player_asset(_normalize(pname), team_norm)
+                    if not existing or not existing.get("photo_url"):
+                        _upsert_player_asset(pname, team_name, None, badge_url, None, None, "not_found_thesportsdb")
+                    result["unmatched"] += 1
 
-                result["logo"] = club_logo
-                # Update in-memory caches
-                if logo_bytes_downloaded:
-                    _cached_team_logos[team_norm] = f"/api/team-logo/{team_norm}"
-                for pname, photo in matched_players.items():
-                    if photo:
-                        _cached_player_assets[(_normalize(pname), team_norm)] = {
-                            "photo_url": photo,
-                            "club_logo": f"/api/team-logo/{team_norm}" if logo_bytes_downloaded else badge_url,
-                        }
-                return result
-
-        # ── SOURCE 2: API-Football (fallback) ────────────────────────
-        try:
-            match = await _search_team_in_apifootball(team_name)
-            result["api_calls"] += 1
-        except Exception as e:
-            logger.warning("API-Football search failed for '%s': %s", team_name, e)
-            match = None
-
-        if match:
-            team_id = match["team"]["id"]
-            apif_logo = match["team"].get("logo")
-            # Use API-Football logo only if TheSportsDB didn't provide one
-            if not club_logo:
-                club_logo = apif_logo
-            logo_data = await _download_image(club_logo)
-            logo_bytes_downloaded = _upsert_team_asset(
-                team_name, team_id, club_logo, "found",
-                logo_bytes=logo_data[0] if logo_data else None,
-                logo_content_type=logo_data[1] if logo_data else "image/png",
-            )
-            result["source"] = result.get("source") or "api_football"
-        else:
-            if not club_logo:
-                # Neither source found the team
-                _upsert_team_asset(team_name, None, None, "not_found")
-                for pname in wyscout_players:
-                    if not _get_player_asset(_normalize(pname), team_norm):
-                        _upsert_player_asset(pname, team_name, None, None, None, None, "team_not_found")
-                        result["unmatched"] += 1
-                return result
-
-    result["logo"] = club_logo
-
-    if not team_id:
-        return result
-
-    # Check if all players are already cached (in-memory) — skip squad fetch to save API quota
-    if _cache_loaded:
-        all_players_cached = True
-        cached_with_photo = 0
-        for pname in wyscout_players:
-            key = (_normalize(pname), team_norm)
-            entry = _cached_player_assets.get(key)
-            if entry:
-                if entry.get("photo_url"):
-                    cached_with_photo += 1
-            else:
-                # Player not in cache at all — need to fetch squad
-                all_players_cached = False
-                break
-
-        if all_players_cached:
-            result["skipped"] = True
-            result["matched"] = cached_with_photo
-            result["unmatched"] = len(wyscout_players) - cached_with_photo
+            result["logo"] = club_logo
+            # Update in-memory caches
+            if logo_bytes_downloaded:
+                _cached_team_logos[team_norm] = f"/api/team-logo/{team_norm}"
+            for pname, photo in matched_players.items():
+                if photo:
+                    _cached_player_assets[(_normalize(pname), team_norm)] = {
+                        "photo_url": photo,
+                        "club_logo": f"/api/team-logo/{team_norm}" if logo_bytes_downloaded else badge_url,
+                    }
             return result
 
-    # Get squad from API-Football (only if team_id was resolved via API-Football)
-    try:
-        from services.api_football import get_squads
-        squad = await get_squads(team_id)
-        result["api_calls"] += 1
-    except Exception as e:
-        logger.warning("Failed to get squad for team %s (id=%s): %s", team_name, team_id, e)
-        return result
+        # TheSportsDB didn't find the team
+        if not club_logo:
+            _upsert_team_asset(team_name, None, None, "not_found")
+            for pname in wyscout_players:
+                if not _get_player_asset(_normalize(pname), team_norm):
+                    _upsert_player_asset(pname, team_name, None, None, None, None, "team_not_found")
+                    result["unmatched"] += 1
+            return result
 
-    # Match players
-    matched = _match_squad_players(wyscout_players, squad)
-
-    for pname in wyscout_players:
-        if pname in matched:
-            m = matched[pname]
-            _upsert_player_asset(
-                pname, team_name,
-                photo_url=m["photo"], club_logo=club_logo,
-                api_football_player_id=m["id"], api_football_team_id=team_id,
-                match_quality=m["quality"],
-            )
-            result["matched"] += 1
-        else:
-            # Only insert not_found if not already cached with a photo
-            existing = _get_player_asset(_normalize(pname), team_norm)
-            if not existing or not existing.get("photo_url"):
-                _upsert_player_asset(pname, team_name, None, club_logo, None, team_id, "not_found")
-            result["unmatched"] += 1
-
-    # Update in-memory cache — use local endpoint only if bytes were downloaded
-    if logo_bytes_downloaded:
-        logo_url_for_cache = f"/api/team-logo/{team_norm}"
-    else:
-        logo_url_for_cache = None  # Let CLUB_LOGOS fallback handle it
-    if logo_url_for_cache:
-        _cached_team_logos[team_norm] = logo_url_for_cache
-    for pname, m in matched.items():
-        if m.get("photo"):
-            _cached_player_assets[(_normalize(pname), team_norm)] = {"photo_url": m["photo"], "club_logo": logo_url_for_cache}
-
+    result["logo"] = club_logo
     return result
 
 
@@ -817,8 +623,6 @@ async def run_bulk_enrichment(
     total_unmatched = 0
     stopped_reason = None
 
-    from services.api_football import APIFootballAccountError
-
     for team_name, players in teams_with_players.items():
         if total_api_calls >= max_api_calls:
             stopped_reason = "rate_limit"
@@ -835,10 +639,6 @@ async def run_bulk_enrichment(
             # Small delay between API calls to be nice
             if team_result["api_calls"] > 0:
                 await asyncio.sleep(0.5)
-        except APIFootballAccountError as e:
-            logger.error("API-Football conta suspensa/indisponível — abortando sync: %s", e)
-            stopped_reason = "account_suspended"
-            break
         except Exception as e:
             logger.error("Error enriching team '%s': %s", team_name, e)
             results.append({"team": team_name, "error": str(e)})

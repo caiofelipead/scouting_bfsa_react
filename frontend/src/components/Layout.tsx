@@ -22,7 +22,6 @@ import {
   Gem,
   Users,
   UserPlus,
-  Globe,
 } from 'lucide-react';
 import type { User } from '../types/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -45,9 +44,7 @@ export type TabId =
   | 'replacements'
   | 'contract_impact'
   | 'scouting_report'
-  | 'apifootball'
-  | 'coaches'
-  | 'vaep';
+  | 'coaches';
 
 interface LayoutProps {
   user: User;
@@ -75,7 +72,6 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
       { id: 'trajectory', label: 'Trajetoria', icon: <TrendingUp size={18} strokeWidth={1.5} /> },
       { id: 'opportunities', label: 'Oportunidades', icon: <Gem size={18} strokeWidth={1.5} /> },
       { id: 'contract_impact', label: 'Impacto Contratação', icon: <UserPlus size={18} strokeWidth={1.5} /> },
-      { id: 'vaep', label: 'Soccer Data', icon: <Database size={18} strokeWidth={1.5} /> },
     ],
   },
   {
@@ -97,12 +93,23 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
     title: 'RELATORIOS',
     items: [
       { id: 'scouting_report', label: 'Scouting Report', icon: <FileText size={18} strokeWidth={1.5} /> },
-      { id: 'apifootball', label: 'API-Football', icon: <Globe size={18} strokeWidth={1.5} /> },
       { id: 'data', label: 'Dados', icon: <Database size={18} strokeWidth={1.5} /> },
       { id: 'analyses', label: 'Analises', icon: <Eye size={18} strokeWidth={1.5} /> },
     ],
   },
 ];
+
+// Users allowed to see the Treinadores tab
+const COACHES_ALLOWED_EMAILS = ['caiofelipe', 'andreleite', 'fillipesoutto'];
+
+function filterNavForUser(email: string) {
+  const emailLower = email.toLowerCase();
+  const canSeeCoaches = COACHES_ALLOWED_EMAILS.some((u) => emailLower.includes(u));
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => item.id !== 'coaches' || canSeeCoaches),
+  })).filter((section) => section.items.length > 0);
+}
 
 // Flat list for mobile
 const ALL_NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
@@ -111,6 +118,8 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [coldStart, setColdStart] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const userNavSections = filterNavForUser(user.email);
+  const userNavItems = userNavSections.flatMap((s) => s.items);
 
   useEffect(() => {
     return onColdStartChange(setColdStart);
@@ -150,7 +159,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
 
         {/* Nav sections */}
         <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-4">
-          {NAV_SECTIONS.map((section, si) => (
+          {userNavSections.map((section, si) => (
             <div key={si}>
               {section.title && (
                 <div
@@ -291,7 +300,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
                 <div className="font-[var(--font-display)] text-sm font-bold">SCOUTING BFSA</div>
               </div>
               <nav className="flex-1 px-3 space-y-4 overflow-y-auto">
-                {NAV_SECTIONS.map((section, si) => (
+                {userNavSections.map((section, si) => (
                   <div key={si}>
                     {section.title && (
                       <div

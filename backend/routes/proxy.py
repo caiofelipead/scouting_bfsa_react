@@ -19,11 +19,6 @@ from starlette.requests import Request
 router = APIRouter(prefix="/api", tags=["proxy"])
 limiter = Limiter(key_func=get_remote_address)
 
-# API-Football key for media.api-sports.io images
-_API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
-if not _API_FOOTBALL_KEY:
-    logger.warning("API_FOOTBALL_KEY not set — media.api-sports.io images may fail")
-
 # TTL cache for proxied images (URL -> (content_type, bytes))
 _image_cache: TTLCache = TTLCache(maxsize=2000, ttl=3600)  # 1 hour TTL
 
@@ -79,32 +74,17 @@ async def image_proxy(request: Request, url: str):
     is_wikimedia = "wikimedia.org" in (parsed.hostname or "")
 
     if is_api_sports:
-        header_strategies = []
-        # Strategy 1: API key auth (most reliable when key is available)
-        if _API_FOOTBALL_KEY:
-            header_strategies.append({
-                "x-apisports-key": _API_FOOTBALL_KEY,
-                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        # Browser-like strategies for cached api-sports.io image URLs
+        header_strategies = [
+            {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            })
-        # Strategy 2: Browser-like with api-football.com Referer
-        header_strategies.append({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-            "Referer": "https://www.api-football.com/",
-            "Origin": "https://www.api-football.com",
-        })
-        # Strategy 3: Simple request without Referer/Origin
-        header_strategies.append({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            "Accept": "image/*,*/*;q=0.8",
-        })
-        # Strategy 4: Dashboard Referer (alternative referrer some CDNs accept)
-        header_strategies.append({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            "Accept": "image/*,*/*;q=0.8",
-            "Referer": "https://dashboard.api-football.com/",
-        })
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            },
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Accept": "image/*,*/*;q=0.8",
+            },
+        ]
     elif is_wikimedia:
         # Wikimedia requires a proper User-Agent with contact info per their policy
         header_strategies = [

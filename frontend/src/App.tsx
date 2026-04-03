@@ -24,9 +24,7 @@ const OpportunitiesPage = lazy(() => import('./pages/OpportunitiesPage'));
 const ReplacementsPage = lazy(() => import('./pages/ReplacementsPage'));
 const ContractImpactPage = lazy(() => import('./pages/ContractImpactPage'));
 const ScoutingReportPage = lazy(() => import('./pages/ScoutingReportPage'));
-const ApiFootballPage = lazy(() => import('./pages/ApiFootballPage'));
 const CoachesPage = lazy(() => import('./pages/CoachesPage'));
-const SoccerDataPage = lazy(() => import('./pages/SoccerDataPage'));
 
 const PAGE_MAP: Record<TabId, React.LazyExoticComponent<React.ComponentType>> = {
   dashboard: DashboardPage,
@@ -45,9 +43,7 @@ const PAGE_MAP: Record<TabId, React.LazyExoticComponent<React.ComponentType>> = 
   replacements: ReplacementsPage,
   contract_impact: ContractImpactPage,
   scouting_report: ScoutingReportPage,
-  apifootball: ApiFootballPage,
   coaches: CoachesPage,
-  vaep: SoccerDataPage,
 };
 
 function PageLoader() {
