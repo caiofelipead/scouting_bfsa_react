@@ -1169,6 +1169,19 @@ async def get_player_profile(
             if "sofascore" not in candidate.lower():
                 photo_url = candidate
 
+    # Fallback: on-demand TheSportsDB enrichment (single player)
+    if not photo_url and team_name_sc:
+        try:
+            from services.enrichment import enrich_single_player
+            enriched = await enrich_single_player(jogador_name, team_name_sc)
+            if enriched:
+                if enriched.get("photo_url"):
+                    photo_url = enriched["photo_url"]
+                if not club_logo_url and enriched.get("club_logo"):
+                    club_logo_url = enriched["club_logo"]
+        except Exception as e:
+            logger.debug("On-demand enrichment failed for %s: %s", jogador_name, e)
+
     result = {
         "summary": {
             "id": idx_val,

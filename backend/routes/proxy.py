@@ -39,6 +39,8 @@ _ALLOWED_IMAGE_DOMAINS = {
     "www.logodetimes.com",
     "upload.wikimedia.org",
     "images.fotmob.com",
+    "www.thesportsdb.com",
+    "thesportsdb.com",
 }
 
 
