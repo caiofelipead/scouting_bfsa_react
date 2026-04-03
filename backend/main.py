@@ -340,18 +340,75 @@ def _ensure_data_loaded():
 
 # ── Lifespan ──────────────────────────────────────────────────────────
 
+async def _auto_enrich_background():
+    """Background task: auto-enrich player photos via TheSportsDB after data loads."""
+    await asyncio.to_thread(_data_ready.wait, 300)  # 5 min timeout
+    if not _data_ready.is_set():
+        logger.warning("Auto-enrichment: data never became ready, skipping")
+        return
+
+    try:
+        from services.enrichment import run_bulk_enrichment, load_asset_cache, backfill_logo_bytes
+
+        df = _data.get("wyscout")
+        if df is None or "Jogador" not in df.columns or "Equipa" not in df.columns:
+            logger.info("Auto-enrichment: no WyScout data available, skipping")
+            return
+
+        # Build {team: [players]} dict
+        teams_with_players: Dict[str, List[str]] = {}
+        for _, row in df.iterrows():
+            team = str(row.get("Equipa", "")).strip() if pd.notna(row.get("Equipa")) else ""
+            player = str(row.get("Jogador", "")).strip()
+            if team and player:
+                teams_with_players.setdefault(team, []).append(player)
+
+        logger.info("Auto-enrichment (TheSportsDB): starting for %d teams", len(teams_with_players))
+        result = await run_bulk_enrichment(teams_with_players, max_api_calls=500)
+        logger.info(
+            "Auto-enrichment complete: %d teams processed, %d players matched, stopped: %s",
+            result.get("teams_processed", 0),
+            result.get("players_matched", 0),
+            result.get("stopped_reason"),
+        )
+
+        # Backfill logo bytes for teams enriched before this feature
+        await backfill_logo_bytes()
+
+        # Reload in-memory cache after enrichment
+        load_asset_cache()
+
+        # Refresh logo bytes cache
+        try:
+            from routes.proxy import prewarm_logo_bytes_cache
+            prewarm_logo_bytes_cache()
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning("Auto-enrichment failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     # Start data loading in background — don't block app startup
-    # Now loads from PostgreSQL (fast) with auto-sync from Sheets if DB is empty
     global _data_loading
     with _data_lock:
         _data_loading = True
         t = threading.Thread(target=_load_all_data, daemon=True)
         t.start()
 
+    # Start auto-enrichment in background (runs after data loads)
+    enrichment_task = asyncio.create_task(_auto_enrich_background())
+
     yield
+
+    # Cancel enrichment if still running on shutdown
+    enrichment_task.cancel()
+    try:
+        await enrichment_task
+    except asyncio.CancelledError:
+        pass
 
 
 # ── App ───────────────────────────────────────────────────────────────
@@ -512,6 +569,73 @@ async def admin_resync(current_user: dict = Depends(require_admin)):
 
     counts = {k: len(v) for k, v in _data.items()}
     return {"sync_results": sync_results, "memory_counts": counts}
+
+
+# ── Photo Enrichment (TheSportsDB) ───────────────────────────────────
+
+@app.post("/api/admin/enrich-assets")
+async def admin_enrich_assets(
+    max_api_calls: int = Query(default=500, le=1000, description="Max API calls to TheSportsDB"),
+    retry_not_found: bool = Query(default=False, description="Re-search teams previously not found"),
+    admin: dict = Depends(require_admin),
+):
+    """Bulk enrich player photos and club logos from TheSportsDB.
+
+    Runs in background. Check progress via GET /api/admin/enrichment-status.
+    """
+    from services.enrichment import run_bulk_enrichment, load_asset_cache, backfill_logo_bytes
+
+    df = _get_wyscout()
+    if "Jogador" not in df.columns or "Equipa" not in df.columns:
+        raise HTTPException(status_code=500, detail="WyScout data missing Jogador/Equipa columns")
+
+    teams_with_players: Dict[str, List[str]] = {}
+    for _, row in df.iterrows():
+        team = str(row.get("Equipa", "")).strip() if pd.notna(row.get("Equipa")) else ""
+        player = str(row.get("Jogador", "")).strip()
+        if team and player:
+            teams_with_players.setdefault(team, []).append(player)
+
+    async def _run_enrichment():
+        try:
+            result = await run_bulk_enrichment(teams_with_players, max_api_calls=max_api_calls, retry_not_found=retry_not_found)
+            logger.info("Manual enrichment complete: %s", result)
+            try:
+                await backfill_logo_bytes()
+            except Exception as e:
+                logger.warning("Logo backfill failed: %s", e)
+            load_asset_cache()
+            try:
+                from routes.proxy import prewarm_logo_bytes_cache
+                prewarm_logo_bytes_cache()
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error("Background enrichment failed: %s", e)
+
+    asyncio.create_task(_run_enrichment())
+
+    return {
+        "status": "started",
+        "message": f"Enrichment via TheSportsDB iniciado para {len(teams_with_players)} equipes. Acompanhe via GET /api/admin/enrichment-status",
+        "teams_to_process": len(teams_with_players),
+    }
+
+
+@app.get("/api/admin/enrichment-status")
+async def admin_enrichment_status(admin: dict = Depends(require_admin)):
+    """Get current enrichment progress: how many players have photos, teams resolved, etc."""
+    from services.enrichment import get_enrichment_stats
+    stats = get_enrichment_stats()
+
+    try:
+        df = _get_wyscout()
+        stats["wyscout_total_players"] = len(df)
+        stats["wyscout_unique_teams"] = df["Equipa"].nunique() if "Equipa" in df.columns else 0
+    except Exception:
+        pass
+
+    return stats
 
 
 # ── Auth & User Management routes → see routes/auth.py
