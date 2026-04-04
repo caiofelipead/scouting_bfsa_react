@@ -1,9 +1,13 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Plus, Trash2, ChevronDown, StickyNote,
   Users, Target, ClipboardList, AlertCircle, GripVertical,
+  Search, Loader2, User,
 } from 'lucide-react';
+import { usePlayers, usePositions } from '../hooks/usePlayers';
+import { proxyImageUrl } from '../lib/api';
+import type { PlayerSummary, PlayersQueryParams } from '../types/api';
 
 // ── Types ──
 
@@ -19,11 +23,15 @@ type PipelineStatus = 'Identificado' | 'Em Avaliação' | 'Negociação' | 'Apro
 
 interface TargetPlayer {
   id: string;
+  dbId?: number | null;
   name: string;
   club: string;
   age: number;
   position: string;
   pipeline: PipelineStatus;
+  photoUrl?: string | null;
+  score?: number | null;
+  league?: string | null;
 }
 
 interface ShadowXISlot {
@@ -217,6 +225,168 @@ function TabNeeds({ needs, setNeeds }: { needs: Need[]; setNeeds: (n: Need[]) =>
   );
 }
 
+// ── Player Search Dropdown ──
+
+function PlayerSearchPicker({ onSelect, existingIds }: {
+  onSelect: (player: PlayerSummary) => void;
+  existingIds: Set<number>;
+}) {
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { data: apiPositions = [] } = usePositions();
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(value), 300);
+  };
+
+  const queryParams = useMemo<PlayersQueryParams>(() => ({
+    search: debouncedSearch || undefined,
+    position: position || undefined,
+    min_minutes: 0,
+    limit: 30,
+  }), [debouncedSearch, position]);
+
+  const { data, isLoading, isFetching } = usePlayers(queryParams);
+  const players = useMemo(() => {
+    const list = data?.players ?? [];
+    return [...list].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  }, [data]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleSelect = (player: PlayerSummary) => {
+    onSelect(player);
+    setSearch('');
+    setDebouncedSearch('');
+    setOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="card-glass p-4 space-y-3">
+        <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
+          Buscar jogador no banco de dados
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Digite o nome do jogador..."
+              value={search}
+              onChange={(e) => { handleSearchChange(e.target.value); setOpen(true); }}
+              onFocus={() => setOpen(true)}
+              className="w-full pl-9 pr-3 py-2 rounded-lg text-sm bg-transparent border outline-none"
+              style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
+            />
+            {(isLoading || isFetching) && (
+              <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin" style={{ color: 'var(--color-text-muted)' }} />
+            )}
+          </div>
+          <div className="relative">
+            <select
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              className="appearance-none pl-3 pr-8 py-2 rounded-lg text-sm bg-transparent border cursor-pointer"
+              style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
+            >
+              <option value="">Todas as Posições</option>
+              {apiPositions.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Results dropdown */}
+      <AnimatePresence>
+        {open && players.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute z-50 left-0 right-0 mt-1 rounded-xl overflow-hidden"
+            style={{
+              background: 'var(--color-surface-1)',
+              border: '1px solid var(--color-border-subtle)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              maxHeight: '320px',
+              overflowY: 'auto',
+            }}
+          >
+            {players.map((player) => {
+              const alreadyAdded = existingIds.has(player.id);
+              return (
+                <button
+                  key={player.id}
+                  onClick={() => !alreadyAdded && handleSelect(player)}
+                  disabled={alreadyAdded}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors cursor-pointer hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+                >
+                  {player.photo_url ? (
+                    <img
+                      src={proxyImageUrl(player.photo_url)!}
+                      alt={player.name}
+                      className="w-8 h-8 rounded-full object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--color-surface-2)' }}>
+                      <User size={14} strokeWidth={1.5} style={{ color: 'var(--color-text-muted)' }} />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+                      {player.display_name || player.name}
+                    </div>
+                    <div className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                      {player.team ?? '—'} &middot; {player.position ?? '—'} &middot; {player.age ?? '—'} anos
+                      {player.league ? ` &middot; ${player.league}` : ''}
+                    </div>
+                  </div>
+                  {player.score != null && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-md" style={{
+                      background: player.score >= 60 ? 'rgba(34,197,94,0.15)' : player.score >= 40 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
+                      color: player.score >= 60 ? '#22c55e' : player.score >= 40 ? '#eab308' : '#ef4444',
+                    }}>
+                      {player.score.toFixed(1)}
+                    </span>
+                  )}
+                  {alreadyAdded && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-muted)' }}>
+                      Já adicionado
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ── Tab 2: Alvos ──
 
 function TabTargets({
@@ -230,10 +400,15 @@ function TabTargets({
 }) {
   const [filterPos, setFilterPos] = useState('');
   const [filterPipeline, setFilterPipeline] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', club: '', age: '', position: '', pipeline: 'Identificado' as PipelineStatus });
+  const [showSearch, setShowSearch] = useState(false);
 
-  const positions = useMemo(() => [...new Set(needs.map((n) => n.position).filter(Boolean))], [needs]);
+  const needPositions = useMemo(() => [...new Set(needs.map((n) => n.position).filter(Boolean))], [needs]);
+  const allPositions = useMemo(() => {
+    const fromTargets = targets.map((t) => t.position).filter(Boolean);
+    return [...new Set([...needPositions, ...fromTargets])];
+  }, [needPositions, targets]);
+
+  const existingPlayerIds = useMemo(() => new Set(targets.map((t) => t.dbId).filter((id): id is number => id != null)), [targets]);
 
   const filtered = useMemo(() => {
     let list = targets;
@@ -242,14 +417,25 @@ function TabTargets({
     return list;
   }, [targets, filterPos, filterPipeline]);
 
-  const addTarget = () => {
-    if (!form.name.trim()) return;
+  const addFromDB = (player: PlayerSummary) => {
+    // Find best matching need position, or use the player's own position
+    const playerPos = player.position ?? '';
+    const matchingNeed = needPositions.find((p) => p.toLowerCase() === playerPos.toLowerCase());
     setTargets([
       ...targets,
-      { id: uid(), name: form.name, club: form.club, age: Number(form.age) || 0, position: form.position, pipeline: form.pipeline },
+      {
+        id: uid(),
+        dbId: player.id,
+        name: player.display_name || player.name,
+        club: player.team ?? '',
+        age: player.age ?? 0,
+        position: matchingNeed || playerPos,
+        pipeline: 'Identificado',
+        photoUrl: player.photo_url,
+        score: player.score,
+        league: player.league,
+      },
     ]);
-    setForm({ name: '', club: '', age: '', position: '', pipeline: 'Identificado' });
-    setShowForm(false);
   };
 
   const updatePipeline = (id: string, pipeline: PipelineStatus) => {
@@ -272,7 +458,7 @@ function TabTargets({
             style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
           >
             <option value="">Todas as Posições</option>
-            {positions.map((p) => (
+            {allPositions.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
@@ -293,70 +479,24 @@ function TabTargets({
           <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => setShowSearch(!showSearch)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer"
           style={{ background: 'var(--color-accent)', color: '#fff' }}
         >
-          <Plus size={14} /> Novo Alvo
+          <Plus size={14} /> Adicionar Jogador
         </button>
       </div>
 
-      {/* Add form */}
+      {/* Player search picker */}
       <AnimatePresence>
-        {showForm && (
+        {showSearch && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="card-glass p-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <input
-                type="text"
-                placeholder="Nome"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="bg-transparent border rounded-lg px-3 py-2 text-sm outline-none"
-                style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
-              />
-              <input
-                type="text"
-                placeholder="Clube"
-                value={form.club}
-                onChange={(e) => setForm({ ...form, club: e.target.value })}
-                className="bg-transparent border rounded-lg px-3 py-2 text-sm outline-none"
-                style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
-              />
-              <input
-                type="number"
-                placeholder="Idade"
-                value={form.age}
-                onChange={(e) => setForm({ ...form, age: e.target.value })}
-                className="bg-transparent border rounded-lg px-3 py-2 text-sm outline-none"
-                style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
-              />
-              <div className="relative">
-                <select
-                  value={form.position}
-                  onChange={(e) => setForm({ ...form, position: e.target.value })}
-                  className="appearance-none w-full bg-transparent border rounded-lg px-3 py-2 text-sm cursor-pointer pr-8"
-                  style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
-                >
-                  <option value="">Posição</option>
-                  {positions.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
-              </div>
-              <button
-                onClick={addTarget}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer"
-                style={{ background: 'var(--color-accent)', color: '#fff' }}
-              >
-                Confirmar
-              </button>
-            </div>
+            <PlayerSearchPicker onSelect={addFromDB} existingIds={existingPlayerIds} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -365,7 +505,7 @@ function TabTargets({
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {filtered.length === 0 && (
           <div className="col-span-full card-glass p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Nenhum alvo encontrado. Adicione alvos vinculados às necessidades.
+            Nenhum alvo encontrado. Clique em "Adicionar Jogador" para buscar no banco de dados.
           </div>
         )}
         {filtered.map((target, i) => (
@@ -376,16 +516,41 @@ function TabTargets({
             transition={{ delay: i * 0.04 }}
             className="card-glass p-4 space-y-3"
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>{target.name}</h3>
-                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            <div className="flex items-start gap-3">
+              {/* Player photo */}
+              {target.photoUrl ? (
+                <img
+                  src={proxyImageUrl(target.photoUrl)!}
+                  alt={target.name}
+                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}>
+                  <User size={16} strokeWidth={1.5} style={{ color: 'var(--color-text-muted)' }} />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{target.name}</h3>
+                  {target.score != null && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{
+                      background: target.score >= 60 ? 'rgba(34,197,94,0.15)' : target.score >= 40 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
+                      color: target.score >= 60 ? '#22c55e' : target.score >= 40 ? '#eab308' : '#ef4444',
+                    }}>
+                      {target.score.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
                   {target.club} &middot; {target.age} anos &middot; {target.position}
+                  {target.league ? ` &middot; ${target.league}` : ''}
                 </p>
               </div>
               <button
                 onClick={() => removeTarget(target.id)}
-                className="p-1 rounded-md transition-colors cursor-pointer hover:bg-red-500/10"
+                className="p-1 rounded-md transition-colors cursor-pointer hover:bg-red-500/10 flex-shrink-0"
                 style={{ color: 'var(--color-text-muted)' }}
               >
                 <Trash2 size={14} />
