@@ -19,7 +19,7 @@ interface Need {
   notes: string;
 }
 
-type PipelineStatus = 'Identificado' | 'Em Avaliação' | 'Negociação' | 'Aprovado' | 'Descartado';
+type PipelineStatus = 'Pendente de avaliação' | 'Titular' | 'Briga por titularidade' | 'Rotação' | 'Aposta' | 'Fundo de elenco' | 'Reprovado';
 
 interface TargetPlayer {
   id: string;
@@ -76,14 +76,16 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PIPELINE_COLORS: Record<PipelineStatus, string> = {
-  Identificado: '#6b7280',
-  'Em Avaliação': '#3b82f6',
-  Negociação: '#eab308',
-  Aprovado: '#22c55e',
-  Descartado: '#ef4444',
+  'Pendente de avaliação': '#6b7280',
+  Titular: '#22c55e',
+  'Briga por titularidade': '#3b82f6',
+  Rotação: '#eab308',
+  Aposta: '#f97316',
+  'Fundo de elenco': '#a855f7',
+  Reprovado: '#ef4444',
 };
 
-const PIPELINE_STEPS: PipelineStatus[] = ['Identificado', 'Em Avaliação', 'Negociação', 'Aprovado', 'Descartado'];
+const PIPELINE_STEPS: PipelineStatus[] = ['Pendente de avaliação', 'Titular', 'Briga por titularidade', 'Rotação', 'Aposta', 'Fundo de elenco', 'Reprovado'];
 
 // 4-3-3 formation positions
 const FORMATION_433: { key: string; label: string; x: number; y: number }[] = [
@@ -430,7 +432,7 @@ function TabTargets({
         club: player.team ?? '',
         age: player.age ?? 0,
         position: matchingNeed || playerPos,
-        pipeline: 'Identificado',
+        pipeline: 'Pendente de avaliação',
         photoUrl: player.photo_url,
         score: player.score,
         league: player.league,
@@ -532,7 +534,12 @@ function TabTargets({
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{target.name}</h3>
+                  <h3
+                    className="text-sm font-semibold truncate cursor-pointer hover:underline"
+                    style={{ color: 'var(--color-accent)' }}
+                    onClick={() => window.open(`${window.location.origin}${window.location.pathname}?tab=dashboard&player=${encodeURIComponent(target.name)}`, '_blank')}
+                    title="Abrir perfil do jogador"
+                  >{target.name}</h3>
                   {target.score != null && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{
                       background: target.score >= 60 ? 'rgba(34,197,94,0.15)' : target.score >= 40 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
@@ -556,21 +563,25 @@ function TabTargets({
               </button>
             </div>
 
-            {/* Pipeline */}
-            <div className="flex gap-1">
-              {PIPELINE_STEPS.map((step) => (
-                <button
-                  key={step}
-                  onClick={() => updatePipeline(target.id, step)}
-                  className="flex-1 text-[10px] py-1 rounded-md font-medium transition-all cursor-pointer"
+            {/* Perfil */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Perfil:</span>
+              <div className="relative flex-1">
+                <select
+                  value={target.pipeline}
+                  onChange={(e) => updatePipeline(target.id, e.target.value as PipelineStatus)}
+                  className="appearance-none w-full bg-transparent border rounded-md px-2.5 py-1.5 text-xs font-medium cursor-pointer pr-7"
                   style={{
-                    background: target.pipeline === step ? PIPELINE_COLORS[step] : 'var(--color-surface-1)',
-                    color: target.pipeline === step ? '#fff' : 'var(--color-text-muted)',
+                    borderColor: PIPELINE_COLORS[target.pipeline],
+                    color: PIPELINE_COLORS[target.pipeline],
                   }}
                 >
-                  {step}
-                </button>
-              ))}
+                  {PIPELINE_STEPS.map((step) => (
+                    <option key={step} value={step}>{step}</option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: PIPELINE_COLORS[target.pipeline] }} />
+              </div>
             </div>
           </motion.div>
         ))}
@@ -590,7 +601,7 @@ function TabShadowXI({
   setXI: (slots: ShadowXISlot[]) => void;
   targets: TargetPlayer[];
 }) {
-  const approved = useMemo(() => targets.filter((t) => t.pipeline === 'Aprovado'), [targets]);
+  const approved = useMemo(() => targets.filter((t) => t.pipeline !== 'Reprovado' && t.pipeline !== 'Pendente de avaliação'), [targets]);
 
   const getSlot = useCallback(
     (key: string) => xi.find((s) => s.positionKey === key)?.playerId ?? null,
@@ -620,7 +631,7 @@ function TabShadowXI({
       {approved.length === 0 && (
         <div className="card-glass p-6 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
           <AlertCircle size={24} className="mx-auto mb-2" style={{ color: 'var(--color-text-muted)' }} />
-          Nenhum alvo com status "Aprovado". Altere o status de pipeline na aba Alvos.
+          Nenhum alvo avaliado. Altere o perfil dos alvos na aba Alvos.
         </div>
       )}
 
