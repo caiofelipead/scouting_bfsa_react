@@ -360,8 +360,8 @@ function PlayerSearchPicker({ onSelect, existingIds }: {
                       {player.display_name || player.name}
                     </div>
                     <div className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
-                      {player.team ?? '—'} &middot; {player.position ?? '—'} &middot; {player.age ?? '—'} anos
-                      {player.league ? ` &middot; ${player.league}` : ''}
+                      {player.team ?? '—'} · {player.position ?? '—'} · {player.age ?? '—'} anos
+                      {player.league ? ` · ${player.league}` : ''}
                     </div>
                   </div>
                   {player.score != null && (
@@ -543,8 +543,8 @@ function TabTargets({
                   )}
                 </div>
                 <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
-                  {target.club} &middot; {target.age} anos &middot; {target.position}
-                  {target.league ? ` &middot; ${target.league}` : ''}
+                  {target.club} · {target.age} anos · {target.position}
+                  {target.league ? ` · ${target.league}` : ''}
                 </p>
               </div>
               <button
