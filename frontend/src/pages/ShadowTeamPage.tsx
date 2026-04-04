@@ -36,7 +36,7 @@ interface TargetPlayer {
 
 interface ShadowXISlot {
   positionKey: string;
-  playerId: string | null;
+  playerIds: string[];
 }
 
 interface Note {
@@ -592,6 +592,8 @@ function TabTargets({
 
 // ── Tab 3: Shadow XI ──
 
+const MAX_PER_POSITION = 5;
+
 function TabShadowXI({
   xi,
   setXI,
@@ -601,128 +603,236 @@ function TabShadowXI({
   setXI: (slots: ShadowXISlot[]) => void;
   targets: TargetPlayer[];
 }) {
-  const approved = useMemo(() => targets.filter((t) => t.pipeline !== 'Reprovado' && t.pipeline !== 'Pendente de avaliação'), [targets]);
+  const available = useMemo(() => targets.filter((t) => t.pipeline !== 'Reprovado' && t.pipeline !== 'Pendente de avaliação'), [targets]);
+  const [selectedPos, setSelectedPos] = useState<string | null>(null);
 
-  const getSlot = useCallback(
-    (key: string) => xi.find((s) => s.positionKey === key)?.playerId ?? null,
+  const getSlotIds = useCallback(
+    (key: string): string[] => xi.find((s) => s.positionKey === key)?.playerIds ?? [],
     [xi],
   );
 
-  const setSlot = (key: string, playerId: string | null) => {
+  const updateSlotIds = (key: string, playerIds: string[]) => {
     const exists = xi.find((s) => s.positionKey === key);
     if (exists) {
-      setXI(xi.map((s) => (s.positionKey === key ? { ...s, playerId } : s)));
+      setXI(xi.map((s) => (s.positionKey === key ? { ...s, playerIds } : s)));
     } else {
-      setXI([...xi, { positionKey: key, playerId }]);
+      setXI([...xi, { positionKey: key, playerIds }]);
     }
   };
 
-  const getPlayerName = (id: string | null) => {
-    if (!id) return null;
-    return approved.find((p) => p.id === id)?.name ?? null;
+  const addToSlot = (key: string, playerId: string) => {
+    const current = getSlotIds(key);
+    if (current.length >= MAX_PER_POSITION || current.includes(playerId)) return;
+    updateSlotIds(key, [...current, playerId]);
   };
+
+  const removeFromSlot = (key: string, playerId: string) => {
+    const current = getSlotIds(key);
+    updateSlotIds(key, current.filter((id) => id !== playerId));
+  };
+
+  const getPlayer = (id: string) => targets.find((t) => t.id === id);
+
+  // All player IDs already assigned to any slot
+  const assignedIds = useMemo(() => new Set(xi.flatMap((s) => s.playerIds)), [xi]);
+
+  const selectedSlotIds = selectedPos ? getSlotIds(selectedPos) : [];
+  const selectedLabel = selectedPos ? FORMATION_433.find((f) => f.key === selectedPos)?.label ?? '' : '';
 
   return (
     <div className="space-y-4">
       <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-        Posicione os alvos aprovados na formação 4-3-3.
+        Clique em uma posição no campo para adicionar até {MAX_PER_POSITION} alvos.
       </p>
 
-      {approved.length === 0 && (
+      {available.length === 0 && (
         <div className="card-glass p-6 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
           <AlertCircle size={24} className="mx-auto mb-2" style={{ color: 'var(--color-text-muted)' }} />
           Nenhum alvo avaliado. Altere o perfil dos alvos na aba Alvos.
         </div>
       )}
 
-      {/* Pitch */}
-      <div className="card-glass p-4 flex justify-center">
-        <div
-          className="relative"
-          style={{
-            width: '100%',
-            maxWidth: '520px',
-            aspectRatio: '68/105',
-            background: 'linear-gradient(180deg, #1a5e2a 0%, #1d6b30 50%, #1a5e2a 100%)',
-            borderRadius: '12px',
-            border: '2px solid rgba(255,255,255,0.15)',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Field lines */}
-          <div style={{ position: 'absolute', top: '50%', left: '5%', right: '5%', height: '1px', background: 'rgba(255,255,255,0.2)' }} />
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '18%', aspectRatio: '1', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)' }} />
-          {/* Penalty areas */}
-          <div style={{ position: 'absolute', bottom: '0', left: '20%', right: '20%', height: '16%', border: '1px solid rgba(255,255,255,0.2)', borderBottom: 'none' }} />
-          <div style={{ position: 'absolute', top: '0', left: '20%', right: '20%', height: '16%', border: '1px solid rgba(255,255,255,0.2)', borderTop: 'none' }} />
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
+        {/* Pitch */}
+        <div className="card-glass p-4 flex justify-center">
+          <div
+            className="relative"
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              aspectRatio: '68/105',
+              background: 'linear-gradient(180deg, #1a5e2a 0%, #1d6b30 50%, #1a5e2a 100%)',
+              borderRadius: '12px',
+              border: '2px solid rgba(255,255,255,0.15)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Field lines */}
+            <div style={{ position: 'absolute', top: '50%', left: '5%', right: '5%', height: '1px', background: 'rgba(255,255,255,0.2)' }} />
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '18%', aspectRatio: '1', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)' }} />
+            <div style={{ position: 'absolute', bottom: '0', left: '20%', right: '20%', height: '16%', border: '1px solid rgba(255,255,255,0.2)', borderBottom: 'none' }} />
+            <div style={{ position: 'absolute', top: '0', left: '20%', right: '20%', height: '16%', border: '1px solid rgba(255,255,255,0.2)', borderTop: 'none' }} />
 
-          {/* Positions */}
-          {FORMATION_433.map((pos) => {
-            const playerId = getSlot(pos.key);
-            const playerName = getPlayerName(playerId);
-            return (
-              <div
-                key={pos.key}
-                style={{
-                  position: 'absolute',
-                  left: `${pos.x}%`,
-                  top: `${pos.y}%`,
-                  transform: 'translate(-50%,-50%)',
-                  textAlign: 'center',
-                  zIndex: 2,
-                }}
-              >
+            {/* Positions */}
+            {FORMATION_433.map((pos) => {
+              const ids = getSlotIds(pos.key);
+              const count = ids.length;
+              const isSelected = selectedPos === pos.key;
+              const firstName = count > 0 ? getPlayer(ids[0])?.name : null;
+              return (
                 <div
-                  className="relative group"
+                  key={pos.key}
                   style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '50%',
-                    background: playerId ? 'var(--color-accent)' : 'rgba(0,0,0,0.45)',
-                    border: '2px solid rgba(255,255,255,0.4)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto',
-                    cursor: 'pointer',
+                    position: 'absolute',
+                    left: `${pos.x}%`,
+                    top: `${pos.y}%`,
+                    transform: 'translate(-50%,-50%)',
+                    textAlign: 'center',
+                    zIndex: 2,
                   }}
                 >
-                  <span className="text-[10px] font-bold text-white">{pos.label}</span>
-                  {/* Dropdown on hover/click */}
-                  <select
-                    value={playerId ?? ''}
-                    onChange={(e) => setSlot(pos.key, e.target.value || null)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    title={`Selecionar jogador para ${pos.label}`}
+                  <button
+                    onClick={() => setSelectedPos(isSelected ? null : pos.key)}
+                    className="cursor-pointer"
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      background: count > 0 ? 'var(--color-accent)' : 'rgba(0,0,0,0.45)',
+                      border: isSelected ? '3px solid #fff' : '2px solid rgba(255,255,255,0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto',
+                      position: 'relative',
+                      boxShadow: isSelected ? '0 0 12px rgba(227,6,19,0.6)' : 'none',
+                      transition: 'all 0.2s',
+                    }}
                   >
-                    <option value="">—</option>
-                    {approved.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    <span className="text-[10px] font-bold text-white">{pos.label}</span>
+                    {count > 0 && (
+                      <span
+                        className="absolute -top-1 -right-1 text-[8px] font-bold rounded-full flex items-center justify-center"
+                        style={{ width: '16px', height: '16px', background: '#fff', color: 'var(--color-accent)' }}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                  {firstName && (
+                    <div
+                      className="text-[8px] font-semibold mt-1 px-1 py-0.5 rounded max-w-[80px] truncate mx-auto"
+                      style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', whiteSpace: 'nowrap' }}
+                    >
+                      {firstName}{count > 1 ? ` +${count - 1}` : ''}
+                    </div>
+                  )}
                 </div>
-                {playerName && (
-                  <div
-                    className="text-[9px] font-semibold mt-1 px-1 py-0.5 rounded"
-                    style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', whiteSpace: 'nowrap' }}
-                  >
-                    {playerName}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 justify-center text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full" style={{ background: 'var(--color-accent)' }} /> Posição preenchida
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.3)' }} /> Posição vazia
-        </span>
+        {/* Side panel — position detail */}
+        <div className="card-glass p-4 space-y-3">
+          {!selectedPos ? (
+            <div className="text-center py-8 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              Selecione uma posição no campo para gerenciar os alvos.
+            </div>
+          ) : (
+            <>
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
+                <span className="w-3 h-3 rounded-full" style={{ background: 'var(--color-accent)' }} />
+                {selectedLabel} — {selectedSlotIds.length}/{MAX_PER_POSITION}
+              </h3>
+
+              {/* Current players in this position */}
+              <div className="space-y-1.5">
+                {selectedSlotIds.map((pid, idx) => {
+                  const p = getPlayer(pid);
+                  if (!p) return null;
+                  return (
+                    <motion.div
+                      key={pid}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                      style={{ background: 'var(--color-surface-2)' }}
+                    >
+                      <span className="text-[10px] font-bold w-4 text-center" style={{ color: 'var(--color-accent)' }}>
+                        {idx + 1}
+                      </span>
+                      {p.photoUrl ? (
+                        <img
+                          src={proxyImageUrl(p.photoUrl)!}
+                          alt={p.name}
+                          className="w-6 h-6 rounded-full object-cover"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'var(--color-surface-3)' }}>
+                          <User size={10} style={{ color: 'var(--color-text-muted)' }} />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-medium truncate block" style={{ color: 'var(--color-text-primary)' }}>{p.name}</span>
+                        <span className="text-[10px] truncate block" style={{ color: 'var(--color-text-muted)' }}>{p.club}</span>
+                      </div>
+                      <button
+                        onClick={() => removeFromSlot(selectedPos, pid)}
+                        className="p-1 rounded-md cursor-pointer hover:bg-red-500/10"
+                        style={{ color: 'var(--color-text-muted)' }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Add player */}
+              {selectedSlotIds.length < MAX_PER_POSITION && (
+                <div>
+                  <p className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                    Adicionar alvo:
+                  </p>
+                  <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                    {available.filter((t) => !selectedSlotIds.includes(t.id)).map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => addToSlot(selectedPos, t.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors cursor-pointer hover:bg-white/5"
+                        style={{ border: '1px solid var(--color-border-subtle)' }}
+                      >
+                        {t.photoUrl ? (
+                          <img
+                            src={proxyImageUrl(t.photoUrl)!}
+                            alt={t.name}
+                            className="w-5 h-5 rounded-full object-cover"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: 'var(--color-surface-3)' }}>
+                            <User size={8} style={{ color: 'var(--color-text-muted)' }} />
+                          </div>
+                        )}
+                        <span className="text-xs truncate" style={{ color: 'var(--color-text-primary)' }}>{t.name}</span>
+                        <span className="text-[10px] ml-auto flex-shrink-0" style={{ color: PIPELINE_COLORS[t.pipeline] }}>{t.pipeline}</span>
+                      </button>
+                    ))}
+                    {available.filter((t) => !selectedSlotIds.includes(t.id)).length === 0 && (
+                      <p className="text-[10px] text-center py-2" style={{ color: 'var(--color-text-muted)' }}>
+                        Nenhum alvo disponível.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
