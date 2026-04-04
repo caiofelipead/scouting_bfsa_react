@@ -178,7 +178,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
                     <button
                       key={item.id}
                       onClick={() => onTabChange(item.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 text-left cursor-pointer relative overflow-hidden"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 text-left cursor-pointer relative overflow-hidden focus-ring-inset"
                       style={{
                         background: active ? 'var(--color-accent-glow)' : 'transparent',
                         color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
@@ -221,7 +221,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
           <div className="flex items-center gap-1">
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg transition-colors hover:bg-white/5 cursor-pointer"
+              className="p-2 rounded-lg btn-ghost focus-ring cursor-pointer"
               style={{ color: 'var(--color-text-muted)' }}
               title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
             >
@@ -229,7 +229,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
             </button>
             <button
               onClick={onLogout}
-              className="p-2 rounded-lg transition-colors hover:bg-white/5 cursor-pointer"
+              className="p-2 rounded-lg btn-ghost focus-ring cursor-pointer"
               style={{ color: 'var(--color-text-muted)' }}
               title="Sair"
             >
@@ -256,7 +256,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
         <div className="flex items-center gap-1">
           <button
             onClick={toggleTheme}
-            className="p-1.5 cursor-pointer"
+            className="p-2 rounded-lg btn-ghost focus-ring cursor-pointer"
             style={{ color: 'var(--color-text-secondary)' }}
             title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
           >
@@ -264,7 +264,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
           </button>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 cursor-pointer"
+            className="p-2 rounded-lg btn-ghost focus-ring cursor-pointer"
             style={{ color: 'var(--color-text-secondary)' }}
           >
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
@@ -371,15 +371,10 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="sticky top-0 z-20 px-4 py-2 text-center text-xs font-medium"
-              style={{
-                background: 'linear-gradient(90deg, rgba(234, 179, 8, 0.15), rgba(234, 179, 8, 0.08))',
-                borderBottom: '1px solid rgba(234, 179, 8, 0.3)',
-                color: '#eab308',
-              }}
+              className="sticky top-0 z-20 px-4 py-2 text-center text-xs font-medium banner-warning"
             >
               <div className="flex items-center justify-center gap-2">
-                <div className="animate-spin h-3 w-3 border border-yellow-500 border-t-transparent rounded-full" />
+                <div className="animate-spin h-3 w-3 rounded-full" style={{ border: '2px solid var(--color-above)', borderTopColor: 'transparent' }} />
                 Servidor iniciando... as requisicoes serao retentadas automaticamente.
               </div>
             </motion.div>

@@ -74,15 +74,13 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@botafogo-sp.com"
                 required
-                className="w-full pl-9 pr-3 py-2.5 rounded text-sm outline-none transition-colors"
+                className="w-full pl-9 pr-3 py-2.5 rounded text-sm outline-none input-focus"
                 style={{
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-border-subtle)',
                   color: 'var(--color-text-primary)',
                   fontFamily: 'var(--font-body)',
                 }}
-                onFocus={(e) => (e.target.style.borderColor = 'rgba(227, 6, 19, 0.4)')}
-                onBlur={(e) => (e.target.style.borderColor = 'var(--color-border-subtle)')}
               />
             </div>
           </div>
@@ -106,15 +104,13 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="******"
                 required
-                className="w-full pl-9 pr-3 py-2.5 rounded text-sm outline-none transition-colors"
+                className="w-full pl-9 pr-3 py-2.5 rounded text-sm outline-none input-focus"
                 style={{
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-border-subtle)',
                   color: 'var(--color-text-primary)',
                   fontFamily: 'var(--font-body)',
                 }}
-                onFocus={(e) => (e.target.style.borderColor = 'rgba(227, 6, 19, 0.4)')}
-                onBlur={(e) => (e.target.style.borderColor = 'var(--color-border-subtle)')}
               />
             </div>
           </div>
@@ -123,12 +119,7 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2 px-3 py-2 rounded text-xs"
-              style={{
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                color: '#ef4444',
-              }}
+              className="flex items-center gap-2 px-3 py-2 rounded text-xs banner-error"
             >
               <AlertCircle size={13} />
               {error}
@@ -138,7 +129,7 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded text-sm font-[var(--font-display)] font-semibold tracking-wide uppercase transition-all duration-200 cursor-pointer disabled:opacity-50"
+            className="w-full py-2.5 rounded text-sm font-[var(--font-display)] font-semibold tracking-wide uppercase transition-all duration-200 cursor-pointer disabled:opacity-50 focus-ring hover:brightness-110 active:scale-[0.98]"
             style={{
               background: loading ? 'var(--color-accent-dim)' : 'var(--color-accent)',
               color: '#fff',

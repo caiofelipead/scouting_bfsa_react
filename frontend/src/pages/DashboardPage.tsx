@@ -282,9 +282,9 @@ export default function DashboardPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.02 }}
                     onClick={() => setSelectedPlayer(player.display_name || player.name)}
-                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all duration-150 cursor-pointer"
+                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all duration-200 cursor-pointer focus-ring-inset"
                     style={{
-                      background: isSelected ? 'var(--color-accent-glow)' : i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
+                      background: isSelected ? 'var(--color-accent-glow)' : i % 2 === 0 ? 'transparent' : 'var(--color-surface-0)',
                       borderBottom: '1px solid var(--color-border-subtle)',
                       borderLeft: isSelected ? '3px solid var(--color-accent)' : '3px solid transparent',
                     }}
@@ -323,7 +323,7 @@ export default function DashboardPage() {
                           <span
                             className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
                             style={{
-                              background: 'rgba(255,255,255,0.04)',
+                              background: 'var(--color-surface-1)',
                               color: 'var(--color-text-muted)',
                               border: '1px solid var(--color-border-subtle)',
                             }}
