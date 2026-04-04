@@ -34,6 +34,7 @@ const LIGAS_TARGET = [
   'Liga Argentina', 'J1 League', 'Saudi Pro League',
 ];
 
+// Hex values required here because they are used in `${color}15` alpha patterns
 const RISK_COLORS: Record<string, string> = {
   baixo: '#22c55e',
   medio: '#eab308',
@@ -120,7 +121,7 @@ export default function RankingsPage() {
 
       {/* Error display */}
       {anyError && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded text-sm" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}>
+        <div className="flex items-center gap-2 px-4 py-3 rounded text-sm banner-error">
           <AlertCircle size={16} />
           <span>Erro ao carregar dados: {(anyError as Error).message || 'Erro desconhecido'}</span>
         </div>
@@ -130,11 +131,11 @@ export default function RankingsPage() {
       <div className="flex gap-2">
         <button
           onClick={() => setMode('ssp')}
-          className="px-4 py-2 rounded text-sm font-[var(--font-display)] tracking-wide cursor-pointer transition-all"
+          className="px-4 py-2 rounded text-sm font-[var(--font-display)] tracking-wide cursor-pointer transition-all focus-ring"
           style={{
             background: mode === 'ssp' ? 'var(--color-accent-glow)' : 'var(--color-surface-1)',
             color: mode === 'ssp' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-            border: `1px solid ${mode === 'ssp' ? 'rgba(220,38,38,0.3)' : 'var(--color-border-subtle)'}`,
+            border: `1px solid ${mode === 'ssp' ? 'var(--color-accent-dim)' : 'var(--color-border-subtle)'}`,
           }}
         >
           <Trophy size={14} className="inline mr-1.5" />
@@ -142,11 +143,11 @@ export default function RankingsPage() {
         </button>
         <button
           onClick={() => setMode('prediction')}
-          className="px-4 py-2 rounded text-sm font-[var(--font-display)] tracking-wide cursor-pointer transition-all"
+          className="px-4 py-2 rounded text-sm font-[var(--font-display)] tracking-wide cursor-pointer transition-all focus-ring"
           style={{
             background: mode === 'prediction' ? 'var(--color-accent-glow)' : 'var(--color-surface-1)',
             color: mode === 'prediction' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-            border: `1px solid ${mode === 'prediction' ? 'rgba(220,38,38,0.3)' : 'var(--color-border-subtle)'}`,
+            border: `1px solid ${mode === 'prediction' ? 'var(--color-accent-dim)' : 'var(--color-border-subtle)'}`,
           }}
         >
           <Target size={14} className="inline mr-1.5" />
@@ -234,7 +235,7 @@ export default function RankingsPage() {
                   ))
                 ) : rankings && rankings.players.length > 0 ? (
                   rankings.players.map((entry, i) => (
-                    <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="group transition-colors hover:bg-white/[0.02] cursor-pointer" onClick={() => setSelectedPlayer(entry.display_name || entry.name)}>
+                    <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="group table-row-interactive cursor-pointer" onClick={() => setSelectedPlayer(entry.display_name || entry.name)}>
                       <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs" style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>{entry.rank}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
@@ -243,10 +244,10 @@ export default function RankingsPage() {
                           ) : (
                             <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}><User size={14} style={{ color: 'var(--color-text-muted)' }} /></div>
                           )}
-                          <span className="font-medium whitespace-nowrap group-hover:text-blue-400 transition-colors">{entry.name}</span>
+                          <span className="font-medium whitespace-nowrap player-name-link">{entry.name}</span>
                           <button
                             onClick={(e) => { e.stopPropagation(); window.open(`${window.location.origin}${window.location.pathname}?tab=rankings&player=${encodeURIComponent(entry.display_name || entry.name)}`, '_blank'); }}
-                            className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-gray-400 hover:text-blue-400 shrink-0"
+                            className="row-action-icon shrink-0"
                             title="Abrir perfil em nova aba"
                           >
                             <ExternalLink size={12} />
@@ -318,9 +319,9 @@ export default function RankingsPage() {
                 ) : predRanking && predRanking.players.length > 0 ? (
                   predRanking.players.map((entry, i) => {
                     const prob = entry.p_success * 100;
-                    const riskColor = RISK_COLORS[entry.risk_level] || '#6b7280';
+                    const riskColor = RISK_COLORS[entry.risk_level] || 'var(--color-text-muted)';
                     return (
-                      <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="group transition-colors hover:bg-white/[0.02] cursor-pointer" onClick={() => setSelectedPlayer(entry.display_name || entry.name)}>
+                      <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="group table-row-interactive cursor-pointer" onClick={() => setSelectedPlayer(entry.display_name || entry.name)}>
                         <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs" style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>{entry.rank}</td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">
@@ -329,10 +330,10 @@ export default function RankingsPage() {
                             ) : (
                               <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}><User size={14} style={{ color: 'var(--color-text-muted)' }} /></div>
                             )}
-                            <span className="font-medium whitespace-nowrap group-hover:text-blue-400 transition-colors">{entry.name}</span>
+                            <span className="font-medium whitespace-nowrap player-name-link">{entry.name}</span>
                             <button
                               onClick={(e) => { e.stopPropagation(); window.open(`${window.location.origin}${window.location.pathname}?tab=rankings&player=${encodeURIComponent(entry.display_name || entry.name)}`, '_blank'); }}
-                              className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-gray-400 hover:text-blue-400 shrink-0"
+                              className="row-action-icon shrink-0"
                               title="Abrir perfil em nova aba"
                             >
                               <ExternalLink size={12} />
@@ -407,7 +408,7 @@ export default function RankingsPage() {
                 </button>
                 <button
                   onClick={() => setSelectedPlayer(null)}
-                  className="flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded hover:bg-gray-800"
+                  className="flex items-center gap-1 text-[10px] px-2 py-1 rounded btn-ghost"
                   style={{ color: 'var(--color-text-muted)' }}
                 >
                   <X size={12} />
