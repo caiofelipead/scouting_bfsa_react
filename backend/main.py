@@ -546,14 +546,26 @@ async def admin_resync(request: Request, current_user: dict = Depends(require_ad
     """
     global _data
     import gc
+    from services.sync_sheets import sync_single_sheet
 
     sheet = request.query_params.get("sheet")
     keys_to_sync = [sheet] if sheet and sheet in SHEET_KEYS else list(SHEET_KEYS)
 
+    # Free memory BEFORE syncing — drop in-memory data for sheets we'll reload
+    for key in keys_to_sync:
+        _data[key] = pd.DataFrame()
+    # Also clear caches that hold references to old data
+    _endpoint_cache.clear()
+    try:
+        from services.similarity import _percentile_cache
+        _percentile_cache.clear()
+    except ImportError:
+        pass
+    gc.collect()
+
     sync_results = {}
     for key in keys_to_sync:
         try:
-            from services.sync_sheets import sync_single_sheet
             count = sync_single_sheet(key)
             sync_results[key] = count
         except Exception as e:
