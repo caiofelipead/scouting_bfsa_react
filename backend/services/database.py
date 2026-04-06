@@ -112,6 +112,17 @@ def upsert_sheet_data(sheet_key: str, df: pd.DataFrame):
         logger.warning("Skipping upsert for '%s' — empty DataFrame", sheet_key)
         return 0
 
+    # Deduplicate column names (append _2, _3, etc. for duplicates)
+    cols = list(df.columns)
+    seen = {}
+    for i, c in enumerate(cols):
+        if c in seen:
+            seen[c] += 1
+            cols[i] = f"{c}_{seen[c]}"
+        else:
+            seen[c] = 1
+    df.columns = cols
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -126,7 +137,11 @@ def upsert_sheet_data(sheet_key: str, df: pd.DataFrame):
                 row_dict = {}
                 for col in df.columns:
                     val = row[col]
-                    if pd.isna(val):
+                    try:
+                        is_na = pd.isna(val)
+                    except (ValueError, TypeError):
+                        is_na = False
+                    if is_na:
                         row_dict[col] = None
                     else:
                         row_dict[col] = str(val) if not isinstance(val, (int, float)) else val
