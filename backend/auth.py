@@ -38,11 +38,19 @@ def _get_connection():
     url = DATABASE_URL
     if url:
         import psycopg2
+        import time
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
-        conn = psycopg2.connect(url)
-        conn.autocommit = False
-        return conn, "pg"
+        for attempt in range(3):
+            try:
+                conn = psycopg2.connect(url, connect_timeout=10)
+                conn.autocommit = False
+                return conn, "pg"
+            except psycopg2.OperationalError:
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+                else:
+                    raise
     else:
         import sqlite3
         db_path = os.environ.get("AUTH_DB_PATH", os.path.join(os.path.dirname(__file__), "users.db"))
