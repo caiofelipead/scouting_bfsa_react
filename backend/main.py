@@ -230,7 +230,7 @@ _data_lock = threading.Lock()
 
 
 def _load_all_data():
-    """Load all data into memory — tries PostgreSQL first, syncs from Sheets if empty."""
+    """Load all data into memory — loads from PostgreSQL first, then syncs from Sheets in background."""
     global _data, _data_loading
 
     try:
@@ -246,13 +246,21 @@ def _load_all_data():
         except Exception as e:
             logger.warning("Could not init VAEP tables: %s", e)
 
-        # Always sync from Google Sheets → PostgreSQL on startup
-        logger.info("Syncing data from Google Sheets...")
+        # Check if PostgreSQL has data — if so, load from it first for fast startup
+        pg_has_data = False
         try:
-            sync_results = sync_all_sheets()
-            logger.info("Sync results: %s", sync_results)
+            pg_has_data = has_data()
         except Exception as e:
-            logger.error("Sync from Google Sheets failed: %s", e)
+            logger.warning("Could not check PostgreSQL for data: %s", e)
+
+        if not pg_has_data:
+            # First run — must sync from Google Sheets before we can serve
+            logger.info("No data in PostgreSQL — syncing from Google Sheets...")
+            try:
+                sync_results = sync_all_sheets()
+                logger.info("Initial sync results: %s", sync_results)
+            except Exception as e:
+                logger.error("Initial sync from Google Sheets failed: %s", e)
 
         # Load from PostgreSQL — prioritize wyscout (used by /api/players)
         priority_order = ["wyscout"] + [k for k in SHEET_KEYS if k != "wyscout"]
@@ -308,7 +316,33 @@ def _load_all_data():
         _data_ready.set()
         _data_loading = False
 
+    # Background refresh: sync from Google Sheets and reload data
+    # This runs AFTER the app is already serving with cached PostgreSQL data
+    if pg_has_data:
+        try:
+            logger.info("Background sync: refreshing data from Google Sheets...")
+            sync_results = sync_all_sheets()
+            logger.info("Background sync results: %s", sync_results)
 
+            # Reload updated data from PostgreSQL
+            for key in SHEET_KEYS:
+                try:
+                    df = load_sheet_dataframe(key)
+                    _data[key] = df
+                except Exception as e:
+                    logger.error("Background reload failed for '%s': %s", key, e)
+
+            if "wyscout" in _data and len(_data["wyscout"]) > 0:
+                _data["wyscout"] = _prepare_wyscout(_data["wyscout"])
+
+            if "skillcorner" in _data and len(_data["skillcorner"]) > 0:
+                sc_text = {"player_name", "short_name", "team_name", "position_group"}
+                _data["skillcorner"] = _coerce_numeric_columns(_data["skillcorner"], sc_text)
+                build_skillcorner_index(_data["skillcorner"])
+
+            logger.info("Background sync complete — data refreshed")
+        except Exception as e:
+            logger.error("Background sync failed: %s", e)
 def _ensure_data_loaded():
     """Trigger background loading if not started, wait up to 120s for data."""
     global _data_loading
