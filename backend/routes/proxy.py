@@ -41,6 +41,7 @@ _ALLOWED_IMAGE_DOMAINS = {
     "images.fotmob.com",
     "www.thesportsdb.com",
     "thesportsdb.com",
+    "sortitoutsidospaces.b-cdn.net",
 }
 
 
