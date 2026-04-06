@@ -922,16 +922,19 @@ async def get_player_profile(
     position_raw = str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else "Meia"
     position = get_posicao_categoria(position_raw)
 
+    # Filter comparison pool to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
     # Percentiles for radar
-    percentiles = calculate_metric_percentiles(row, position, df, top_n=12)
+    percentiles = calculate_metric_percentiles(row, position, df_league, top_n=12)
 
     # Composite indices
     pos_indices = INDICES_CONFIG.get(position, {})
-    indices = calculate_all_indices(row, pos_indices, df, position)
+    indices = calculate_all_indices(row, pos_indices, df_league, position)
     indices = {k: round(v, 1) for k, v in indices.items()}
 
     # Overall score
-    score = calculate_overall_score(row, position, df)
+    score = calculate_overall_score(row, position, df_league)
     perf_class = classify_performance(score) if score else None
 
     # SkillCorner match
@@ -1525,7 +1528,10 @@ async def get_radar_data(
     pos_raw = str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else "Meia"
     position = get_posicao_categoria(pos_raw)
 
-    percentiles = calculate_metric_percentiles(row, position, df, top_n=top_n)
+    # Filter comparison pool to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
+    percentiles = calculate_metric_percentiles(row, position, df_league, top_n=top_n)
 
     return {
         "labels": list(percentiles.keys()),
@@ -1555,8 +1561,11 @@ async def compare_players(
     pos2 = get_posicao_categoria(str(row2.get("Posição", "Meia")))
     position = pos1
 
-    p1_perc = calculate_metric_percentiles(row1, position, df, top_n=12)
-    p2_perc = calculate_metric_percentiles(row2, position, df, top_n=12)
+    # Filter comparison pool to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
+    p1_perc = calculate_metric_percentiles(row1, position, df_league, top_n=12)
+    p2_perc = calculate_metric_percentiles(row2, position, df_league, top_n=12)
 
     all_labels = list(dict.fromkeys(list(p1_perc.keys()) + list(p2_perc.keys())))
 
