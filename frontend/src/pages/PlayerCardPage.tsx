@@ -404,7 +404,7 @@ export default function PlayerCardPage() {
           {/* ── Percentile description ────────────────────────────── */}
           <div className="text-center">
             <span className="text-[10px] font-[var(--font-mono)] tracking-[0.15em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
-              PERCENTIL VS {indicesData.position.toUpperCase()} · PER 90 MINUTES
+              PERCENTIL VS {indicesData.position.toUpperCase()} · SÉRIE B BRASIL · PER 90 MINUTES
             </span>
           </div>
 
