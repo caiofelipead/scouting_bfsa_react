@@ -315,35 +315,6 @@ def _load_all_data():
         # ALWAYS signal readiness — even on failure — so requests don't hang forever
         _data_ready.set()
         _data_loading = False
-
-    # Background refresh: sync from Google Sheets and reload data
-    # This runs AFTER the app is already serving with cached PostgreSQL data
-    if pg_has_data:
-        try:
-            logger.info("Background sync: refreshing data from Google Sheets...")
-            sync_results = sync_all_sheets()
-            logger.info("Background sync results: %s", sync_results)
-
-            # Reload updated data from PostgreSQL
-            for key in SHEET_KEYS:
-                try:
-                    df = load_sheet_dataframe(key)
-                    _data[key] = df
-                except Exception as e:
-                    logger.error("Background reload failed for '%s': %s", key, e)
-
-            if "wyscout" in _data and len(_data["wyscout"]) > 0:
-                _data["wyscout"] = _prepare_wyscout(_data["wyscout"])
-
-            if "skillcorner" in _data and len(_data["skillcorner"]) > 0:
-                sc_text = {"player_name", "short_name", "team_name", "position_group"}
-                _data["skillcorner"] = _coerce_numeric_columns(_data["skillcorner"], sc_text)
-                build_skillcorner_index(_data["skillcorner"])
-
-            logger.info("Background sync complete — data refreshed")
-            _endpoint_cache.clear()
-        except Exception as e:
-            logger.error("Background sync failed: %s", e)
 def _ensure_data_loaded():
     """Trigger background loading if not started, wait up to 120s for data."""
     global _data_loading
