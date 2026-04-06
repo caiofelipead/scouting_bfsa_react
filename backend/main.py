@@ -1934,8 +1934,11 @@ async def get_player_indices(
     pos_raw = position or (str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else "Meia")
     pos = get_posicao_categoria(pos_raw)
 
+    # Filter comparison pool to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
     pos_indices = INDICES_CONFIG.get(pos, {})
-    indices = calculate_all_indices(row, pos_indices, df, pos)
+    indices = calculate_all_indices(row, pos_indices, df_league, pos)
     indices = {k: round(v, 1) for k, v in indices.items()}
 
     # Per-index metric breakdown
