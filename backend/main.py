@@ -539,21 +539,37 @@ async def health_check():
 
 
 @app.post("/api/admin/resync")
-async def admin_resync(current_user: dict = Depends(require_admin)):
-    """Force re-sync all sheets from Google Sheets → PostgreSQL and reload into memory."""
+async def admin_resync(request: Request, current_user: dict = Depends(require_admin)):
+    """Force re-sync all sheets from Google Sheets → PostgreSQL and reload into memory.
+    Syncs one sheet at a time to stay within memory limits.
+    Use ?sheet=wyscout to sync only a specific sheet.
+    """
     global _data
+    import gc
 
-    # Step 1: Sync from Google Sheets → PostgreSQL
-    sync_results = sync_all_sheets()
+    sheet = request.query_params.get("sheet")
+    keys_to_sync = [sheet] if sheet and sheet in SHEET_KEYS else list(SHEET_KEYS)
 
-    # Step 2: Reload from PostgreSQL into memory
-    for key in SHEET_KEYS:
+    sync_results = {}
+    for key in keys_to_sync:
+        try:
+            from services.sync_sheets import sync_single_sheet
+            count = sync_single_sheet(key)
+            sync_results[key] = count
+        except Exception as e:
+            logger.error("Sync failed for '%s': %s", key, e)
+            sync_results[key] = -1
+        gc.collect()
+
+    # Reload from PostgreSQL into memory
+    for key in keys_to_sync:
         try:
             df = load_sheet_dataframe(key)
             _data[key] = df
         except Exception as e:
             logger.error("Failed to reload '%s': %s", key, e)
             _data[key] = pd.DataFrame()
+        gc.collect()
 
     if "wyscout" in _data and len(_data["wyscout"]) > 0:
         _data["wyscout"] = _prepare_wyscout(_data["wyscout"])
@@ -563,6 +579,7 @@ async def admin_resync(current_user: dict = Depends(require_admin)):
         _data["skillcorner"] = _coerce_numeric_columns(_data["skillcorner"], sc_text)
         build_skillcorner_index(_data["skillcorner"])
 
+    _endpoint_cache.clear()
     _data_ready.set()
 
     counts = {k: len(v) for k, v in _data.items()}
