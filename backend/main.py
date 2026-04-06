@@ -1233,6 +1233,7 @@ async def get_player_profile(
             "display_name": str(row.get("JogadorDisplay", "")),
             "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
             "club_logo": club_logo_url,
+            "league_logo": assets.get("league_logo") or LEAGUE_LOGOS.get(league_actual) if league_actual else None,
             "position": position,
             "age": age,
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,

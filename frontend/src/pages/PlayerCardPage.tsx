@@ -221,6 +221,7 @@ export default function PlayerCardPage() {
   const summary = indicesData?.summary;
   const nationality = profileData?.summary?.nationality;
   const league = profileData?.summary?.league;
+  const leagueLogo = profileData?.summary?.league_logo;
   const photoUrl = profileData?.summary?.photo_url;
   const clubLogo = profileData?.summary?.club_logo;
 
@@ -364,7 +365,13 @@ export default function PlayerCardPage() {
                   )}
                   {league && (
                     <InfoPill
-                      icon={<Building2 size={14} strokeWidth={1.5} />}
+                      icon={
+                        leagueLogo ? (
+                          <img src={proxyImageUrl(leagueLogo)!} alt={league} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" />
+                        ) : (
+                          <Building2 size={14} strokeWidth={1.5} />
+                        )
+                      }
                       label="LIGA"
                       value={league}
                     />
