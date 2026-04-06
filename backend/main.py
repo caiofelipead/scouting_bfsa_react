@@ -341,6 +341,7 @@ def _load_all_data():
                 build_skillcorner_index(_data["skillcorner"])
 
             logger.info("Background sync complete — data refreshed")
+            _endpoint_cache.clear()
         except Exception as e:
             logger.error("Background sync failed: %s", e)
 def _ensure_data_loaded():
