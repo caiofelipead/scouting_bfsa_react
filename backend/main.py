@@ -1233,6 +1233,7 @@ async def get_player_profile(
             "display_name": str(row.get("JogadorDisplay", "")),
             "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
             "club_logo": club_logo_url,
+            "league_logo": assets.get("league_logo") or LEAGUE_LOGOS.get(league_actual) if league_actual else None,
             "position": position,
             "age": age,
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
@@ -1933,8 +1934,11 @@ async def get_player_indices(
     pos_raw = position or (str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else "Meia")
     pos = get_posicao_categoria(pos_raw)
 
+    # Filter comparison pool to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
     pos_indices = INDICES_CONFIG.get(pos, {})
-    indices = calculate_all_indices(row, pos_indices, df, pos)
+    indices = calculate_all_indices(row, pos_indices, df_league, pos)
     indices = {k: round(v, 1) for k, v in indices.items()}
 
     # Per-index metric breakdown
