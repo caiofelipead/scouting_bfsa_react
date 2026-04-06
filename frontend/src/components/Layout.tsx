@@ -45,7 +45,8 @@ export type TabId =
   | 'contract_impact'
   | 'scouting_report'
   | 'coaches'
-  | 'shadow_team';
+  | 'shadow_team'
+  | 'player_card';
 
 interface LayoutProps {
   user: User;
@@ -63,6 +64,7 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
       { id: 'indices', label: 'Indices', icon: <FileBarChart size={18} strokeWidth={1.5} /> },
       { id: 'report', label: 'Relatorio', icon: <FileText size={18} strokeWidth={1.5} /> },
       { id: 'comparison', label: 'Comparativo', icon: <ArrowLeftRight size={18} strokeWidth={1.5} /> },
+      { id: 'player_card', label: 'Player Card', icon: <FileText size={18} strokeWidth={1.5} /> },
     ],
   },
   {

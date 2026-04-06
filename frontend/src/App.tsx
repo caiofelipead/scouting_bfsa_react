@@ -26,6 +26,7 @@ const ContractImpactPage = lazy(() => import('./pages/ContractImpactPage'));
 const ScoutingReportPage = lazy(() => import('./pages/ScoutingReportPage'));
 const CoachesPage = lazy(() => import('./pages/CoachesPage'));
 const ShadowTeamPage = lazy(() => import('./pages/ShadowTeamPage'));
+const PlayerCardPage = lazy(() => import('./pages/PlayerCardPage'));
 
 const PAGE_MAP: Record<TabId, React.LazyExoticComponent<React.ComponentType>> = {
   dashboard: DashboardPage,
@@ -46,6 +47,7 @@ const PAGE_MAP: Record<TabId, React.LazyExoticComponent<React.ComponentType>> = 
   scouting_report: ScoutingReportPage,
   coaches: CoachesPage,
   shadow_team: ShadowTeamPage,
+  player_card: PlayerCardPage,
 };
 
 function PageLoader() {
