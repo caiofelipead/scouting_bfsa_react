@@ -246,21 +246,13 @@ def _load_all_data():
         except Exception as e:
             logger.warning("Could not init VAEP tables: %s", e)
 
-        # Check if PostgreSQL has data
-        pg_has_data = False
+        # Always sync from Google Sheets → PostgreSQL on startup
+        logger.info("Syncing data from Google Sheets...")
         try:
-            pg_has_data = has_data()
+            sync_results = sync_all_sheets()
+            logger.info("Sync results: %s", sync_results)
         except Exception as e:
-            logger.warning("Could not check PostgreSQL for data: %s", e)
-
-        if not pg_has_data:
-            # First run or empty DB — sync from Google Sheets → PostgreSQL
-            logger.info("No data in PostgreSQL — syncing from Google Sheets...")
-            try:
-                sync_results = sync_all_sheets()
-                logger.info("Initial sync results: %s", sync_results)
-            except Exception as e:
-                logger.error("Initial sync from Google Sheets failed: %s", e)
+            logger.error("Sync from Google Sheets failed: %s", e)
 
         # Load from PostgreSQL — prioritize wyscout (used by /api/players)
         priority_order = ["wyscout"] + [k for k in SHEET_KEYS if k != "wyscout"]
@@ -858,8 +850,15 @@ async def list_players(
         team_name = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
         assets = get_player_assets(player_name, team_name)
 
-        # Fallback: try DataFrame columns for photo_url
-        photo_url = assets.get("photo_url")
+        # HIGHEST PRIORITY: url_foto column from WyScout Google Sheet
+        photo_url = None
+        url_foto_val = row.get("url_foto")
+        if url_foto_val is not None and pd.notna(url_foto_val) and str(url_foto_val).strip():
+            photo_url = str(url_foto_val).strip()
+
+        # Fallback: try asset service (CSV with enrichment data)
+        if not photo_url:
+            photo_url = assets.get("photo_url")
         if not photo_url:
             for photo_col in ("photo_url", "Foto", "ImageDataURL", "image_url"):
                 val = row.get(photo_col)
@@ -1147,15 +1146,22 @@ async def get_player_profile(
             }
             logger.debug("Análises match for '%s': found '%s'", player_display_name, ana_match.get("Nome"))
 
+    # HIGHEST PRIORITY: url_foto column from WyScout Google Sheet
+    photo_url = None
+    url_foto_val = row.get("url_foto")
+    if url_foto_val is not None and pd.notna(url_foto_val) and str(url_foto_val).strip():
+        photo_url = str(url_foto_val).strip()
+
     # Get photo, club logo, and league logo from asset service (CSV with SofaScore data)
     assets = get_player_assets(jogador_name, team_name_sc)
-    photo_url = assets.get("photo_url")
+    if not photo_url:
+        photo_url = assets.get("photo_url")
     # Prefer API-Football enrichment logos (media.api-sports.io), fallback to hardcoded
     club_logo_url = assets.get("club_logo")
     if not club_logo_url:
         club_logo_url = CLUB_LOGOS.get(team_name_sc) if team_name_sc else None
 
-    # Fallback: try WyScout DataFrame columns for photo_url
+    # Fallback: try other WyScout DataFrame columns for photo_url
     if not photo_url:
         for photo_col in ("photo_url", "Foto", "ImageDataURL", "image_url"):
             val = row.get(photo_col)
