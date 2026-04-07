@@ -21,6 +21,7 @@ export interface PlayerSummary {
   age: number | null;
   nationality: string | null;
   league: string | null;
+  league_logo: string | null;
   minutes_played: number | null;
   photo_url: string | null;
   score: number | null;
