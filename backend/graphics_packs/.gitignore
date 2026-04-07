@@ -1,0 +1,13 @@
+# Ignore graphics pack images (they are large and user-specific)
+faces/*.png
+faces/*.jpg
+faces/*.jpeg
+faces/*.webp
+logos/*.png
+logos/*.jpg
+logos/*.jpeg
+logos/*.webp
+
+# Keep the directory structure
+!faces/.gitkeep
+!logos/.gitkeep

@@ -202,9 +202,36 @@ def prewarm_logo_bytes_cache():
         logger.warning("Failed to pre-warm logo bytes cache: %s", e)
 
 
+@router.get("/player-face/{player_name}")
+async def get_player_face(player_name: str):
+    """Serve player face from local graphics pack."""
+    from services.graphics_packs import get_local_face
+    result = get_local_face(player_name)
+    if result:
+        data, ct = result
+        return Response(
+            content=data, media_type=ct,
+            headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
+        )
+    raise HTTPException(status_code=404, detail="Face not found in local graphics pack")
+
+
 @router.get("/team-logo/{team_name_norm}")
 async def get_team_logo(team_name_norm: str):
     """Serve locally cached team logo (avoids CDN 403 issues)."""
+    # Priority 0: Check local graphics pack (sortitoutsi / manual)
+    try:
+        from services.graphics_packs import get_local_logo
+        local = get_local_logo(team_name_norm)
+        if local:
+            data, ct = local
+            return Response(
+                content=data, media_type=ct,
+                headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
+            )
+    except Exception:
+        pass
+
     # Check memory cache (pre-warmed at startup)
     if team_name_norm in _logo_bytes_cache:
         data, ct = _logo_bytes_cache[team_name_norm]

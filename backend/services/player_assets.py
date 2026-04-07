@@ -146,14 +146,25 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
     name_norm = _normalize(player_name) if player_name else ""
     team_norm = _normalize(team) if team else ""
 
-    # 1) API-Football enrichment cache (in-memory) — most reliable source
+    # 0) Local graphics packs (sortitoutsi / manual) — highest priority
+    try:
+        from services.graphics_packs import has_local_face, has_local_logo
+        if name_norm and has_local_face(player_name):
+            result["photo_url"] = f"/api/player-face/{player_name}"
+        if team_norm and has_local_logo(team):
+            result["club_logo"] = f"/api/team-logo/{team_norm}"
+    except Exception:
+        pass
+
+    # 1) API-Football enrichment cache (in-memory) — fallback if no local pack
     if name_norm:
         try:
             from services.enrichment import get_cached_photo, get_cached_team_logo
-            cached_photo = get_cached_photo(player_name, team)
-            if cached_photo:
-                result["photo_url"] = cached_photo
-            if team:
+            if not result["photo_url"]:
+                cached_photo = get_cached_photo(player_name, team)
+                if cached_photo:
+                    result["photo_url"] = cached_photo
+            if team and not result["club_logo"]:
                 cached_logo = get_cached_team_logo(team)
                 if cached_logo:
                     result["club_logo"] = cached_logo
