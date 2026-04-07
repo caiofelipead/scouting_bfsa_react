@@ -367,7 +367,7 @@ export default function PlayerCardPage() {
                     <InfoPill
                       icon={
                         leagueLogo ? (
-                          <img src={proxyImageUrl(leagueLogo)!} alt={league} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" />
+                          <img src={proxyImageUrl(leagueLogo)!} alt={league} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                         ) : (
                           <Building2 size={14} strokeWidth={1.5} />
                         )
@@ -380,7 +380,7 @@ export default function PlayerCardPage() {
                     <InfoPill
                       icon={
                         clubLogo ? (
-                          <img src={proxyImageUrl(clubLogo)!} alt={summary.team} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" />
+                          <img src={proxyImageUrl(clubLogo)!} alt={summary.team} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                         ) : (
                           <Shield size={14} strokeWidth={1.5} />
                         )

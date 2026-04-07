@@ -55,7 +55,12 @@ async def image_proxy(request: Request, url: str):
 
     hostname = parsed.hostname.lower()
     if not any(hostname == d or hostname.endswith("." + d) for d in _ALLOWED_IMAGE_DOMAINS):
-        raise HTTPException(status_code=403, detail="Domain not allowed")
+        _failed_cache[url] = True
+        return Response(
+            content=b"",
+            status_code=404,
+            headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"},
+        )
 
     # Check cache
     if url in _image_cache:
@@ -161,14 +166,20 @@ async def image_proxy(request: Request, url: str):
     # client auth failures.  Map them to 502 so the frontend's 401 interceptor
     # doesn't mistakenly clear the user session.
     if last_status in (401, 403):
-        logger.info("Image proxy: upstream %d for %s (mapped to 502)", last_status, parsed.hostname)
-        last_status = 502
+        logger.info("Image proxy: upstream %d for %s (mapped to 404)", last_status, parsed.hostname)
+        last_status = 404
     elif last_status == 404:
         # Upstream 404 is normal for missing images — log at debug, not warning
         logger.debug("Image proxy: 404 for %s%s", parsed.hostname, parsed.path)
     else:
         logger.warning("Image proxy: all strategies failed for %s (status: %d)", parsed.hostname, last_status)
-    raise HTTPException(status_code=last_status, detail="Upstream image fetch failed")
+
+    # Return a cacheable empty response so the browser doesn't re-request on navigation
+    return Response(
+        content=b"",
+        status_code=last_status,
+        headers={"Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"},
+    )
 
 
 # ── Cached team logo endpoint ──────────────────────────────────────────
