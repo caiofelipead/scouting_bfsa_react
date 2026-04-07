@@ -8,7 +8,7 @@ import App from './App.tsx'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: false,  // Axios interceptor already retries with exponential backoff
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000,  // 5 min — avoid refetching data that hasn't changed
       gcTime: 15 * 60 * 1000,    // 15 min — keep unused queries in cache longer
