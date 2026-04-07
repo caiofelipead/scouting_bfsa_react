@@ -6,7 +6,7 @@ import {
   Search, Loader2, User,
 } from 'lucide-react';
 import { usePlayers, usePositions } from '../hooks/usePlayers';
-import { proxyImageUrl } from '../lib/api';
+import { proxyImageUrl, isProxyFallback } from '../lib/api';
 import type { PlayerSummary, PlayersQueryParams } from '../types/api';
 
 // ── Types ──
@@ -350,7 +350,7 @@ function PlayerSearchPicker({ onSelect, existingIds }: {
                       alt={player.name}
                       className="w-8 h-8 rounded-full object-cover"
                       referrerPolicy="no-referrer"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--color-surface-2)' }}>
@@ -525,7 +525,7 @@ function TabTargets({
                   alt={target.name}
                   className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                   referrerPolicy="no-referrer"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
               ) : (
                 <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}>
@@ -768,7 +768,7 @@ function TabShadowXI({
                           alt={p.name}
                           className="w-6 h-6 rounded-full object-cover"
                           referrerPolicy="no-referrer"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       ) : (
                         <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'var(--color-surface-3)' }}>
@@ -811,7 +811,7 @@ function TabShadowXI({
                             alt={t.name}
                             className="w-5 h-5 rounded-full object-cover"
                             referrerPolicy="no-referrer"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                         ) : (
                           <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: 'var(--color-surface-3)' }}>

@@ -127,4 +127,14 @@ export function proxyImageUrl(url: string | null | undefined): string | null {
   return url;
 }
 
+/**
+ * Returns true if an <img> loaded a 1×1 transparent fallback pixel from the
+ * image proxy (meaning the upstream image failed).  Use in onLoad handlers:
+ *
+ *   onLoad={(e) => { if (isProxyFallback(e.target)) hide(); }}
+ */
+export function isProxyFallback(img: HTMLImageElement): boolean {
+  return img.naturalWidth <= 1 && img.naturalHeight <= 1;
+}
+
 export default api;

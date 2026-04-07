@@ -22,7 +22,7 @@ import RadarChart from './RadarChart';
 import SkeletonProfile from './SkeletonProfile';
 import { usePlayerProfile, useRadarData, useSkillCornerSearch } from '../hooks/usePlayers';
 import { cn, getScoreClass, getScoreColor, getPerformanceLabel, formatNumber } from '../lib/utils';
-import { proxyImageUrl } from '../lib/api';
+import { proxyImageUrl, isProxyFallback } from '../lib/api';
 
 function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: string; size?: 'sm' | 'lg' }) {
   const [failed, setFailed] = useState(false);
@@ -41,6 +41,7 @@ function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: strin
       alt={alt}
       className={size === 'lg' ? 'player-photo-hex-lg' : 'player-photo-hex'}
       referrerPolicy="no-referrer"
+      onLoad={(e) => { if (isProxyFallback(e.currentTarget)) setFailed(true); }}
       onError={() => setFailed(true)}
     />
   );
@@ -57,6 +58,7 @@ function ClubLogo({ url, alt, className = 'w-5 h-5 object-contain', fallback }: 
       alt={alt}
       className={className}
       referrerPolicy="no-referrer"
+      onLoad={(e) => { if (isProxyFallback(e.currentTarget)) setFailed(true); }}
       onError={() => setFailed(true)}
     />
   );

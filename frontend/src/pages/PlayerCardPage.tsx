@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
-import { proxyImageUrl } from '../lib/api';
+import { proxyImageUrl, isProxyFallback } from '../lib/api';
 import { usePlayers, usePositions, usePlayerProfile } from '../hooks/usePlayers';
 import { getScoreColor } from '../lib/utils';
 import { getFlagUrl } from '../lib/countryFlags';
@@ -367,7 +367,7 @@ export default function PlayerCardPage() {
                     <InfoPill
                       icon={
                         leagueLogo ? (
-                          <img src={proxyImageUrl(leagueLogo)!} alt={league} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                          <img src={proxyImageUrl(leagueLogo)!} alt={league} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" onLoad={(e) => { if (isProxyFallback(e.currentTarget as HTMLImageElement)) (e.currentTarget as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                         ) : (
                           <Building2 size={14} strokeWidth={1.5} />
                         )
@@ -380,7 +380,7 @@ export default function PlayerCardPage() {
                     <InfoPill
                       icon={
                         clubLogo ? (
-                          <img src={proxyImageUrl(clubLogo)!} alt={summary.team} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                          <img src={proxyImageUrl(clubLogo)!} alt={summary.team} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" onLoad={(e) => { if (isProxyFallback(e.currentTarget as HTMLImageElement)) (e.currentTarget as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                         ) : (
                           <Shield size={14} strokeWidth={1.5} />
                         )

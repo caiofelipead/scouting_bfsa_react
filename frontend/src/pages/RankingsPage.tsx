@@ -4,7 +4,7 @@ import { Trophy, ArrowUpDown, AlertCircle, Target, User, ExternalLink, X } from 
 import { useQuery } from '@tanstack/react-query';
 import { useRankings, usePositions, useLeagues } from '../hooks/usePlayers';
 import { getScoreColor, formatNumber } from '../lib/utils';
-import api, { proxyImageUrl } from '../lib/api';
+import api, { proxyImageUrl, isProxyFallback } from '../lib/api';
 import type { RankingsQueryParams } from '../types/api';
 import PlayerProfile from '../components/PlayerProfile';
 
@@ -240,7 +240,7 @@ export default function RankingsPage() {
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           {entry.photo_url ? (
-                            <img src={proxyImageUrl(entry.photo_url)!} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" style={{ background: 'var(--color-surface-2)' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            <img src={proxyImageUrl(entry.photo_url)!} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" style={{ background: 'var(--color-surface-2)' }} onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                           ) : (
                             <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}><User size={14} style={{ color: 'var(--color-text-muted)' }} /></div>
                           )}
@@ -256,13 +256,13 @@ export default function RankingsPage() {
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5">
-                          {entry.club_logo && <img src={proxyImageUrl(entry.club_logo)!} alt="" className="w-5 h-5 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                          {entry.club_logo && <img src={proxyImageUrl(entry.club_logo)!} alt="" className="w-5 h-5 object-contain flex-shrink-0" onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
                           <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{entry.team || '—'}</span>
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5">
-                          {entry.league_logo && <img src={proxyImageUrl(entry.league_logo)!} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                          {entry.league_logo && <img src={proxyImageUrl(entry.league_logo)!} alt="" className="w-4 h-4 object-contain flex-shrink-0" onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
                           <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{entry.league || '—'}</span>
                         </div>
                       </td>
@@ -326,7 +326,7 @@ export default function RankingsPage() {
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">
                             {entry.photo_url ? (
-                              <img src={proxyImageUrl(entry.photo_url)!} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" style={{ background: 'var(--color-surface-2)' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              <img src={proxyImageUrl(entry.photo_url)!} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" style={{ background: 'var(--color-surface-2)' }} onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             ) : (
                               <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}><User size={14} style={{ color: 'var(--color-text-muted)' }} /></div>
                             )}
@@ -342,13 +342,13 @@ export default function RankingsPage() {
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1.5">
-                            {entry.club_logo && <img src={proxyImageUrl(entry.club_logo)!} alt="" className="w-5 h-5 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                            {entry.club_logo && <img src={proxyImageUrl(entry.club_logo)!} alt="" className="w-5 h-5 object-contain flex-shrink-0" onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
                             <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>{entry.team || '—'}</span>
                           </div>
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1.5">
-                            {entry.league_logo && <img src={proxyImageUrl(entry.league_logo)!} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                            {entry.league_logo && <img src={proxyImageUrl(entry.league_logo)!} alt="" className="w-4 h-4 object-contain flex-shrink-0" onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
                             <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{entry.league || '—'}</span>
                           </div>
                         </td>
