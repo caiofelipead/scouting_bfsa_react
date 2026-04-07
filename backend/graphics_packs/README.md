@@ -1,6 +1,6 @@
 # Graphics Packs (sortitoutsi.net)
 
-Este diretório armazena imagens de faces e logos importadas de graphics packs
+Este diretorio armazena imagens de faces e logos importadas de graphics packs
 do sortitoutsi.net (ou outras fontes).
 
 ## Estrutura
@@ -27,32 +27,56 @@ graphics_packs/
 
 ### 2. Extrair o ZIP
 
-Extraia o conteúdo do ZIP baixado em uma pasta temporária.
+Extraia o conteudo do ZIP baixado em uma pasta temporaria.
 
-### 3. Criar arquivo de mapeamento
+### 3. Obter dados de mapeamento FM UID → Nome
 
-Os packs do sortitoutsi usam IDs únicos do Football Manager como nomes de arquivo
-(ex: `85178649.png`). Para importar, você precisa de um CSV que mapeie esses IDs
-para nomes reais.
+Os packs usam IDs unicos do Football Manager (ex: `19024412.png` = Neymar).
+Voce precisa de um CSV com esses mapeamentos.
 
-**Para faces** — crie `fm_faces_mapping.csv`:
-```csv
-uid,player_name,team_name
-85178649,Lionel Messi,Inter Miami
-...
+**Opcoes para obter o CSV:**
+
+a) **FM Editor** — Abra o FM, va em Ferramentas > Exportar dados. Exporte jogadores/times
+   com colunas `uid` e `name`.
+
+b) **fmref.com** — Site de busca do sortitoutsi. Busque jogadores por nome e
+   pressione "c" para copiar o UID. Util para buscar jogadores individuais.
+   Ex: Buscar "Neymar" → UID `19024412`
+
+c) **Databases da comunidade FM** — Existem exports da database do FM em sites como
+   fmscout.com, sortitoutsi.net/football-manager, etc.
+
+### 4. Gerar mapeamento automatico (recomendado)
+
+Use o script `build_fmref_mapping.py` para cruzar automaticamente os jogadores
+do dashboard com a database do FM usando fuzzy matching:
+
+```bash
+cd backend
+
+# Gerar mapeamento de faces
+python scripts/build_fmref_mapping.py faces \
+    --fm-data /caminho/para/fm_people.csv \
+    --pack-dir /caminho/para/sortitoutsi/faces \
+    --min-score 85
+
+# Gerar mapeamento de logos
+python scripts/build_fmref_mapping.py logos \
+    --fm-data /caminho/para/fm_clubs.csv \
+    --pack-dir /caminho/para/sortitoutsi/logos \
+    --min-score 80
 ```
 
-**Para logos** — crie `fm_logos_mapping.csv`:
-```csv
-uid,team_name
-131,Flamengo
-...
-```
+O script:
+1. Le os jogadores/times do dashboard (`fotos_jogadores_clubes_ligas.csv`)
+2. Le a database do FM (seu CSV exportado)
+3. Faz fuzzy matching por nome (usando rapidfuzz)
+4. Gera `fm_faces_mapping.csv` ou `fm_logos_mapping.csv` pronto para importar
+5. Lista os jogadores sem match para voce buscar manualmente no fmref.com
 
-Você pode exportar esses mapeamentos do FM Editor (Ferramentas > Exportar dados)
-ou usar databases da comunidade FM.
+### 5. Importar as imagens
 
-### 4. Executar o script de importação
+Com o mapping CSV gerado, execute o import:
 
 ```bash
 # Importar faces
@@ -64,15 +88,12 @@ python scripts/import_graphics_pack.py faces \
 python scripts/import_graphics_pack.py logos \
     --pack-dir /caminho/para/sortitoutsi/logos \
     --mapping fm_logos_mapping.csv
-
-# Importar logos diretamente (sem mapeamento FM) — basta nomear os arquivos
-# com o nome do time e colocar em graphics_packs/logos/
 ```
 
-### 5. Importação manual (sem script)
+### 6. Importacao manual (sem script)
 
 Se preferir, basta renomear os arquivos PNG com o nome do jogador/time
-(em minúsculas) e colocar nos diretórios `faces/` ou `logos/`:
+(em minusculas) e colocar nos diretorios `faces/` ou `logos/`:
 
 ```bash
 # Exemplo
@@ -80,4 +101,39 @@ cp minha_foto.png graphics_packs/faces/lionel messi.png
 cp meu_escudo.png graphics_packs/logos/flamengo.png
 ```
 
-O sistema normaliza os nomes automaticamente (remove acentos, minúsculas).
+Para buscar UIDs individuais no fmref.com:
+1. Acesse https://fmref.com
+2. Digite o nome do jogador (ex: "neymar")
+3. Encontre o jogador correto nos resultados
+4. Pressione "c" para copiar o UID (ex: `19024412`)
+5. Localize `19024412.png` no pack do sortitoutsi
+6. Renomeie para o nome normalizado e copie para `faces/`
+
+O sistema normaliza os nomes automaticamente (remove acentos, minusculas).
+
+## Fluxo completo resumido
+
+```
+sortitoutsi.net          fmref.com / FM Editor
+     |                        |
+     v                        v
+ Pack ZIP                 FM database CSV
+(19024412.png)           (uid,name,team)
+     |                        |
+     +--- build_fmref_mapping.py ---+
+                    |
+                    v
+           fm_faces_mapping.csv
+          (uid,player_name,team_name)
+                    |
+                    v
+         import_graphics_pack.py
+                    |
+                    v
+          graphics_packs/faces/
+         (lionel messi.png, etc)
+                    |
+                    v
+          Dashboard automaticamente
+          usa as imagens locais!
+```
