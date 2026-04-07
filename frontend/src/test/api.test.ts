@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { proxyImageUrl } from '../lib/api';
+import { proxyImageUrl, isProxyFallback } from '../lib/api';
 
 describe('proxyImageUrl', () => {
   it('proxies absolute http URLs', () => {
@@ -37,5 +37,22 @@ describe('proxyImageUrl', () => {
 
   it('passes through team-logo URLs without spaces', () => {
     expect(proxyImageUrl('/api/team-logo/millonarios')).toBe('/api/team-logo/millonarios');
+  });
+});
+
+describe('isProxyFallback', () => {
+  it('detects 1×1 transparent fallback pixel', () => {
+    const img = { naturalWidth: 1, naturalHeight: 1 } as HTMLImageElement;
+    expect(isProxyFallback(img)).toBe(true);
+  });
+
+  it('returns false for normal images', () => {
+    const img = { naturalWidth: 100, naturalHeight: 100 } as HTMLImageElement;
+    expect(isProxyFallback(img)).toBe(false);
+  });
+
+  it('detects 0×0 images as fallback', () => {
+    const img = { naturalWidth: 0, naturalHeight: 0 } as HTMLImageElement;
+    expect(isProxyFallback(img)).toBe(true);
   });
 });

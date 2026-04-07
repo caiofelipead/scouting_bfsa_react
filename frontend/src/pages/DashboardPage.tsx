@@ -4,7 +4,7 @@ import { Search, Filter, ChevronRight, SlidersHorizontal, User } from 'lucide-re
 import PlayerProfile from '../components/PlayerProfile';
 import { usePlayers, usePositions, useLeagues } from '../hooks/usePlayers';
 import { cn, getScoreColor, formatNumber } from '../lib/utils';
-import { proxyImageUrl } from '../lib/api';
+import { proxyImageUrl, isProxyFallback } from '../lib/api';
 import type { PlayersQueryParams } from '../types/api';
 
 function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: string; size?: 'sm' | 'lg' }) {
@@ -28,6 +28,7 @@ function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: strin
       alt={alt}
       className={size === 'lg' ? 'player-photo-hex-lg' : 'player-photo-hex'}
       referrerPolicy="no-referrer"
+      onLoad={(e) => { if (isProxyFallback(e.currentTarget)) setFailed(true); }}
       onError={() => setFailed(true)}
     />
   );
@@ -42,6 +43,7 @@ function ClubLogo({ url, alt, className = 'w-3.5 h-3.5 object-contain' }: { url:
       alt={alt}
       className={className}
       referrerPolicy="no-referrer"
+      onLoad={(e) => { if (isProxyFallback(e.currentTarget)) setFailed(true); }}
       onError={() => setFailed(true)}
     />
   );

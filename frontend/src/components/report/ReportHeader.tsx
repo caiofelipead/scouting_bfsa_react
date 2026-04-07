@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Upload } from 'lucide-react';
-import { proxyImageUrl } from '../../lib/api';
+import { proxyImageUrl, isProxyFallback } from '../../lib/api';
 
 // External logo URLs
 const YOUTUBE_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Youtube_logo.png';
@@ -137,9 +137,14 @@ export default function ReportHeader({
               alt={name}
               style={styles.fullBodyImg}
               referrerPolicy="no-referrer"
+              onLoad={(e) => {
+                const img = e.target as HTMLImageElement;
+                if (isProxyFallback(img) && img.src.includes('/api/image-proxy')) {
+                  img.src = photo; // fallback to direct URL
+                }
+              }}
               onError={(e) => {
                 const img = e.target as HTMLImageElement;
-                // If proxy failed, try direct URL as fallback
                 if (img.src.includes('/api/image-proxy')) {
                   img.src = photo;
                 } else {

@@ -1,11 +1,19 @@
 """Image proxy route with SSRF protection."""
 
+import base64
 import logging
 import os
 from typing import Dict
 from urllib.parse import quote, urlparse
 
 logger = logging.getLogger(__name__)
+
+# 1×1 transparent PNG returned for failed upstream images (avoids browser
+# console "Failed to load resource" errors which spam the DevTools console).
+_TRANSPARENT_1PX_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAB"
+    "Nl7BcQAAAABJRU5ErkJggg=="
+)
 
 import aiohttp
 from cachetools import TTLCache
@@ -58,9 +66,13 @@ async def image_proxy(request: Request, url: str):
     if not any(hostname == d or hostname.endswith("." + d) for d in _ALLOWED_IMAGE_DOMAINS):
         _failed_cache[url] = True
         return Response(
-            content=b"",
-            status_code=404,
-            headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"},
+            content=_TRANSPARENT_1PX_PNG,
+            media_type="image/png",
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "Access-Control-Allow-Origin": "*",
+                "X-Image-Fallback": "domain-not-allowed",
+            },
         )
 
     # Check cache
@@ -73,9 +85,13 @@ async def image_proxy(request: Request, url: str):
     # Skip URLs known to be broken (avoids spamming upstream)
     if url in _failed_cache:
         return Response(
-            content=b"",
-            status_code=404,
-            headers={"Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"},
+            content=_TRANSPARENT_1PX_PNG,
+            media_type="image/png",
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "Access-Control-Allow-Origin": "*",
+                "X-Image-Fallback": "cached-failure",
+            },
         )
 
     # Build domain-specific header strategies
@@ -163,23 +179,24 @@ async def image_proxy(request: Request, url: str):
     # Cache the failure so we don't keep spamming upstream
     _failed_cache[url] = True
 
-    # Never forward 401/403 from upstream — these are internal auth issues, not
-    # client auth failures.  Map them to 502 so the frontend's 401 interceptor
-    # doesn't mistakenly clear the user session.
     if last_status in (401, 403):
-        logger.info("Image proxy: upstream %d for %s (mapped to 404)", last_status, parsed.hostname)
-        last_status = 404
+        logger.info("Image proxy: upstream %d for %s", last_status, parsed.hostname)
     elif last_status == 404:
-        # Upstream 404 is normal for missing images — log at debug, not warning
         logger.debug("Image proxy: 404 for %s%s", parsed.hostname, parsed.path)
     else:
         logger.warning("Image proxy: all strategies failed for %s (status: %d)", parsed.hostname, last_status)
 
-    # Return a cacheable empty response so the browser doesn't re-request on navigation
+    # Return a 1×1 transparent PNG with 200 status so the browser does NOT log
+    # "Failed to load resource" errors in the console.  The X-Image-Fallback
+    # header lets the frontend detect this is a placeholder if needed.
     return Response(
-        content=b"",
-        status_code=last_status,
-        headers={"Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"},
+        content=_TRANSPARENT_1PX_PNG,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+            "X-Image-Fallback": "upstream-error",
+        },
     )
 
 

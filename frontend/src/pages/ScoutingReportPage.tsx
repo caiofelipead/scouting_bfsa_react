@@ -14,7 +14,7 @@ import ReportRadar from '../components/report/ReportRadar';
 import WedgeRadar from '../components/report/WedgeRadar';
 import DeltaChart from '../components/report/DeltaChart';
 import { C, QUADRANT, PAGE_WIDTH, PAGE_HEIGHT, FONTS_HREF, BFSA_SHIELD, injectFonts, styles } from './scoutingReportStyles';
-import { proxyImageUrl } from '../lib/api';
+import { proxyImageUrl, isProxyFallback } from '../lib/api';
 
 // ── Page wrapper component with shield watermark + auto-scaling ──
 function ReportPage({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
@@ -782,7 +782,7 @@ export default function ScoutingReportPage() {
                   <div style={{ ...styles.card, flex: 1, display: 'flex', flexDirection: 'column' as const }}>
                     <div style={styles.analysisHeader}>
                       {data.player.clubLogo && (
-                        <img src={proxyImageUrl(data.player.clubLogo)!} alt={data.player.club} style={{ width: 36, height: 36, objectFit: 'contain' }} crossOrigin="anonymous" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <img src={proxyImageUrl(data.player.clubLogo)!} alt={data.player.club} style={{ width: 36, height: 36, objectFit: 'contain' }} crossOrigin="anonymous" onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       )}
                       <div>
                         <div style={styles.analysisLabel}>ANÁLISE</div>
