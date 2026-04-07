@@ -118,6 +118,11 @@ export function proxyImageUrl(url: string | null | undefined): string | null {
     const teamName = url.slice('/api/team-logo/'.length);
     return `/api/team-logo/${encodeURIComponent(teamName)}`;
   }
+  // Encode path segments for local face URLs from graphics packs
+  if (url.startsWith('/api/player-face/')) {
+    const playerName = url.slice('/api/player-face/'.length);
+    return `/api/player-face/${encodeURIComponent(playerName)}`;
+  }
   return url;
 }
 

@@ -307,6 +307,12 @@ def _load_all_data():
         except Exception as e:
             logger.warning("Could not pre-warm logo bytes cache: %s", e)
 
+        # Load local graphics packs (sortitoutsi faces & logos)
+        try:
+            from services.graphics_packs import load_graphics_packs
+            load_graphics_packs()
+        except Exception as e:
+            logger.warning("Could not load graphics packs: %s", e)
 
         logger.info("All data loaded successfully: %s", {k: len(v) for k, v in _data.items()})
     except Exception as e:
