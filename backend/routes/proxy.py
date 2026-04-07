@@ -54,53 +54,13 @@ _ALLOWED_IMAGE_DOMAINS = {
 }
 
 
-@router.get("/image-proxy")
-@limiter.limit("300/minute")
-async def image_proxy(request: Request, url: str):
-    """Proxy external image URLs to avoid CORS/hotlink 403 errors."""
-    parsed = urlparse(url)
-    if not parsed.hostname or not parsed.scheme.startswith("http"):
-        raise HTTPException(status_code=400, detail="Invalid URL")
-
-    hostname = parsed.hostname.lower()
-    if not any(hostname == d or hostname.endswith("." + d) for d in _ALLOWED_IMAGE_DOMAINS):
-        _failed_cache[url] = True
-        return Response(
-            content=_TRANSPARENT_1PX_PNG,
-            media_type="image/png",
-            headers={
-                "Cache-Control": "public, max-age=86400",
-                "Access-Control-Allow-Origin": "*",
-                "X-Image-Fallback": "domain-not-allowed",
-            },
-        )
-
-    # Check cache
-    if url in _image_cache:
-        content_type, data = _image_cache[url]
-        return Response(content=data, media_type=content_type,
-                        headers={"Cache-Control": "public, max-age=86400",
-                                 "Access-Control-Allow-Origin": "*"})
-
-    # Skip URLs known to be broken (avoids spamming upstream)
-    if url in _failed_cache:
-        return Response(
-            content=_TRANSPARENT_1PX_PNG,
-            media_type="image/png",
-            headers={
-                "Cache-Control": "public, max-age=3600",
-                "Access-Control-Allow-Origin": "*",
-                "X-Image-Fallback": "cached-failure",
-            },
-        )
-
-    # Build domain-specific header strategies
+def _get_header_strategies(parsed) -> list:
+    """Return domain-specific header strategies for fetching an image URL."""
     is_api_sports = "api-sports.io" in (parsed.hostname or "") or "api-football-v1" in (parsed.hostname or "")
     is_wikimedia = "wikimedia.org" in (parsed.hostname or "")
 
     if is_api_sports:
-        # Browser-like strategies for cached api-sports.io image URLs
-        header_strategies = [
+        return [
             {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
                 "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -111,8 +71,7 @@ async def image_proxy(request: Request, url: str):
             },
         ]
     elif is_wikimedia:
-        # Wikimedia requires a proper User-Agent with contact info per their policy
-        header_strategies = [
+        return [
             {
                 "User-Agent": "ScoutingBFSA/1.0 (https://scouting-bfsa-react.vercel.app; bot) Python/aiohttp",
                 "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -125,7 +84,7 @@ async def image_proxy(request: Request, url: str):
             },
         ]
     else:
-        header_strategies = [
+        return [
             {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
                 "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -149,6 +108,30 @@ async def image_proxy(request: Request, url: str):
             },
         ]
 
+
+async def _fetch_image(url: str) -> tuple | None:
+    """Fetch an image URL using domain-specific strategies.
+
+    Returns (content_type, bytes) on success, or None on failure.
+    Uses and populates the shared _image_cache / _failed_cache.
+    """
+    # Check caches first
+    if url in _image_cache:
+        return _image_cache[url]
+    if url in _failed_cache:
+        return None
+
+    parsed = urlparse(url)
+    if not parsed.hostname or not parsed.scheme.startswith("http"):
+        return None
+
+    hostname = parsed.hostname.lower()
+    if not any(hostname == d or hostname.endswith("." + d) for d in _ALLOWED_IMAGE_DOMAINS):
+        _failed_cache[url] = True
+        return None
+
+    header_strategies = _get_header_strategies(parsed)
+
     last_status = 502
     for headers in header_strategies:
         try:
@@ -162,42 +145,56 @@ async def image_proxy(request: Request, url: str):
                     if resp.status == 200:
                         data = await resp.read()
                         content_type = resp.content_type or "image/png"
-                        # Cache the result (TTLCache handles maxsize & eviction)
                         _image_cache[url] = (content_type, data)
-                        return Response(
-                            content=data,
-                            media_type=content_type,
-                            headers={
-                                "Cache-Control": "public, max-age=86400",
-                                "Access-Control-Allow-Origin": "*",
-                            },
-                        )
+                        return (content_type, data)
                     last_status = resp.status
         except aiohttp.ClientError:
             continue
 
-    # Cache the failure so we don't keep spamming upstream
     _failed_cache[url] = True
-
     if last_status in (401, 403):
         logger.info("Image proxy: upstream %d for %s", last_status, parsed.hostname)
     elif last_status == 404:
         logger.debug("Image proxy: 404 for %s%s", parsed.hostname, parsed.path)
     else:
         logger.warning("Image proxy: all strategies failed for %s (status: %d)", parsed.hostname, last_status)
+    return None
 
-    # Return a 1×1 transparent PNG with 200 status so the browser does NOT log
-    # "Failed to load resource" errors in the console.  The X-Image-Fallback
-    # header lets the frontend detect this is a placeholder if needed.
+
+def _image_response(content_type: str, data: bytes, max_age: int = 86400) -> Response:
+    """Return a successful image response with standard headers."""
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={
+            "Cache-Control": f"public, max-age={max_age}",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
+def _fallback_response(reason: str = "upstream-error", max_age: int = 3600) -> Response:
+    """Return a 1×1 transparent PNG placeholder (200 status, no console errors)."""
     return Response(
         content=_TRANSPARENT_1PX_PNG,
         media_type="image/png",
         headers={
-            "Cache-Control": "public, max-age=3600",
+            "Cache-Control": f"public, max-age={max_age}",
             "Access-Control-Allow-Origin": "*",
-            "X-Image-Fallback": "upstream-error",
+            "X-Image-Fallback": reason,
         },
     )
+
+
+@router.get("/image-proxy")
+@limiter.limit("300/minute")
+async def image_proxy(request: Request, url: str):
+    """Proxy external image URLs to avoid CORS/hotlink 403 errors."""
+    result = await _fetch_image(url)
+    if result:
+        content_type, data = result
+        return _image_response(content_type, data)
+    return _fallback_response()
 
 
 # ── Cached team logo endpoint ──────────────────────────────────────────
@@ -247,15 +244,22 @@ async def get_player_face(player_name: str):
 
 @router.get("/team-logo/{team_name_norm}")
 async def get_team_logo(team_name_norm: str):
-    """Serve locally cached team logo (avoids CDN 403 issues)."""
-    # Priority 0a: FM sortitoutsi CDN logo
+    """Serve team logo with multi-source fallback chain.
+
+    Instead of 307 redirects (which bypass remaining fallbacks on failure),
+    this endpoint fetches images inline so every source is tried in order.
+    """
+    # Priority 0a: FM sortitoutsi CDN logo — fetch inline (not redirect)
     try:
         from services.fm_sortitoutsi import get_logo_url
         fm_logo = get_logo_url(team_name_norm)
         if fm_logo:
-            from starlette.responses import RedirectResponse
-            proxy_url = f"/api/image-proxy?url={quote(fm_logo, safe='')}"
-            return RedirectResponse(url=proxy_url, status_code=307)
+            result = await _fetch_image(fm_logo)
+            if result:
+                ct, data = result
+                # Cache in memory for future requests
+                _logo_bytes_cache[team_name_norm] = (data, ct)
+                return _image_response(ct, data, max_age=604800)
     except Exception:
         pass
 
@@ -265,24 +269,18 @@ async def get_team_logo(team_name_norm: str):
         local = get_local_logo(team_name_norm)
         if local:
             data, ct = local
-            return Response(
-                content=data, media_type=ct,
-                headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
-            )
+            return _image_response(ct, data, max_age=604800)
     except Exception:
         pass
 
     # Check memory cache (pre-warmed at startup)
     if team_name_norm in _logo_bytes_cache:
         data, ct = _logo_bytes_cache[team_name_norm]
-        return Response(
-            content=data, media_type=ct,
-            headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
-        )
+        return _image_response(ct, data, max_age=604800)
 
     # Already checked and not found
     if team_name_norm in _logo_miss_cache:
-        raise HTTPException(status_code=404, detail="Logo not found")
+        return _fallback_response("logo-not-found")
 
     # Load from DB (in case bytes were added after startup)
     try:
@@ -291,41 +289,42 @@ async def get_team_logo(team_name_norm: str):
         if result:
             data, ct = result
             _logo_bytes_cache[team_name_norm] = (data, ct)
-            return Response(
-                content=data, media_type=ct,
-                headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
-            )
+            return _image_response(ct, data, max_age=604800)
     except Exception as e:
         logger.warning("Failed to load cached logo for %s: %s", team_name_norm, e)
 
-    # Fallback: redirect to CDN URL via image-proxy (if available)
+    # Fallback: CDN URL via inline fetch (not redirect)
     try:
         from services.enrichment import get_team_cdn_url
         cdn_url = get_team_cdn_url(team_name_norm)
         if cdn_url:
-            from starlette.responses import RedirectResponse
-            proxy_url = f"/api/image-proxy?url={quote(cdn_url, safe='')}"
-            return RedirectResponse(url=proxy_url, status_code=307)
+            result = await _fetch_image(cdn_url)
+            if result:
+                ct, data = result
+                _logo_bytes_cache[team_name_norm] = (data, ct)
+                return _image_response(ct, data, max_age=604800)
     except Exception as e:
         logger.debug("CDN fallback failed for %s: %s", team_name_norm, e)
 
     # Fallback: try hardcoded CLUB_LOGOS mapping
     try:
         from config.mappings import CLUB_LOGOS
-        # Check if any CLUB_LOGOS key normalizes to this team_name_norm
+        import re
+        import unicodedata
         for team_key, logo_url in CLUB_LOGOS.items():
-            import unicodedata
-            import re
             norm_key = unicodedata.normalize("NFD", team_key.lower())
             norm_key = "".join(c for c in norm_key if unicodedata.category(c) != "Mn")
             norm_key = re.sub(r"[^a-z0-9\s]", "", norm_key)
             norm_key = " ".join(norm_key.split())
             if norm_key == team_name_norm:
-                from starlette.responses import RedirectResponse
-                proxy_url = f"/api/image-proxy?url={quote(logo_url, safe='')}"
-                return RedirectResponse(url=proxy_url, status_code=307)
+                result = await _fetch_image(logo_url)
+                if result:
+                    ct, data = result
+                    _logo_bytes_cache[team_name_norm] = (data, ct)
+                    return _image_response(ct, data, max_age=604800)
+                break
     except Exception:
         pass
 
     _logo_miss_cache[team_name_norm] = True
-    raise HTTPException(status_code=404, detail="Logo not found")
+    return _fallback_response("logo-not-found")
