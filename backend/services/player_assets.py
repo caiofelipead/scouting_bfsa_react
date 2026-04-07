@@ -156,10 +156,10 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
         if team_norm:
             fm_logo = get_logo_url(team)
             if fm_logo:
-                # Route through team-logo endpoint (not raw CDN URL) so the
-                # multi-fallback chain in get_team_logo() is used when the
-                # CDN blocks server-side requests.
-                result["club_logo"] = f"/api/team-logo/{team_norm}"
+                # Return raw CDN URL so the browser loads it directly.
+                # Server-side proxy fetches get blocked by CDNs (403),
+                # but <img> tags load cross-origin images without issues.
+                result["club_logo"] = fm_logo
     except Exception:
         pass
 

@@ -106,12 +106,33 @@ api.interceptors.response.use(
 );
 
 /**
+ * Trusted CDN domains that browsers can load directly via <img> tags.
+ * Server-side proxying these often fails (CDNs return 403 to non-browser requests),
+ * while browsers load them without issues (no CORS needed for <img>).
+ */
+const DIRECT_IMAGE_DOMAINS = [
+  'sortitoutsi.b-cdn.net',
+  'sortitoutsidospaces.b-cdn.net',
+  'logodetimes.com',
+  'www.logodetimes.com',
+  'upload.wikimedia.org',
+  'images.fotmob.com',
+];
+
+/**
  * Route external image URLs through the backend proxy to avoid CORS/hotlink 403 errors.
- * Proxies all absolute http(s) URLs; local/relative URLs pass through unchanged.
+ * Trusted CDN domains bypass the proxy (browsers load them directly).
+ * Local/relative URLs pass through unchanged.
  */
 export function proxyImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      if (DIRECT_IMAGE_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d))) {
+        return url; // Browser loads directly from CDN
+      }
+    } catch { /* invalid URL, fall through to proxy */ }
     return `/api/image-proxy?url=${encodeURIComponent(url)}`;
   }
   // Encode path segments for local URLs (e.g. /api/team-logo/ldu quito → /api/team-logo/ldu%20quito)
