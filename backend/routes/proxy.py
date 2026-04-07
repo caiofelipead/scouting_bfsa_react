@@ -219,7 +219,18 @@ async def get_player_face(player_name: str):
 @router.get("/team-logo/{team_name_norm}")
 async def get_team_logo(team_name_norm: str):
     """Serve locally cached team logo (avoids CDN 403 issues)."""
-    # Priority 0: Check local graphics pack (sortitoutsi / manual)
+    # Priority 0a: FM sortitoutsi CDN logo
+    try:
+        from services.fm_sortitoutsi import get_logo_url
+        fm_logo = get_logo_url(team_name_norm)
+        if fm_logo:
+            from starlette.responses import RedirectResponse
+            proxy_url = f"/api/image-proxy?url={quote(fm_logo, safe='')}"
+            return RedirectResponse(url=proxy_url, status_code=307)
+    except Exception:
+        pass
+
+    # Priority 0b: Check local graphics pack (manual overrides)
     try:
         from services.graphics_packs import get_local_logo
         local = get_local_logo(team_name_norm)

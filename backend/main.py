@@ -307,7 +307,16 @@ def _load_all_data():
         except Exception as e:
             logger.warning("Could not pre-warm logo bytes cache: %s", e)
 
-        # Load local graphics packs (sortitoutsi faces & logos)
+        # Load FM sortitoutsi CDN mappings (faces & logos from fmref.com)
+        try:
+            from services.fm_sortitoutsi import load_fm_mappings, get_stats
+            load_fm_mappings()
+            fm_stats = get_stats()
+            logger.info("FM sortitoutsi CDN: %d faces, %d logos", fm_stats["faces"], fm_stats["logos"])
+        except Exception as e:
+            logger.warning("Could not load FM sortitoutsi mappings: %s", e)
+
+        # Load local graphics packs (manual overrides)
         try:
             from services.graphics_packs import load_graphics_packs
             load_graphics_packs()

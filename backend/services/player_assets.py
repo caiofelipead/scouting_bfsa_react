@@ -146,12 +146,26 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
     name_norm = _normalize(player_name) if player_name else ""
     team_norm = _normalize(team) if team else ""
 
-    # 0) Local graphics packs (sortitoutsi / manual) — highest priority
+    # 0a) FM sortitoutsi CDN (cut-out faces & logos) — highest priority
+    try:
+        from services.fm_sortitoutsi import get_face_url, get_logo_url
+        if name_norm:
+            fm_face = get_face_url(player_name, team)
+            if fm_face:
+                result["photo_url"] = fm_face
+        if team_norm:
+            fm_logo = get_logo_url(team)
+            if fm_logo:
+                result["club_logo"] = fm_logo
+    except Exception:
+        pass
+
+    # 0b) Local graphics packs (manual overrides) — second priority
     try:
         from services.graphics_packs import has_local_face, has_local_logo
-        if name_norm and has_local_face(player_name):
+        if name_norm and not result["photo_url"] and has_local_face(player_name):
             result["photo_url"] = f"/api/player-face/{player_name}"
-        if team_norm and has_local_logo(team):
+        if team_norm and not result["club_logo"] and has_local_logo(team):
             result["club_logo"] = f"/api/team-logo/{team_norm}"
     except Exception:
         pass
