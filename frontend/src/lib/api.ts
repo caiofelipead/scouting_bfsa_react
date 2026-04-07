@@ -93,6 +93,7 @@ api.interceptors.response.use(
     if (
       err.response?.status === 401 &&
       !config?.url?.includes('/auth/login') &&
+      !config?.url?.includes('/auth/me') &&
       !config?.url?.includes('/image-proxy')
     ) {
       console.warn('[api] 401 received – clearing session', config?.url);

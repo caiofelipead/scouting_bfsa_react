@@ -32,7 +32,11 @@ export function useAuth() {
       setUser(res.data.user);
       return true;
     } catch (err: any) {
-      const msg = err.response?.data?.detail || 'Erro ao fazer login';
+      const status = err.response?.status;
+      const isServerError = !err.response || [502, 503, 504].includes(status);
+      const msg = isServerError
+        ? 'Servidor indisponível — tente novamente em alguns segundos'
+        : err.response?.data?.detail || 'Erro ao fazer login';
       console.error('[useAuth] login failed', msg);
       setError(msg);
       return false;
