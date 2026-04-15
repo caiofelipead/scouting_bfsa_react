@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, AlertCircle, Activity } from 'lucide-react';
+import { ArrowLeftRight, AlertCircle, Activity, Shield } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import api from '../lib/api';
+import api, { proxyImageUrl, isProxyFallback } from '../lib/api';
 import { usePlayers, usePositions, useSkillCornerComparison } from '../hooks/usePlayers';
 import { getScoreColor } from '../lib/utils';
 import RadarChart from '../components/RadarChart';
@@ -104,11 +104,21 @@ export default function ComparisonPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="card-glass rounded-lg p-4" style={{ borderLeft: '3px solid var(--color-accent)' }}>
               <div className="font-bold text-lg">{comparison.player1.name}</div>
-              <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{comparison.player1.team} • {comparison.player1.position_raw} • {comparison.player1.age} anos</div>
+              <div className="text-xs flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                {comparison.player1.club_logo ? (
+                  <img src={proxyImageUrl(comparison.player1.club_logo)!} alt="" className="w-4 h-4 object-contain" onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : <Shield size={13} strokeWidth={1.5} />}
+                {comparison.player1.team} • {comparison.player1.position_raw} • {comparison.player1.age} anos
+              </div>
             </div>
             <div className="card-glass rounded-lg p-4" style={{ borderLeft: '3px solid #3b82f6' }}>
               <div className="font-bold text-lg">{comparison.player2.name}</div>
-              <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{comparison.player2.team} • {comparison.player2.position_raw} • {comparison.player2.age} anos</div>
+              <div className="text-xs flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                {comparison.player2.club_logo ? (
+                  <img src={proxyImageUrl(comparison.player2.club_logo)!} alt="" className="w-4 h-4 object-contain" onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : <Shield size={13} strokeWidth={1.5} />}
+                {comparison.player2.team} • {comparison.player2.position_raw} • {comparison.player2.age} anos
+              </div>
             </div>
           </div>
 
