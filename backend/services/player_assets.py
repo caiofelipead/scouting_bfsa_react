@@ -146,20 +146,20 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
     name_norm = _normalize(player_name) if player_name else ""
     team_norm = _normalize(team) if team else ""
 
-    # 0a) FM sortitoutsi CDN (cut-out faces & logos) — highest priority
+    # 0a) FM sortitoutsi CDN (cut-out faces & logos) — highest priority for faces
     try:
         from services.fm_sortitoutsi import get_face_url, get_logo_url
         if name_norm:
             fm_face = get_face_url(player_name, team)
             if fm_face:
                 result["photo_url"] = fm_face
+        # For logos: route through /api/team-logo/ endpoint which fetches
+        # server-side with proper headers and has a full fallback chain.
+        # Raw CDN URLs get blocked by hotlink protection in browsers.
         if team_norm:
             fm_logo = get_logo_url(team)
             if fm_logo:
-                # Return raw CDN URL so the browser loads it directly.
-                # Server-side proxy fetches get blocked by CDNs (403),
-                # but <img> tags load cross-origin images without issues.
-                result["club_logo"] = fm_logo
+                result["club_logo"] = f"/api/team-logo/{team_norm}"
     except Exception:
         pass
 
