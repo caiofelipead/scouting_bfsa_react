@@ -885,15 +885,18 @@ async def list_players(
     total = len(df)
     df = df.iloc[offset: offset + limit]
 
+    # Filter percentile base to Serie B Brasil only
+    df_league = df_all[df_all["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df_all.columns else df_all
+
     # Pre-compute percentile matrix for fast scoring
     from services.similarity import _get_percentile_matrix
-    perc_matrix = _get_percentile_matrix(df_all)
+    perc_matrix = _get_percentile_matrix(df_league)
 
     players = []
     for idx, row in df.iterrows():
         pos_raw = str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else None
         pos_cat = get_posicao_categoria(pos_raw) if pos_raw else None
-        score = calculate_overall_score(row, pos_cat, df_all, _perc_matrix=perc_matrix) if pos_cat else None
+        score = calculate_overall_score(row, pos_cat, df_league, _perc_matrix=perc_matrix) if pos_cat else None
 
         # Get photo, club logo, and league logo from asset service
         player_name = str(row.get("Jogador", ""))
@@ -1302,11 +1305,14 @@ async def get_rankings(
     if req.league and "liga_tier" in pool.columns:
         pool = pool[pool["liga_tier"] == req.league]
 
+    # Filter percentile base to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
     pos_indices = INDICES_CONFIG.get(position, {})
     ranked = rank_players_weighted(
         pool,
         position,
-        df,
+        df_league,
         indices_config=pos_indices,
         min_minutes=req.min_minutes,
     )
@@ -1408,12 +1414,15 @@ async def get_prediction_rankings(
     predictor = ContractSuccessPredictor()
     results = []
 
+    # Filter percentile base to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
     # Pre-compute percentile matrix once for the entire pool (vectorized)
     from services.similarity import _get_percentile_matrix
-    perc_matrix = _get_percentile_matrix(df)
+    perc_matrix = _get_percentile_matrix(df_league)
 
     for idx, row in pool.iterrows():
-        ssp = calculate_overall_score(row, position, df, _perc_matrix=perc_matrix)
+        ssp = calculate_overall_score(row, position, df_league, _perc_matrix=perc_matrix)
         if ssp is None:
             continue
         age = _safe_float(row.get("Idade")) or 24
@@ -1504,13 +1513,16 @@ async def find_similar_players(
     if "Posição" in pool.columns:
         pool = pool[pool["Posição"].apply(lambda p: get_posicao_categoria(p) == position if pd.notna(p) else False)]
 
+    # Filter percentile base to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
     similar_df = compute_weighted_cosine_similarity(
         target,
         pool,
         position,
         top_n=req.top_n,
         min_minutes=req.min_minutes,
-        percentile_base=df,
+        percentile_base=df_league,
     )
 
     if len(similar_df) == 0:
@@ -1956,14 +1968,14 @@ async def get_player_indices(
     indices = calculate_all_indices(row, pos_indices, df_league, pos)
     indices = {k: round(v, 1) for k, v in indices.items()}
 
-    # Per-index metric breakdown
+    # Per-index metric breakdown (percentiles relative to Serie B)
     breakdown = {}
     for idx_name, metrics in pos_indices.items():
         metric_details = []
         for m in metrics:
             if m in row.index:
                 val = _safe_float(row.get(m))
-                col_vals = df[m].apply(_safe_float).dropna()
+                col_vals = df_league[m].apply(_safe_float).dropna() if m in df_league.columns else pd.Series(dtype=float)
                 perc = 0.0
                 if val is not None and len(col_vals) > 0:
                     perc = float((col_vals < val).sum() / len(col_vals) * 100)
@@ -2019,9 +2031,12 @@ async def compare_players_indices(
     row1 = df[mask1].iloc[0]
     row2 = df[mask2].iloc[0]
 
+    # Filter percentile base to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
     pos_indices = INDICES_CONFIG.get(pos, {})
-    idx1 = calculate_all_indices(row1, pos_indices, df, pos)
-    idx2 = calculate_all_indices(row2, pos_indices, df, pos)
+    idx1 = calculate_all_indices(row1, pos_indices, df_league, pos)
+    idx2 = calculate_all_indices(row2, pos_indices, df_league, pos)
 
     comparison = []
     for name in pos_indices.keys():
@@ -2163,7 +2178,10 @@ async def predict_contract_success(
     pos_raw = str(row_data.get("Posição", "")) if pd.notna(row_data.get("Posição")) else "Meia"
     pos = get_posicao_categoria(pos_raw)
 
-    ssp = calculate_overall_score(row_data, pos, df) or 50.0
+    # Filter percentile base to Serie B Brasil only
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
+    ssp = calculate_overall_score(row_data, pos, df_league) or 50.0
     age = _safe_float(row_data.get("Idade")) or 24
     minutes = _safe_float(row_data.get("Minutos jogados:")) or 0
 
@@ -2510,12 +2528,22 @@ async def get_skillcorner_player_profile(
         if val is not None:
             physical[label] = round(val, 2)
 
-    # Compute percentiles relative to the full SkillCorner dataset
+    # Filter SkillCorner percentile base to Serie B teams only
+    if "team_name" in sc_df.columns:
+        sc_league = sc_df[sc_df["team_name"].apply(
+            lambda t: resolve_actual_league(str(t).strip()) == "Serie B Brasil" if pd.notna(t) else False
+        )]
+        if len(sc_league) < 5:
+            sc_league = sc_df  # fallback if too few Serie B players
+    else:
+        sc_league = sc_df
+
+    # Compute percentiles relative to Serie B SkillCorner players
     physical_percentiles = {}
     for col, label in _SC_PHYSICAL_COLS.items():
         val = _safe_float(sc_match.get(col))
-        if val is not None and col in sc_df.columns:
-            col_data = pd.to_numeric(sc_df[col], errors="coerce").dropna()
+        if val is not None and col in sc_league.columns:
+            col_data = pd.to_numeric(sc_league[col], errors="coerce").dropna()
             if len(col_data) > 0:
                 pct = (col_data < val).sum() / len(col_data) * 100
                 physical_percentiles[label] = round(pct, 1)
@@ -2523,8 +2551,8 @@ async def get_skillcorner_player_profile(
     indices_percentiles = {}
     for idx_name in sc_indices_keys:
         val = _safe_float(sc_match.get(idx_name))
-        if val is not None and idx_name in sc_df.columns:
-            col_data = pd.to_numeric(sc_df[idx_name], errors="coerce").dropna()
+        if val is not None and idx_name in sc_league.columns:
+            col_data = pd.to_numeric(sc_league[idx_name], errors="coerce").dropna()
             if len(col_data) > 0:
                 pct = (col_data < val).sum() / len(col_data) * 100
                 indices_percentiles[idx_name] = round(pct, 1)
