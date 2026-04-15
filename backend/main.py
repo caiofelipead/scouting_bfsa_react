@@ -1534,10 +1534,15 @@ async def find_similar_players(
 
     similar_players = []
     for idx, row in similar_df.iterrows():
+        sim_player_name = str(row.get("Jogador", ""))
+        sim_team_name = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
+        sim_assets = get_player_assets(sim_player_name, sim_team_name)
         similar_players.append({
-            "name": str(row.get("Jogador", "")),
+            "name": sim_player_name,
             "display_name": str(row.get("JogadorDisplay", row.get("Jogador", ""))),
-            "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
+            "team": sim_team_name,
+            "club_logo": sim_assets.get("club_logo") or (CLUB_LOGOS.get(sim_team_name) if sim_team_name else None),
+            "photo_url": sim_assets.get("photo_url"),
             "similarity_pct": float(row.get("similarity_pct", 0)),
             "matched_metrics": int(row.get("matched_metrics", 0)),
         })
@@ -2050,9 +2055,16 @@ async def compare_players_indices(
         })
 
     def _player_info(row):
+        player_name = str(row.get("Jogador", ""))
+        team_name = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
+        assets = get_player_assets(player_name, team_name)
+        liga_tier_raw = str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None
         return {
-            "name": str(row.get("Jogador", "")),
-            "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
+            "name": player_name,
+            "display_name": str(row.get("JogadorDisplay", row.get("Jogador", ""))),
+            "team": team_name,
+            "club_logo": assets.get("club_logo") or (CLUB_LOGOS.get(team_name) if team_name else None),
+            "league": resolve_actual_league(row.get("Equipa"), fallback_liga_tier=liga_tier_raw),
             "age": _safe_float(row.get("Idade")),
             "position_raw": str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else None,
         }

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Users, AlertCircle } from 'lucide-react';
 import { usePlayers, useSimilarity, usePositions } from '../hooks/usePlayers';
+import { proxyImageUrl, isProxyFallback } from '../lib/api';
 
 export default function SimilarityPage() {
   const similarity = useSimilarity();
@@ -179,7 +180,12 @@ export default function SimilarityPage() {
                   >
                     <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs" style={{ color: 'var(--color-text-muted)' }}>{i + 1}</td>
                     <td className="px-3 py-2.5 font-medium">{sp.display_name || sp.name}</td>
-                    <td className="px-3 py-2.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>{sp.team || '—'}</td>
+                    <td className="px-3 py-2.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                      <span className="flex items-center gap-1">
+                        {sp.club_logo && <img src={proxyImageUrl(sp.club_logo)!} alt="" className="w-4 h-4 object-contain flex-shrink-0" onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                        {sp.team || '—'}
+                      </span>
+                    </td>
                     <td className="px-3 py-2.5 text-right font-[var(--font-mono)] text-xs" style={{ color: 'var(--color-text-muted)' }}>{sp.matched_metrics}</td>
                     <td className="px-3 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">

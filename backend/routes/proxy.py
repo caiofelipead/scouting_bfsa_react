@@ -311,12 +311,17 @@ async def get_team_logo(team_name_norm: str):
         from config.mappings import CLUB_LOGOS
         import re
         import unicodedata
+        # Normalize input the same way we normalize dict keys (strip accents)
+        input_norm = unicodedata.normalize("NFD", team_name_norm.lower())
+        input_norm = "".join(c for c in input_norm if unicodedata.category(c) != "Mn")
+        input_norm = re.sub(r"[^a-z0-9\s]", "", input_norm)
+        input_norm = " ".join(input_norm.split())
         for team_key, logo_url in CLUB_LOGOS.items():
             norm_key = unicodedata.normalize("NFD", team_key.lower())
             norm_key = "".join(c for c in norm_key if unicodedata.category(c) != "Mn")
             norm_key = re.sub(r"[^a-z0-9\s]", "", norm_key)
             norm_key = " ".join(norm_key.split())
-            if norm_key == team_name_norm:
+            if norm_key == input_norm:
                 result = await _fetch_image(logo_url)
                 if result:
                     ct, data = result

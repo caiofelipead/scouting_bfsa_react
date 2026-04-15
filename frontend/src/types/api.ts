@@ -139,8 +139,8 @@ export interface IndicesResponse {
 
 export interface ComparisonResponse {
   position: string;
-  player1: { name: string; team: string | null; age: number | null; position_raw: string | null };
-  player2: { name: string; team: string | null; age: number | null; position_raw: string | null };
+  player1: { name: string; display_name?: string; team: string | null; club_logo?: string | null; league?: string | null; age: number | null; position_raw: string | null };
+  player2: { name: string; display_name?: string; team: string | null; club_logo?: string | null; league?: string | null; age: number | null; position_raw: string | null };
   comparison: { index: string; player1_value: number; player2_value: number; diff: number }[];
   indices1: Record<string, number>;
   indices2: Record<string, number>;
