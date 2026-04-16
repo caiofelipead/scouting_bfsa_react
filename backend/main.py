@@ -263,17 +263,18 @@ def _load_all_data():
             except Exception as e:
                 logger.error("Initial sync from Google Sheets failed: %s", e)
         else:
-            # Data exists — check if it's stale (>6 hours old)
+            # Data exists — always resync on startup to keep data fresh.
+            # Load from PostgreSQL first (fast startup), then resync in background.
             try:
                 age_hours = get_data_age_hours()
-                if age_hours is not None and age_hours > 6:
-                    logger.info(
-                        "Data is %.1f hours old (>6h) — will resync from Google Sheets after loading",
-                        age_hours,
-                    )
-                    needs_resync = True
+                logger.info(
+                    "Data is %.1f hours old — will resync from Google Sheets after loading",
+                    age_hours if age_hours is not None else 0,
+                )
+                needs_resync = True
             except Exception as e:
-                logger.warning("Could not check data age: %s", e)
+                logger.warning("Could not check data age, will resync anyway: %s", e)
+                needs_resync = True
 
         # Load from PostgreSQL — prioritize wyscout (used by /api/players)
         priority_order = ["wyscout"] + [k for k in SHEET_KEYS if k != "wyscout"]
