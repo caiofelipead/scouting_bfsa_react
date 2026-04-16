@@ -79,7 +79,7 @@ from services.scouting_intelligence import (
 from services.league_power_model import get_opta_league_power, get_all_league_powers
 from services.fuzzy_match import build_skillcorner_index, find_skillcorner_player
 from services.player_assets import load_player_assets_csv, get_player_assets
-from services.database import init_scouting_tables, init_vaep_tables, load_sheet_dataframe, has_data, get_sync_status
+from services.database import init_scouting_tables, init_vaep_tables, load_sheet_dataframe, has_data, get_sync_status, get_data_age_hours
 from services.sync_sheets import sync_all_sheets
 from config.mappings import (
     CLUB_LEAGUE_MAP,
@@ -248,6 +248,7 @@ def _load_all_data():
 
         # Check if PostgreSQL has data — if so, load from it first for fast startup
         pg_has_data = False
+        needs_resync = False
         try:
             pg_has_data = has_data()
         except Exception as e:
@@ -261,6 +262,18 @@ def _load_all_data():
                 logger.info("Initial sync results: %s", sync_results)
             except Exception as e:
                 logger.error("Initial sync from Google Sheets failed: %s", e)
+        else:
+            # Data exists — check if it's stale (>6 hours old)
+            try:
+                age_hours = get_data_age_hours()
+                if age_hours is not None and age_hours > 6:
+                    logger.info(
+                        "Data is %.1f hours old (>6h) — will resync from Google Sheets after loading",
+                        age_hours,
+                    )
+                    needs_resync = True
+            except Exception as e:
+                logger.warning("Could not check data age: %s", e)
 
         # Load from PostgreSQL — prioritize wyscout (used by /api/players)
         priority_order = ["wyscout"] + [k for k in SHEET_KEYS if k != "wyscout"]
@@ -324,12 +337,69 @@ def _load_all_data():
             logger.warning("Could not load graphics packs: %s", e)
 
         logger.info("All data loaded successfully: %s", {k: len(v) for k, v in _data.items()})
+
+        # If data was stale, resync from Google Sheets now (after marking ready)
+        if needs_resync:
+            _data_ready.set()  # Mark ready with stale data first so app is responsive
+            _resync_stale_data()
+
     except Exception as e:
         logger.error("CRITICAL: _load_all_data crashed: %s", e, exc_info=True)
     finally:
         # ALWAYS signal readiness — even on failure — so requests don't hang forever
         _data_ready.set()
         _data_loading = False
+
+
+def _resync_stale_data():
+    """Resync stale data from Google Sheets and reload into memory."""
+    global _data
+    import gc
+    from services.sync_sheets import sync_single_sheet
+
+    logger.info("Background resync: starting fresh sync from Google Sheets...")
+    for key in SHEET_KEYS:
+        try:
+            count = sync_single_sheet(key)
+            logger.info("Background resync: '%s' → %d rows", key, count)
+        except Exception as e:
+            logger.error("Background resync failed for '%s': %s", key, e)
+        gc.collect()
+
+    # Reload data into memory from freshly synced PostgreSQL
+    for key in SHEET_KEYS:
+        try:
+            df = load_sheet_dataframe(key)
+            _data[key] = df
+            logger.info("Background resync: reloaded '%s' into memory: %d rows", key, len(df))
+        except Exception as e:
+            logger.error("Background resync: failed to reload '%s': %s", key, e)
+
+    # Re-prepare wyscout data
+    if "wyscout" in _data and len(_data["wyscout"]) > 0:
+        _data["wyscout"] = _prepare_wyscout(_data["wyscout"])
+
+    if "skillcorner" in _data and len(_data["skillcorner"]) > 0:
+        sc_text = {"player_name", "short_name", "team_name", "position_group"}
+        _data["skillcorner"] = _coerce_numeric_columns(_data["skillcorner"], sc_text)
+        build_skillcorner_index(_data["skillcorner"])
+
+    # Clear stale caches so new data is used
+    _endpoint_cache.clear()
+    try:
+        from services.similarity import _percentile_cache
+        _percentile_cache.clear()
+    except ImportError:
+        pass
+
+    # Re-warm percentile cache
+    if "wyscout" in _data and len(_data["wyscout"]) > 0:
+        from services.similarity import _get_percentile_matrix
+        _get_percentile_matrix(_data["wyscout"])
+
+    logger.info("Background resync complete: %s", {k: len(v) for k, v in _data.items()})
+
+
 def _ensure_data_loaded():
     """Trigger background loading if not started, wait up to 120s for data."""
     global _data_loading
@@ -545,11 +615,25 @@ async def health_check():
     except Exception:
         pass
 
+    sync_status = {}
+    try:
+        sync_status = get_sync_status()
+    except Exception:
+        pass
+
+    data_age = None
+    try:
+        data_age = get_data_age_hours()
+    except Exception:
+        pass
+
     return {
         "status": "ready" if ready else "loading",
         "data_loaded": ready,
         "counts": counts,
         "database": {"connection": "ok" if db_ok else "error"},
+        "sync_status": sync_status,
+        "data_age_hours": round(data_age, 1) if data_age is not None else None,
     }
 
 

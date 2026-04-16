@@ -537,3 +537,22 @@ def has_data() -> bool:
         return False
     finally:
         release_connection(conn)
+
+
+def get_data_age_hours() -> Optional[float]:
+    """Return the age (in hours) of the oldest synced sheet, or None if no data."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT EXTRACT(EPOCH FROM (NOW() - MIN(synced_at))) / 3600.0 "
+                "FROM scouting_sheets"
+            )
+            row = cur.fetchone()
+            if row and row[0] is not None:
+                return float(row[0])
+            return None
+    except Exception:
+        return None
+    finally:
+        release_connection(conn)
