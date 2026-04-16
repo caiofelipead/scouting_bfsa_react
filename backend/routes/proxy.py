@@ -18,7 +18,7 @@ _TRANSPARENT_1PX_PNG = base64.b64decode(
 import aiohttp
 from cachetools import TTLCache
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.requests import Request
@@ -249,17 +249,13 @@ async def get_team_logo(team_name_norm: str):
     Instead of 307 redirects (which bypass remaining fallbacks on failure),
     this endpoint fetches images inline so every source is tried in order.
     """
-    # Priority 0a: FM sortitoutsi CDN logo — fetch inline (not redirect)
+    # Priority 0a: FM sortitoutsi CDN logo — redirect to CDN (browser loads directly).
+    # Server-side fetches get 403 from the CDN, but browsers load <img> fine.
     try:
         from services.fm_sortitoutsi import get_logo_url
         fm_logo = get_logo_url(team_name_norm)
         if fm_logo:
-            result = await _fetch_image(fm_logo)
-            if result:
-                ct, data = result
-                # Cache in memory for future requests
-                _logo_bytes_cache[team_name_norm] = (data, ct)
-                return _image_response(ct, data, max_age=604800)
+            return RedirectResponse(url=fm_logo, status_code=302)
     except Exception:
         pass
 
