@@ -472,6 +472,30 @@ async def _auto_enrich_background():
         logger.warning("Auto-enrichment failed: %s", e)
 
 
+# Interval (in seconds) between periodic data resyncs from Google Sheets
+_RESYNC_INTERVAL = int(os.environ.get("RESYNC_INTERVAL_HOURS", "6")) * 3600
+
+
+async def _periodic_resync_background():
+    """Background task: resync data from Google Sheets every RESYNC_INTERVAL_HOURS hours."""
+    # Wait for initial data load to complete first
+    await asyncio.to_thread(_data_ready.wait, 300)
+    if not _data_ready.is_set():
+        logger.warning("Periodic resync: data never became ready, skipping")
+        return
+
+    logger.info("Periodic resync: will resync every %d hours", _RESYNC_INTERVAL // 3600)
+
+    while True:
+        await asyncio.sleep(_RESYNC_INTERVAL)
+        logger.info("Periodic resync: starting scheduled resync from Google Sheets...")
+        try:
+            await asyncio.to_thread(_resync_stale_data)
+            logger.info("Periodic resync: completed successfully")
+        except Exception as e:
+            logger.error("Periodic resync: failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -484,15 +508,18 @@ async def lifespan(app: FastAPI):
 
     # Start auto-enrichment in background (runs after data loads)
     enrichment_task = asyncio.create_task(_auto_enrich_background())
+    # Start periodic resync (resyncs Google Sheets every N hours)
+    resync_task = asyncio.create_task(_periodic_resync_background())
 
     yield
 
-    # Cancel enrichment if still running on shutdown
-    enrichment_task.cancel()
-    try:
-        await enrichment_task
-    except asyncio.CancelledError:
-        pass
+    # Cancel background tasks on shutdown
+    for task in (enrichment_task, resync_task):
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 # ── App ───────────────────────────────────────────────────────────────
@@ -893,7 +920,7 @@ async def sync_data(admin: dict = Depends(require_admin)):
 
 
 @app.get("/api/data/sync-status")
-async def data_sync_status(admin: dict = Depends(require_admin)):
+async def data_sync_status(current_user: dict = Depends(get_current_user)):
     """Return the last sync timestamps for each sheet."""
     try:
         status = get_sync_status()

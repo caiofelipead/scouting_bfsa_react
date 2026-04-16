@@ -22,10 +22,12 @@ import {
   Gem,
   Users,
   UserPlus,
+  RefreshCw,
+  Check,
 } from 'lucide-react';
 import type { User } from '../types/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { onColdStartChange } from '../lib/api';
+import api, { onColdStartChange } from '../lib/api';
 
 export type TabId =
   | 'dashboard'
@@ -121,13 +123,35 @@ const ALL_NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 export default function Layout({ user, activeTab, onTabChange, onLogout, children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [coldStart, setColdStart] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncDone, setSyncDone] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
   const userNavSections = filterNavForUser(user.email);
   const userNavItems = userNavSections.flatMap((s) => s.items);
+  const isAdmin = user.role === 'admin';
 
   useEffect(() => {
     return onColdStartChange(setColdStart);
   }, []);
+
+  const handleResync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncDone(false);
+    setSyncError(null);
+    try {
+      await api.post('/admin/resync');
+      setSyncDone(true);
+      setTimeout(() => setSyncDone(false), 3000);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro ao sincronizar';
+      setSyncError(msg);
+      setTimeout(() => setSyncError(null), 4000);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex relative">
@@ -221,6 +245,23 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {isAdmin && (
+              <button
+                onClick={handleResync}
+                disabled={syncing}
+                className="p-2 rounded-lg btn-ghost focus-ring cursor-pointer relative"
+                style={{
+                  color: syncDone ? 'var(--color-above)' : syncError ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                }}
+                title={syncing ? 'Sincronizando...' : syncDone ? 'Dados atualizados!' : syncError ? syncError : 'Atualizar dados do Google Sheets'}
+              >
+                {syncDone ? (
+                  <Check size={16} strokeWidth={2} />
+                ) : (
+                  <RefreshCw size={16} strokeWidth={1.5} className={syncing ? 'animate-spin' : ''} />
+                )}
+              </button>
+            )}
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg btn-ghost focus-ring cursor-pointer"
@@ -347,7 +388,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
                   </div>
                 ))}
               </nav>
-              <div className="px-5 py-4" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+              <div className="px-5 py-4 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
                 <button
                   onClick={onLogout}
                   className="flex items-center gap-2 text-xs cursor-pointer"
@@ -356,6 +397,24 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
                   <LogOut size={14} strokeWidth={1.5} />
                   Sair ({user.name})
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={handleResync}
+                    disabled={syncing}
+                    className="flex items-center gap-1.5 text-xs cursor-pointer px-2 py-1 rounded-lg"
+                    style={{
+                      color: syncDone ? 'var(--color-above)' : syncError ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                    }}
+                    title={syncing ? 'Sincronizando...' : 'Atualizar dados'}
+                  >
+                    {syncDone ? (
+                      <Check size={14} strokeWidth={2} />
+                    ) : (
+                      <RefreshCw size={14} strokeWidth={1.5} className={syncing ? 'animate-spin' : ''} />
+                    )}
+                    {syncing ? 'Sincronizando...' : syncDone ? 'Atualizado!' : 'Atualizar'}
+                  </button>
+                )}
               </div>
             </motion.aside>
           </>
