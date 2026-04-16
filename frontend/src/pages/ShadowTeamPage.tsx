@@ -3,11 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Plus, Trash2, ChevronDown, StickyNote,
   Users, Target, ClipboardList, AlertCircle, GripVertical,
-  Search, Loader2, User,
+  Search, Loader2, User, ArrowLeftRight,
 } from 'lucide-react';
-import { usePlayers, usePositions } from '../hooks/usePlayers';
-import { proxyImageUrl, isProxyFallback } from '../lib/api';
-import type { PlayerSummary, PlayersQueryParams } from '../types/api';
+import { useQuery, useQueries } from '@tanstack/react-query';
+import { usePlayers, usePositions, playerKeys } from '../hooks/usePlayers';
+import api, { proxyImageUrl, isProxyFallback } from '../lib/api';
+import { getScoreColor, getScoreClass, getPerformanceLabel } from '../lib/utils';
+import RadarChart from '../components/RadarChart';
+import type { PlayerSummary, PlayersQueryParams, PlayerProfile } from '../types/api';
 
 // ── Types ──
 
@@ -961,13 +964,599 @@ function TabNotes({
   );
 }
 
+// ── Tab 5: Comparativo (multi-player) ──
+
+// Color palette for up to 8 compared players
+const COMPARE_COLORS = [
+  '#ef4444', '#3b82f6', '#22c55e', '#f59e0b',
+  '#a855f7', '#ec4899', '#14b8a6', '#f97316',
+];
+
+// Helper: PDI color/label
+function getPdiColor(score: number): string {
+  if (score >= 75) return '#22c55e';
+  if (score >= 60) return '#3b82f6';
+  if (score >= 40) return '#eab308';
+  return '#ef4444';
+}
+function getPdiLabel(score: number): string {
+  if (score >= 75) return 'ALTO POTENCIAL';
+  if (score >= 60) return 'PROMISSOR';
+  if (score >= 40) return 'MODERADO';
+  return 'BAIXO';
+}
+
+// Individual player profile card for comparison
+function ComparisonPlayerCard({
+  profile,
+  radarData,
+  accentColor,
+  target,
+}: {
+  profile: PlayerProfile;
+  radarData: { labels: string[]; values: number[] } | undefined;
+  accentColor: string;
+  target: TargetPlayer;
+}) {
+  const { summary, indices, percentiles, scout_score, performance_class, projection_score } = profile;
+
+  return (
+    <div className="space-y-3">
+      {/* Header card */}
+      <div className="card-glass overflow-hidden" style={{ borderTop: `3px solid ${accentColor}` }}>
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            {target.photoUrl ? (
+              <img
+                src={proxyImageUrl(target.photoUrl)!}
+                alt={summary.name}
+                className="w-14 h-14 rounded-full object-cover flex-shrink-0"
+                referrerPolicy="no-referrer"
+                onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}>
+                <User size={20} style={{ color: 'var(--color-text-muted)' }} />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                {summary.display_name || summary.name}
+              </h3>
+              {summary.team && (
+                <p className="text-xs flex items-center gap-1.5 mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                  {summary.club_logo ? (
+                    <img
+                      src={proxyImageUrl(summary.club_logo)!}
+                      alt=""
+                      className="w-4 h-4 object-contain"
+                      onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <Shield size={12} strokeWidth={1.5} />
+                  )}
+                  {summary.team}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                {summary.position && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: `${accentColor}15`, color: accentColor, border: `1px solid ${accentColor}30` }}>
+                    {summary.position}
+                  </span>
+                )}
+                {summary.age && (
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{summary.age} anos</span>
+                )}
+                {summary.league && (
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{summary.league}</span>
+                )}
+                {summary.minutes_played != null && (
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{summary.minutes_played} min</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SSP Score */}
+        {scout_score !== null && (
+          <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+            <span className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--color-text-muted)' }}>SSP</span>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${getScoreClass(scout_score)}`}>
+                {scout_score.toFixed(1)}
+              </span>
+              {performance_class && (
+                <span className="text-[9px] tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                  {getPerformanceLabel(performance_class)}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* PDI Score */}
+        {projection_score != null && (
+          <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+            <span className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--color-text-muted)' }}>PDI</span>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold" style={{ color: getPdiColor(projection_score), background: `${getPdiColor(projection_score)}15` }}>
+                {projection_score.toFixed(1)}
+              </span>
+              <span className="text-[9px] tracking-wider" style={{ color: getPdiColor(projection_score) }}>
+                {getPdiLabel(projection_score)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Radar chart (individual percentiles) */}
+      {radarData && radarData.labels.length > 0 && (
+        <div className="card-glass p-4">
+          <div className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>
+            PERCENTIS
+          </div>
+          <RadarChart
+            labels={radarData.labels}
+            values={radarData.values}
+            size={280}
+            color1={accentColor}
+          />
+          {/* Percentile grid */}
+          {percentiles && Object.keys(percentiles).length > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-0.5">
+              {Object.entries(percentiles).map(([metric, value]) => (
+                <div key={metric} className="flex items-center justify-between">
+                  <span className="text-[9px] truncate pr-1" style={{ color: 'var(--color-text-muted)' }}>{metric}</span>
+                  <span className="text-[9px] font-mono font-semibold" style={{ color: getScoreColor(value) }}>P{value.toFixed(0)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Composite indices with bars */}
+      {indices && Object.keys(indices).length > 0 && (
+        <div className="card-glass p-4">
+          <div className="text-[10px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>
+            ÍNDICES COMPOSTOS
+          </div>
+          <div className="space-y-2.5">
+            {Object.entries(indices).map(([name, value], i) => (
+              <motion.div
+                key={name}
+                initial={{ opacity: 0, x: 4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 + i * 0.05 }}
+              >
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>{name}</span>
+                  <span className="text-[11px] font-mono font-semibold" style={{ color: getScoreColor(value) }}>{value.toFixed(1)}</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-surface-2)' }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: `linear-gradient(90deg, ${accentColor} 0%, ${getScoreColor(value)} 100%)` }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(value, 100)}%` }}
+                    transition={{ duration: 0.6, delay: 0.2 + i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                  />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Multi-player radar overlay SVG
+function MultiRadarChart({
+  labels,
+  datasets,
+  size = 400,
+}: {
+  labels: string[];
+  datasets: { name: string; values: number[]; color: string }[];
+  size?: number;
+}) {
+  const pad = size * 0.14;
+  const fullSize = size + pad * 2;
+  const center = fullSize / 2;
+  const radius = size * 0.34;
+  const rings = [0.25, 0.5, 0.75, 1.0];
+  const n = labels.length;
+
+  const getPoint = (val: number, i: number) => {
+    const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+    const r = (val / 100) * radius;
+    return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) };
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
+      <svg viewBox={`0 0 ${fullSize} ${fullSize}`} width="100%" height="100%" style={{ overflow: 'visible' }}>
+        {/* Ring grid */}
+        {rings.map((pct, ri) => {
+          const r = pct * radius;
+          const pts = Array.from({ length: n }, (_, i) => {
+            const a = (Math.PI * 2 * i) / n - Math.PI / 2;
+            return `${center + r * Math.cos(a)},${center + r * Math.sin(a)}`;
+          }).join(' ');
+          return <polygon key={ri} points={pts} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />;
+        })}
+
+        {/* Axis lines */}
+        {labels.map((_, i) => {
+          const a = (Math.PI * 2 * i) / n - Math.PI / 2;
+          return <line key={i} x1={center} y1={center} x2={center + radius * Math.cos(a)} y2={center + radius * Math.sin(a)} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />;
+        })}
+
+        {/* Data polygons */}
+        {datasets.map((ds, di) => {
+          const pts = ds.values.map((v, i) => { const p = getPoint(v, i); return `${p.x},${p.y}`; }).join(' ');
+          return (
+            <motion.polygon
+              key={di}
+              points={pts}
+              fill={ds.color}
+              fillOpacity={0.12}
+              stroke={ds.color}
+              strokeWidth="2"
+              strokeLinejoin="round"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.2 + di * 0.1 }}
+            />
+          );
+        })}
+
+        {/* Data points */}
+        {datasets.map((ds, di) =>
+          ds.values.map((v, i) => {
+            const p = getPoint(v, i);
+            return (
+              <motion.circle
+                key={`${di}-${i}`}
+                cx={p.x}
+                cy={p.y}
+                r={3}
+                fill={ds.color}
+                stroke="var(--color-void)"
+                strokeWidth="1.5"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3 + di * 0.1 + i * 0.03, type: 'spring', stiffness: 300 }}
+              />
+            );
+          }),
+        )}
+
+        {/* Labels */}
+        {labels.map((label, i) => {
+          const a = (Math.PI * 2 * i) / n - Math.PI / 2;
+          const lr = radius + 28;
+          const lx = center + lr * Math.cos(a);
+          const ly = center + lr * Math.sin(a);
+          const anchor = Math.abs(Math.cos(a)) < 0.1 ? 'middle' : Math.cos(a) > 0 ? 'start' : 'end';
+          return (
+            <text key={i} x={lx} y={ly} textAnchor={anchor} fill="var(--color-text-secondary)" fontSize="9" fontFamily="var(--font-body)" fontWeight="400">
+              {label.length > 18 ? label.slice(0, 18) + '...' : label}
+            </text>
+          );
+        })}
+      </svg>
+    </motion.div>
+  );
+}
+
+function TabComparison({ targets }: { targets: TargetPlayer[] }) {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [position, setPosition] = useState('');
+
+  const { data: apiPositions = [] } = usePositions();
+
+  const togglePlayer = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const selectedTargets = useMemo(
+    () => selectedIds.map((id) => targets.find((t) => t.id === id)).filter((t): t is TargetPlayer => !!t),
+    [selectedIds, targets],
+  );
+
+  // Fetch profiles for all selected players
+  const profileQueries = useQueries({
+    queries: selectedTargets.map((t) => ({
+      queryKey: playerKeys.profile(t.name),
+      queryFn: async () => {
+        const res = await api.get(`/players/${encodeURIComponent(t.name)}/profile`);
+        return res.data as PlayerProfile;
+      },
+      staleTime: 10 * 60 * 1000,
+      enabled: true,
+    })),
+  });
+
+  // Fetch radar data for all selected players
+  const radarQueries = useQueries({
+    queries: selectedTargets.map((t) => ({
+      queryKey: playerKeys.radar(t.name),
+      queryFn: async () => {
+        const res = await api.get(`/players/${encodeURIComponent(t.name)}/radar`);
+        return { labels: (res.data?.labels ?? []) as string[], values: (res.data?.values ?? []) as number[] };
+      },
+      staleTime: 10 * 60 * 1000,
+      enabled: true,
+    })),
+  });
+
+  const isLoading = profileQueries.some((q) => q.isLoading) || radarQueries.some((q) => q.isLoading);
+
+  // Collect loaded profiles alongside their targets and colors
+  const loaded = useMemo(() => {
+    return selectedTargets.map((t, i) => ({
+      target: t,
+      profile: profileQueries[i]?.data ?? null,
+      radar: radarQueries[i]?.data ?? null,
+      color: COMPARE_COLORS[i % COMPARE_COLORS.length],
+    })).filter((entry) => entry.profile !== null) as {
+      target: TargetPlayer;
+      profile: PlayerProfile;
+      radar: { labels: string[]; values: number[] } | null;
+      color: string;
+    }[];
+  }, [selectedTargets, profileQueries, radarQueries]);
+
+  // Compute multi-player comparison table from indices
+  const comparisonTable = useMemo(() => {
+    if (loaded.length < 2) return null;
+    // Collect all index names across profiles
+    const allKeys = new Set<string>();
+    loaded.forEach((l) => Object.keys(l.profile.indices).forEach((k) => allKeys.add(k)));
+    const indexNames = Array.from(allKeys);
+    // Build rows
+    return indexNames.map((name) => {
+      const values = loaded.map((l) => l.profile.indices[name] ?? null);
+      const validValues = values.filter((v): v is number => v !== null);
+      const best = validValues.length > 0 ? Math.max(...validValues) : null;
+      return { name, values, best };
+    });
+  }, [loaded]);
+
+  // Build multi-radar datasets from indices
+  const radarDatasets = useMemo(() => {
+    if (loaded.length < 2 || !comparisonTable) return null;
+    const labels = comparisonTable.map((r) => r.name);
+    const datasets = loaded.map((l) => ({
+      name: l.target.name,
+      values: comparisonTable.map((r) => l.profile.indices[r.name] ?? 0),
+      color: l.color,
+    }));
+    return { labels, datasets };
+  }, [loaded, comparisonTable]);
+
+  // Auto-detect position
+  const effectivePosition = position || selectedTargets[0]?.position || 'Atacante';
+
+  return (
+    <div className="space-y-4">
+      {/* Selection card */}
+      <div className="card-glass p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            Selecione os alvos para comparar ({selectedIds.length} selecionado{selectedIds.length !== 1 ? 's' : ''})
+          </p>
+          <div className="relative">
+            <select
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              className="appearance-none pl-3 pr-8 py-2 rounded-lg text-xs bg-transparent border cursor-pointer"
+              style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
+            >
+              <option value="">Posição: Auto</option>
+              {apiPositions.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
+          </div>
+        </div>
+
+        {/* Player toggle chips */}
+        {targets.length === 0 ? (
+          <p className="text-xs py-2" style={{ color: 'var(--color-text-muted)' }}>
+            Nenhum alvo cadastrado. Adicione jogadores na aba "Alvos" primeiro.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {targets.map((t, i) => {
+              const isSelected = selectedIds.includes(t.id);
+              const colorIdx = isSelected ? selectedIds.indexOf(t.id) : -1;
+              const color = isSelected ? COMPARE_COLORS[colorIdx % COMPARE_COLORS.length] : undefined;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => togglePlayer(t.id)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                  style={{
+                    background: isSelected ? `${color}18` : 'var(--color-surface-2)',
+                    border: `1.5px solid ${isSelected ? color : 'var(--color-border-subtle)'}`,
+                    color: isSelected ? color : 'var(--color-text-secondary)',
+                  }}
+                >
+                  {t.photoUrl ? (
+                    <img
+                      src={proxyImageUrl(t.photoUrl)!}
+                      alt={t.name}
+                      className="w-5 h-5 rounded-full object-cover"
+                      referrerPolicy="no-referrer"
+                      onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: isSelected ? `${color}30` : 'var(--color-surface-3)' }}>
+                      <User size={10} style={{ color: isSelected ? color : 'var(--color-text-muted)' }} />
+                    </div>
+                  )}
+                  <span className="truncate max-w-[120px]">{t.name}</span>
+                  {t.score != null && (
+                    <span className="font-mono text-[10px] opacity-70">{t.score.toFixed(0)}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Loading */}
+      {isLoading && selectedIds.length > 0 && (
+        <div className="card-glass p-8 text-center">
+          <Loader2 size={24} className="animate-spin mx-auto mb-2" style={{ color: 'var(--color-accent)' }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Carregando perfis...</p>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {selectedIds.length === 0 && (
+        <div className="card-glass p-8 text-center" style={{ color: 'var(--color-text-muted)' }}>
+          <ArrowLeftRight size={32} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Clique nos alvos acima para selecionar e comparar</p>
+          {targets.length < 2 && (
+            <p className="text-xs mt-2 opacity-60">Você precisa de pelo menos 2 alvos na aba "Alvos".</p>
+          )}
+        </div>
+      )}
+
+      {/* Profile cards grid */}
+      {loaded.length > 0 && !isLoading && (
+        <div className={`grid gap-4 ${
+          loaded.length === 1 ? 'grid-cols-1 max-w-md' :
+          loaded.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
+          loaded.length === 3 ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' :
+          'grid-cols-1 md:grid-cols-2 xl:grid-cols-4'
+        }`}>
+          {loaded.map((entry) => (
+            <ComparisonPlayerCard
+              key={entry.target.id}
+              profile={entry.profile}
+              radarData={entry.radar ?? undefined}
+              accentColor={entry.color}
+              target={entry.target}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Multi-player radar overlay */}
+      {radarDatasets && radarDatasets.datasets.length >= 2 && (
+        <div className="card-glass p-5">
+          <div className="text-[10px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>
+            RADAR COMPARATIVO — ÍNDICES ({effectivePosition})
+          </div>
+          <div className="max-w-lg mx-auto">
+            <MultiRadarChart
+              labels={radarDatasets.labels}
+              datasets={radarDatasets.datasets}
+              size={400}
+            />
+          </div>
+          {/* Legend */}
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-3">
+            {loaded.map((entry) => (
+              <span key={entry.target.id} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: entry.color }} />
+                {entry.target.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Multi-column comparison table */}
+      {comparisonTable && loaded.length >= 2 && (
+        <div className="card-glass rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+            <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
+              TABELA COMPARATIVA
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold tracking-wider uppercase sticky left-0" style={{ color: 'var(--color-text-muted)', background: 'var(--color-surface-1)' }}>
+                    Índice
+                  </th>
+                  {loaded.map((entry) => (
+                    <th key={entry.target.id} className="px-3 py-2.5 text-right text-[10px] font-semibold tracking-wider uppercase whitespace-nowrap" style={{ color: entry.color }}>
+                      {entry.target.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonTable.map((row, i) => (
+                  <motion.tr
+                    key={row.name}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.03 }}
+                    style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+                    className="hover:bg-white/[0.02]"
+                  >
+                    <td className="px-4 py-2.5 font-medium text-sm sticky left-0" style={{ color: 'var(--color-text-primary)', background: 'var(--color-surface-1)' }}>
+                      {row.name}
+                    </td>
+                    {row.values.map((val, vi) => {
+                      const isBest = val !== null && val === row.best && row.values.filter((v) => v === row.best).length === 1;
+                      return (
+                        <td
+                          key={vi}
+                          className="px-3 py-2.5 text-right font-mono text-xs"
+                          style={{
+                            color: val !== null ? getScoreColor(val) : 'var(--color-text-muted)',
+                            fontWeight: isBest ? 700 : 400,
+                          }}
+                        >
+                          {val !== null ? (
+                            <span className="inline-flex items-center gap-1">
+                              {val.toFixed(0)}
+                              {isBest && (
+                                <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ background: loaded[vi].color }} />
+                              )}
+                            </span>
+                          ) : '—'}
+                        </td>
+                      );
+                    })}
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ──
 
-type ShadowTab = 'needs' | 'targets' | 'xi' | 'notes';
+type ShadowTab = 'needs' | 'targets' | 'xi' | 'comparison' | 'notes';
 
 const TABS: { id: ShadowTab; label: string }[] = [
   { id: 'needs', label: 'Necessidades' },
   { id: 'targets', label: 'Alvos' },
+  { id: 'comparison', label: 'Comparativo' },
   { id: 'xi', label: 'Shadow XI' },
   { id: 'notes', label: 'Notas' },
 ];
@@ -1038,6 +1627,7 @@ export default function ShadowTeamPage() {
       {/* Tab content */}
       {activeTab === 'needs' && <TabNeeds needs={needs} setNeeds={setNeeds} />}
       {activeTab === 'targets' && <TabTargets targets={targets} setTargets={setTargets} needs={needs} />}
+      {activeTab === 'comparison' && <TabComparison targets={targets} />}
       {activeTab === 'xi' && <TabShadowXI xi={xi} setXI={setXI} targets={targets} />}
       {activeTab === 'notes' && <TabNotes notes={notes} setNotes={setNotes} targets={targets} />}
     </motion.div>
