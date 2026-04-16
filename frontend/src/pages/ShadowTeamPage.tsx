@@ -6,11 +6,11 @@ import {
   Search, Loader2, User, ArrowLeftRight,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { usePlayers, usePositions } from '../hooks/usePlayers';
+import { usePlayers, usePositions, usePlayerProfile, useRadarData } from '../hooks/usePlayers';
 import api, { proxyImageUrl, isProxyFallback } from '../lib/api';
-import { getScoreColor } from '../lib/utils';
+import { getScoreColor, getScoreClass, getPerformanceLabel } from '../lib/utils';
 import RadarChart from '../components/RadarChart';
-import type { PlayerSummary, PlayersQueryParams, ComparisonResponse } from '../types/api';
+import type { PlayerSummary, PlayersQueryParams, ComparisonResponse, PlayerProfile } from '../types/api';
 
 // ── Types ──
 
@@ -966,6 +966,189 @@ function TabNotes({
 
 // ── Tab 5: Comparativo ──
 
+// Helper: PDI color/label
+function getPdiColor(score: number): string {
+  if (score >= 75) return '#22c55e';
+  if (score >= 60) return '#3b82f6';
+  if (score >= 40) return '#eab308';
+  return '#ef4444';
+}
+function getPdiLabel(score: number): string {
+  if (score >= 75) return 'ALTO POTENCIAL';
+  if (score >= 60) return 'PROMISSOR';
+  if (score >= 40) return 'MODERADO';
+  return 'BAIXO';
+}
+
+// Individual player profile card for comparison
+function ComparisonPlayerCard({
+  profile,
+  radarData,
+  accentColor,
+  target,
+}: {
+  profile: PlayerProfile;
+  radarData: { labels: string[]; values: number[] } | undefined;
+  accentColor: string;
+  target: TargetPlayer;
+}) {
+  const { summary, indices, percentiles, scout_score, performance_class, projection_score } = profile;
+
+  return (
+    <div className="space-y-3">
+      {/* Header card */}
+      <div className="card-glass overflow-hidden" style={{ borderTop: `3px solid ${accentColor}` }}>
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            {target.photoUrl ? (
+              <img
+                src={proxyImageUrl(target.photoUrl)!}
+                alt={summary.name}
+                className="w-14 h-14 rounded-full object-cover flex-shrink-0"
+                referrerPolicy="no-referrer"
+                onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}>
+                <User size={20} style={{ color: 'var(--color-text-muted)' }} />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                {summary.display_name || summary.name}
+              </h3>
+              {summary.team && (
+                <p className="text-xs flex items-center gap-1.5 mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                  {summary.club_logo ? (
+                    <img
+                      src={proxyImageUrl(summary.club_logo)!}
+                      alt=""
+                      className="w-4 h-4 object-contain"
+                      onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <Shield size={12} strokeWidth={1.5} />
+                  )}
+                  {summary.team}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                {summary.position && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: `${accentColor}15`, color: accentColor, border: `1px solid ${accentColor}30` }}>
+                    {summary.position}
+                  </span>
+                )}
+                {summary.age && (
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{summary.age} anos</span>
+                )}
+                {summary.league && (
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{summary.league}</span>
+                )}
+                {summary.minutes_played != null && (
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{summary.minutes_played} min</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SSP Score */}
+        {scout_score !== null && (
+          <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+            <span className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--color-text-muted)' }}>SSP</span>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${getScoreClass(scout_score)}`}>
+                {scout_score.toFixed(1)}
+              </span>
+              {performance_class && (
+                <span className="text-[9px] tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                  {getPerformanceLabel(performance_class)}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* PDI Score */}
+        {projection_score != null && (
+          <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+            <span className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--color-text-muted)' }}>PDI</span>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold" style={{ color: getPdiColor(projection_score), background: `${getPdiColor(projection_score)}15` }}>
+                {projection_score.toFixed(1)}
+              </span>
+              <span className="text-[9px] tracking-wider" style={{ color: getPdiColor(projection_score) }}>
+                {getPdiLabel(projection_score)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Radar chart (individual percentiles) */}
+      {radarData && radarData.labels.length > 0 && (
+        <div className="card-glass p-4">
+          <div className="text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>
+            PERCENTIS
+          </div>
+          <RadarChart
+            labels={radarData.labels}
+            values={radarData.values}
+            size={280}
+            color1={accentColor}
+          />
+          {/* Percentile grid */}
+          {percentiles && Object.keys(percentiles).length > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-0.5">
+              {Object.entries(percentiles).map(([metric, value]) => (
+                <div key={metric} className="flex items-center justify-between">
+                  <span className="text-[9px] truncate pr-1" style={{ color: 'var(--color-text-muted)' }}>{metric}</span>
+                  <span className="text-[9px] font-mono font-semibold" style={{ color: getScoreColor(value) }}>P{value.toFixed(0)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Composite indices with bars */}
+      {indices && Object.keys(indices).length > 0 && (
+        <div className="card-glass p-4">
+          <div className="text-[10px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>
+            ÍNDICES COMPOSTOS
+          </div>
+          <div className="space-y-2.5">
+            {Object.entries(indices).map(([name, value], i) => (
+              <motion.div
+                key={name}
+                initial={{ opacity: 0, x: 4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 + i * 0.05 }}
+              >
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>{name}</span>
+                  <span className="text-[11px] font-mono font-semibold" style={{ color: getScoreColor(value) }}>{value.toFixed(1)}</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-surface-2)' }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: `linear-gradient(90deg, ${accentColor} 0%, ${getScoreColor(value)} 100%)` }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(value, 100)}%` }}
+                    transition={{ duration: 0.6, delay: 0.2 + i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                  />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TabComparison({ targets }: { targets: TargetPlayer[] }) {
   const [player1Id, setPlayer1Id] = useState('');
   const [player2Id, setPlayer2Id] = useState('');
@@ -973,32 +1156,40 @@ function TabComparison({ targets }: { targets: TargetPlayer[] }) {
 
   const { data: apiPositions = [] } = usePositions();
 
-  const player1 = targets.find((t) => t.id === player1Id);
-  const player2 = targets.find((t) => t.id === player2Id);
+  const target1 = targets.find((t) => t.id === player1Id);
+  const target2 = targets.find((t) => t.id === player2Id);
+
+  // Fetch full profiles
+  const { data: profile1, isLoading: loadingP1 } = usePlayerProfile(target1?.name ?? null);
+  const { data: profile2, isLoading: loadingP2 } = usePlayerProfile(target2?.name ?? null);
+  const { data: radar1 } = useRadarData(target1?.name ?? null);
+  const { data: radar2 } = useRadarData(target2?.name ?? null);
 
   // Auto-detect position from selected players
-  const effectivePosition = position || player1?.position || player2?.position || 'Atacante';
+  const effectivePosition = position || target1?.position || target2?.position || 'Atacante';
 
-  const { data: comparison, isLoading, error } = useQuery({
-    queryKey: ['comparison', player1?.name, player2?.name, effectivePosition],
+  const { data: comparison, isLoading: loadingComparison, error } = useQuery({
+    queryKey: ['comparison', target1?.name, target2?.name, effectivePosition],
     queryFn: async () => {
       const res = await api.post('/comparison', {
-        player1: player1!.name,
-        player2: player2!.name,
+        player1: target1!.name,
+        player2: target2!.name,
         position: effectivePosition,
       });
       return res.data as ComparisonResponse;
     },
-    enabled: !!player1 && !!player2 && player1.id !== player2.id,
+    enabled: !!target1 && !!target2 && target1.id !== target2.id,
     staleTime: 10 * 60 * 1000,
   });
+
+  const isLoading = loadingP1 || loadingP2 || loadingComparison;
 
   return (
     <div className="space-y-4">
       {/* Selection card */}
       <div className="card-glass p-4 space-y-4">
         <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-          Selecione dois alvos para comparar seus índices compostos.
+          Selecione dois alvos para comparar seus perfis e índices compostos.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
           {/* Player 1 */}
@@ -1079,10 +1270,10 @@ function TabComparison({ targets }: { targets: TargetPlayer[] }) {
       )}
 
       {/* Loading */}
-      {isLoading && (
+      {isLoading && (player1Id || player2Id) && (
         <div className="card-glass p-8 text-center">
           <Loader2 size={24} className="animate-spin mx-auto mb-2" style={{ color: 'var(--color-accent)' }} />
-          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Carregando comparação...</p>
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Carregando perfis...</p>
         </div>
       )}
 
@@ -1097,68 +1288,36 @@ function TabComparison({ targets }: { targets: TargetPlayer[] }) {
         </div>
       )}
 
-      {/* Comparison results */}
+      {/* Side-by-side player profile cards */}
+      {(profile1 || profile2) && !isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            {profile1 && target1 && (
+              <ComparisonPlayerCard
+                profile={profile1}
+                radarData={radar1}
+                accentColor="var(--color-accent)"
+                target={target1}
+              />
+            )}
+          </div>
+          <div>
+            {profile2 && target2 && (
+              <ComparisonPlayerCard
+                profile={profile2}
+                radarData={radar2}
+                accentColor="#3b82f6"
+                target={target2}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Comparison radar + table */}
       {comparison && (
         <>
-          {/* Player info cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <motion.div
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="card-glass p-4 flex items-center gap-3"
-              style={{ borderLeft: '3px solid var(--color-accent)' }}
-            >
-              {player1?.photoUrl ? (
-                <img
-                  src={proxyImageUrl(player1.photoUrl)!}
-                  alt={player1.name}
-                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                  referrerPolicy="no-referrer"
-                  onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }}
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}>
-                  <User size={16} style={{ color: 'var(--color-text-muted)' }} />
-                </div>
-              )}
-              <div className="min-w-0">
-                <div className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{comparison.player1.name}</div>
-                <div className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
-                  {comparison.player1.team} · {comparison.player1.position_raw} · {comparison.player1.age} anos
-                </div>
-              </div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, x: 8 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="card-glass p-4 flex items-center gap-3"
-              style={{ borderLeft: '3px solid #3b82f6' }}
-            >
-              {player2?.photoUrl ? (
-                <img
-                  src={proxyImageUrl(player2.photoUrl)!}
-                  alt={player2.name}
-                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                  referrerPolicy="no-referrer"
-                  onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }}
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}>
-                  <User size={16} style={{ color: 'var(--color-text-muted)' }} />
-                </div>
-              )}
-              <div className="min-w-0">
-                <div className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{comparison.player2.name}</div>
-                <div className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
-                  {comparison.player2.team} · {comparison.player2.position_raw} · {comparison.player2.age} anos
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Radar chart */}
+          {/* Dual radar chart */}
           <div className="card-glass p-5">
             <div className="text-[10px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>
               RADAR COMPARATIVO ({comparison.position})
