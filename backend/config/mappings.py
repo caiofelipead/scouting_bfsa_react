@@ -229,32 +229,48 @@ CLUB_LOGOS = {
 # ============================================
 # LOGOS DE LIGAS
 # ============================================
+_BRASILEIRAO_LOGO = 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png'
+_PREMIER_LOGO = 'https://logodetimes.com/times/premier-league/logo-premier-league-256.png'
+_LALIGA_LOGO = 'https://logodetimes.com/times/la-liga/logo-la-liga-256.png'
+_SERIE_A_ITA_LOGO = 'https://logodetimes.com/times/serie-a-italia/logo-serie-a-italia-256.png'
+_BUNDESLIGA_LOGO = 'https://logodetimes.com/times/bundesliga/logo-bundesliga-256.png'
+_LIGUE1_LOGO = 'https://logodetimes.com/times/ligue-1/logo-ligue-1-256.png'
+_EREDIVISIE_LOGO = 'https://logodetimes.com/times/eredivisie/logo-eredivisie-256.png'
+_LIGA_PT_LOGO = 'https://logodetimes.com/times/liga-portugal/logo-liga-portugal-256.png'
+_LIGA_AR_LOGO = 'https://logodetimes.com/times/liga-profissional-argentina/logo-liga-profissional-argentina-256.png'
+_MLS_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/MLS_crest_logo_RGB_gradient.svg/200px-MLS_crest_logo_RGB_gradient.svg.png'
+_LIGA_MX_LOGO = 'https://logodetimes.com/times/liga-mx/logo-liga-mx-256.png'
+_SAUDI_LOGO = 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b7/Saudi_Pro_League_Logo.svg/200px-Saudi_Pro_League_Logo.svg.png'
+
 LEAGUE_LOGOS = {
-    'Série A': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
-    'Serie A': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
-    'Série B': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
-    'Serie B': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
-    'Brasil | 1': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
-    'Brasil | 2': 'https://logodetimes.com/times/campeonato-brasileiro/logo-campeonato-brasileiro-256.png',
-    'Premier League': 'https://logodetimes.com/times/premier-league/logo-premier-league-256.png',
-    'England | 1': 'https://logodetimes.com/times/premier-league/logo-premier-league-256.png',
-    'La Liga': 'https://logodetimes.com/times/la-liga/logo-la-liga-256.png',
-    'Spain | 1': 'https://logodetimes.com/times/la-liga/logo-la-liga-256.png',
-    'Italy | 1': 'https://logodetimes.com/times/serie-a-italia/logo-serie-a-italia-256.png',
-    'Bundesliga': 'https://logodetimes.com/times/bundesliga/logo-bundesliga-256.png',
-    'Germany | 1': 'https://logodetimes.com/times/bundesliga/logo-bundesliga-256.png',
-    'Ligue 1': 'https://logodetimes.com/times/ligue-1/logo-ligue-1-256.png',
-    'France | 1': 'https://logodetimes.com/times/ligue-1/logo-ligue-1-256.png',
-    'Eredivisie': 'https://logodetimes.com/times/eredivisie/logo-eredivisie-256.png',
-    'Netherlands | 1': 'https://logodetimes.com/times/eredivisie/logo-eredivisie-256.png',
-    'Liga Portugal': 'https://logodetimes.com/times/liga-portugal/logo-liga-portugal-256.png',
-    'Portugal | 1': 'https://logodetimes.com/times/liga-portugal/logo-liga-portugal-256.png',
-    'Argentina | 1': 'https://logodetimes.com/times/liga-profissional-argentina/logo-liga-profissional-argentina-256.png',
-    'MLS': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/MLS_crest_logo_RGB_gradient.svg/200px-MLS_crest_logo_RGB_gradient.svg.png',
-    'USA | 1': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/MLS_crest_logo_RGB_gradient.svg/200px-MLS_crest_logo_RGB_gradient.svg.png',
-    'Liga MX': 'https://logodetimes.com/times/liga-mx/logo-liga-mx-256.png',
-    'Mexico | 1': 'https://logodetimes.com/times/liga-mx/logo-liga-mx-256.png',
-    'Saudi Pro League': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b7/Saudi_Pro_League_Logo.svg/200px-Saudi_Pro_League_Logo.svg.png',
+    # WyScout raw labels
+    'Série A': _BRASILEIRAO_LOGO, 'Serie A': _BRASILEIRAO_LOGO,
+    'Série B': _BRASILEIRAO_LOGO, 'Serie B': _BRASILEIRAO_LOGO,
+    'Brasil | 1': _BRASILEIRAO_LOGO, 'Brasil | 2': _BRASILEIRAO_LOGO,
+    'Brasil | 3': _BRASILEIRAO_LOGO, 'Brasil | 4': _BRASILEIRAO_LOGO,
+    # Canonical names produced by WYSCOUT_LEAGUE_MAP
+    'Serie A Brasil': _BRASILEIRAO_LOGO, 'Serie B Brasil': _BRASILEIRAO_LOGO,
+    'Serie C Brasil': _BRASILEIRAO_LOGO, 'Serie D Brasil': _BRASILEIRAO_LOGO,
+    'Brasileirão': _BRASILEIRAO_LOGO,
+    'Premier League': _PREMIER_LOGO, 'England | 1': _PREMIER_LOGO,
+    'Championship': _PREMIER_LOGO, 'England | 2': _PREMIER_LOGO,
+    'La Liga': _LALIGA_LOGO, 'Spain | 1': _LALIGA_LOGO, 'LaLiga': _LALIGA_LOGO,
+    'La Liga 2': _LALIGA_LOGO, 'Spain | 2': _LALIGA_LOGO,
+    'Serie A Italia': _SERIE_A_ITA_LOGO, 'Italy | 1': _SERIE_A_ITA_LOGO,
+    'Serie B Italia': _SERIE_A_ITA_LOGO, 'Italy | 2': _SERIE_A_ITA_LOGO,
+    'Bundesliga': _BUNDESLIGA_LOGO, 'Germany | 1': _BUNDESLIGA_LOGO,
+    '2. Bundesliga': _BUNDESLIGA_LOGO, 'Germany | 2': _BUNDESLIGA_LOGO,
+    'Ligue 1': _LIGUE1_LOGO, 'France | 1': _LIGUE1_LOGO,
+    'Ligue 2': _LIGUE1_LOGO, 'France | 2': _LIGUE1_LOGO,
+    'Eredivisie': _EREDIVISIE_LOGO, 'Netherlands | 1': _EREDIVISIE_LOGO,
+    'Liga Portugal': _LIGA_PT_LOGO, 'Portugal | 1': _LIGA_PT_LOGO,
+    'Liga Portugal 2': _LIGA_PT_LOGO, 'Portugal | 2': _LIGA_PT_LOGO,
+    'Primeira Liga': _LIGA_PT_LOGO,
+    'Liga Argentina': _LIGA_AR_LOGO, 'Argentina | 1': _LIGA_AR_LOGO,
+    'Liga Argentina B': _LIGA_AR_LOGO, 'Argentina | 2': _LIGA_AR_LOGO,
+    'MLS': _MLS_LOGO, 'USA | 1': _MLS_LOGO,
+    'Liga MX': _LIGA_MX_LOGO, 'Mexico | 1': _LIGA_MX_LOGO,
+    'Saudi Pro League': _SAUDI_LOGO, 'Saudi Arabia | 1': _SAUDI_LOGO,
 }
 
 

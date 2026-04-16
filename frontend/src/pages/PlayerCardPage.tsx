@@ -23,6 +23,7 @@ import { proxyImageUrl, isProxyFallback } from '../lib/api';
 import { usePlayers, usePositions, usePlayerProfile } from '../hooks/usePlayers';
 import { getScoreColor } from '../lib/utils';
 import { getFlagUrl } from '../lib/countryFlags';
+import PositionPitch from '../components/PositionPitch';
 import type { IndicesResponse } from '../types/api';
 
 // ── Percentile bar color (matches Streamlit reference) ──────────────
@@ -404,6 +405,11 @@ export default function PlayerCardPage() {
                     />
                   )}
                 </div>
+              </div>
+
+              {/* Mini pitch showing player's position */}
+              <div className="shrink-0 self-start hidden md:block">
+                <PositionPitch position={summary.position_raw || indicesData.position} />
               </div>
             </div>
           </div>
