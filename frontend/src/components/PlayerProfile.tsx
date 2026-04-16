@@ -19,6 +19,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import RadarChart from './RadarChart';
+import PositionPitch from './PositionPitch';
 import SkeletonProfile from './SkeletonProfile';
 import { usePlayerProfile, useRadarData, useSkillCornerSearch } from '../hooks/usePlayers';
 import { cn, getScoreClass, getScoreColor, getPerformanceLabel, formatNumber } from '../lib/utils';
@@ -262,6 +263,9 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                     </span>
                   )}
                 </div>
+              </div>
+              <div className="shrink-0 self-start hidden sm:block">
+                <PositionPitch position={summary.position} />
               </div>
             </div>
           </div>
