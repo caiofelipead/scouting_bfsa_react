@@ -8,7 +8,7 @@ and provides fast lookups by player name + team.
 import os
 import csv
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,9 @@ _club_logos: Dict[str, str] = {}
 
 # League logo cache: league_name → logo_url
 _league_logos: Dict[str, str] = {}
+
+# All CSV rows (used for "players without photos" reports).
+_csv_rows: List[dict] = []
 
 _loaded = False
 
@@ -59,6 +62,7 @@ def load_player_assets_csv(csv_path: str = None):
                 quality = row.get("Qualidade_Match", "").strip().upper()
                 jogador = row.get("Jogador", "").strip()
                 equipa = row.get("Equipa_CSV", "").strip()
+                sofascore_name = row.get("Jogador_Sofascore", "").strip()
                 foto_url = row.get("Foto_Jogador_URL", "").strip()
                 escudo_url = row.get("Escudo_Clube_URL", "").strip()
                 liga = row.get("Liga", "").strip()
@@ -67,6 +71,13 @@ def load_player_assets_csv(csv_path: str = None):
 
                 if not jogador:
                     continue
+
+                _csv_rows.append({
+                    "jogador": jogador,
+                    "equipa": equipa,
+                    "sofascore_name": sofascore_name,
+                    "quality": quality,
+                })
 
                 # Only use photo_url from reliable matches (ALTA or MEDIA)
                 # BAIXA_REVISAR and NAO_ENCONTRADO photos are likely wrong
@@ -79,6 +90,7 @@ def load_player_assets_csv(csv_path: str = None):
                     "league_country": pais_liga or None,
                     "league_logo": logo_liga_url or None,
                     "quality": quality,
+                    "sofascore_name": sofascore_name or None,
                 }
 
                 key = (_normalize(jogador), _normalize(equipa))
@@ -149,11 +161,24 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
     name_norm = _normalize(player_name) if player_name else ""
     team_norm = _normalize(team) if team else ""
 
+    # Pre-fetch CSV entry so we can feed the SofaScore full name into the FM
+    # lookup as an alternate alias (recovers players whose WyScout short name
+    # doesn't match FM but whose SofaScore full name does).
+    csv_entry = None
+    if name_norm and team_norm:
+        csv_entry = _player_assets.get((name_norm, team_norm))
+    if not csv_entry and name_norm:
+        csv_entry = _player_assets_by_name.get(name_norm)
+
+    alt_names = []
+    if csv_entry and csv_entry.get("sofascore_name"):
+        alt_names.append(csv_entry["sofascore_name"])
+
     # 0a) FM sortitoutsi CDN — highest priority for both faces AND logos
     try:
         from services.fm_sortitoutsi import get_face_url, get_logo_url
         if name_norm:
-            fm_face = get_face_url(player_name, team)
+            fm_face = get_face_url(player_name, team, alt_names=alt_names)
             if fm_face:
                 result["photo_url"] = fm_face
         if team_norm:
@@ -188,13 +213,8 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
         except Exception:
             pass  # enrichment module not loaded yet
 
-    # 2) CSV lookup for metadata and fallback URLs (filter out SofaScore)
-    csv_entry = None
-    if name_norm and team_norm:
-        csv_entry = _player_assets.get((name_norm, team_norm))
-    if not csv_entry and name_norm:
-        csv_entry = _player_assets_by_name.get(name_norm)
-
+    # 2) CSV entry (pre-fetched above) provides metadata + fallback URLs.
+    #    SofaScore URLs are filtered out because they return 403 server-side.
     if csv_entry:
         if not result["photo_url"]:
             result["photo_url"] = _usable_url(csv_entry.get("photo_url"))
@@ -232,3 +252,26 @@ def get_league_logo(league: str) -> Optional[str]:
         load_player_assets_csv()
     url = _league_logos.get(_normalize(league)) if league else None
     return _usable_url(url)
+
+
+def list_players_without_photos() -> List[dict]:
+    """Return CSV entries whose photo resolution chain produces no usable URL.
+
+    Exercises the full lookup chain (FM sortitoutsi → graphics packs → CSV) so
+    the report matches what the frontend actually sees. Meant for offline
+    reporting / manual graphics-pack targeting — not a hot-path call.
+    """
+    if not _loaded:
+        load_player_assets_csv()
+
+    missing: List[dict] = []
+    for row in _csv_rows:
+        assets = get_player_assets(row["jogador"], row["equipa"])
+        if not assets.get("photo_url"):
+            missing.append({
+                "jogador": row["jogador"],
+                "equipa": row["equipa"],
+                "sofascore_name": row["sofascore_name"],
+                "quality": row["quality"],
+            })
+    return missing
