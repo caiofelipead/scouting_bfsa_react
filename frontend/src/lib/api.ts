@@ -117,7 +117,6 @@ const DIRECT_IMAGE_DOMAINS = [
   'www.logodetimes.com',
   'upload.wikimedia.org',
   'images.fotmob.com',
-  'api.sofascore.com',
 ];
 
 /**
