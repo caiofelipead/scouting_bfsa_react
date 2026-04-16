@@ -133,7 +133,10 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
     """Look up player photo, club logo, and league logo.
 
     Priority: API-Football enrichment cache first (reliable media.api-sports.io URLs),
-    then CSV as fallback (filtering out blocked SofaScore URLs).
+    then CSV as fallback (filtering out blocked SofaScore URLs for photos only).
+
+    Club logos from SofaScore are allowed since browsers can load them directly
+    via <img> tags (no CORS needed), even though server-side fetches get 403.
 
     Returns dict with keys: photo_url, club_logo, league_logo, league_name
     All values may be None if not found.
@@ -181,7 +184,9 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
         except Exception:
             pass  # enrichment module not loaded yet
 
-    # 2) CSV lookup for metadata and fallback URLs (filter out SofaScore)
+    # 2) CSV lookup for metadata and fallback URLs
+    # Photos: filter out SofaScore URLs (server-side 403, proxy won't work)
+    # Club logos: allow SofaScore URLs (browsers load <img> directly, no CORS)
     csv_entry = None
     if name_norm and team_norm:
         csv_entry = _player_assets.get((name_norm, team_norm))
@@ -192,15 +197,21 @@ def get_player_assets(player_name: str, team: str = None) -> dict:
         if not result["photo_url"]:
             result["photo_url"] = _usable_url(csv_entry.get("photo_url"))
         if not result["club_logo"]:
-            result["club_logo"] = _usable_url(csv_entry.get("club_logo"))
+            # Allow SofaScore URLs for logos — browsers can load them directly
+            logo_url = csv_entry.get("club_logo")
+            if logo_url:
+                result["club_logo"] = logo_url
         if not result["league_logo"]:
-            result["league_logo"] = _usable_url(csv_entry.get("league_logo"))
+            # Allow SofaScore URLs for league logos too
+            league_logo_url = csv_entry.get("league_logo")
+            if league_logo_url:
+                result["league_logo"] = league_logo_url
         if not result["league_name"]:
             result["league_name"] = csv_entry.get("league_name")
 
-    # 3) Club logo fallback from CSV index
+    # 3) Club logo fallback from CSV index (allow SofaScore URLs)
     if not result["club_logo"] and team_norm and team_norm in _club_logos:
-        result["club_logo"] = _usable_url(_club_logos[team_norm])
+        result["club_logo"] = _club_logos[team_norm]
 
     # 4) Final fallback: always route through /api/team-logo/ endpoint which
     # fetches server-side with full fallback chain (sortitoutsi → local →
