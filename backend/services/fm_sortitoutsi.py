@@ -204,6 +204,60 @@ def get_logo_url(team_name: str) -> Optional[str]:
     return _fuzzy_lookup(name_key, _logo_name_choices, _logo_urls)
 
 
+# Football Manager competition IDs → sortitoutsi CDN logo URLs.
+# Keyed by the canonical league names produced by WYSCOUT_LEAGUE_MAP.
+_LEAGUE_LOGO_CDN = "https://sortitoutsi.b-cdn.net/uploads/logo/logo_{id}.png"
+_LEAGUE_FM_IDS: Dict[str, int] = {
+    'Serie A Brasil': 102423,
+    'Serie B Brasil': 107191,
+    'Serie C Brasil': 107192,
+    'Serie D Brasil': 19127222,
+    'Premier League': 11,
+    'Championship': 12,
+    'La Liga': 67,
+    'La Liga 2': 68,
+    'Serie A Italia': 32,
+    'Serie B Italia': 33,
+    'Bundesliga': 22,
+    '2. Bundesliga': 23,
+    'Ligue 1': 16,
+    'Ligue 2': 17,
+    'Eredivisie': 29,
+    'Liga Portugal': 60,
+    'Liga Portugal 2': 61,
+    'Liga Argentina': 102421,
+    'MLS': 40,
+    'Liga MX': 135973,
+    'Saudi Pro League': 7920263,
+    'Super Lig': 130286,
+    'Belgian Pro League': 1,
+    'Scottish Premiership': 45,
+    'Austrian Bundesliga': 136543,
+    'Danish Superliga': 7540024,
+    'Swiss Super League': 137889,
+    'J1 League': 102428,
+    'K-League 1': 136407,
+    'Liga Colombia': 2000094876,
+    'Liga Chile': 5250792,
+    'Liga Uruguai': 5512770,
+}
+_LEAGUE_FM_IDS_NORM: Dict[str, int] = {_normalize(k): v for k, v in _LEAGUE_FM_IDS.items()}
+
+
+def get_league_logo_url(league_name: str) -> Optional[str]:
+    """Return sortitoutsi CDN logo URL for a league, by canonical name.
+
+    Accepts either the canonical league name (e.g. "Serie A Brasil") or any
+    alias that normalizes to the same key.
+    """
+    if not league_name:
+        return None
+    fm_id = _LEAGUE_FM_IDS_NORM.get(_normalize(league_name))
+    if fm_id is None:
+        return None
+    return _LEAGUE_LOGO_CDN.format(id=fm_id)
+
+
 def get_stats() -> dict:
     _ensure_loaded()
     return {

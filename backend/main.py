@@ -79,6 +79,7 @@ from services.scouting_intelligence import (
 from services.league_power_model import get_opta_league_power, get_all_league_powers
 from services.fuzzy_match import build_skillcorner_index, find_skillcorner_player
 from services.player_assets import load_player_assets_csv, get_player_assets
+from services.logos import resolve_club_logo, resolve_league_logo
 from services.database import init_scouting_tables, init_vaep_tables, load_sheet_dataframe, has_data, get_sync_status, get_data_age_hours
 from services.sync_sheets import sync_all_sheets
 from config.mappings import (
@@ -1047,10 +1048,9 @@ async def list_players(
                         photo_url = candidate
                         break
 
-        # Prefer API-Football enrichment logos (media.api-sports.io), fallback to hardcoded
-        club_logo = assets.get("club_logo")
-        if not club_logo:
-            club_logo = CLUB_LOGOS.get(team_name) if team_name else None
+        club_logo = resolve_club_logo(team_name, fallback=assets.get("club_logo"))
+        league_raw = str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None
+        league_actual = resolve_actual_league(row.get("Equipa"), fallback_liga_tier=league_raw)
 
         players.append({
             "id": int(idx) if isinstance(idx, (int, np.integer)) else hash(str(idx)) % 10**8,
@@ -1058,14 +1058,11 @@ async def list_players(
             "display_name": str(row.get("JogadorDisplay", row.get("Jogador", ""))),
             "team": team_name,
             "club_logo": club_logo,
-            "league_logo": assets.get("league_logo"),
+            "league_logo": resolve_league_logo(league_actual, league_raw=league_raw, fallback=assets.get("league_logo")),
             "position": pos_raw,
             "age": _safe_float(row.get("Idade")),
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
-            "league": resolve_actual_league(
-                row.get("Equipa"),
-                fallback_liga_tier=str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
-            ),
+            "league": league_actual,
             "minutes_played": _safe_float(row.get("Minutos jogados:")),
             "photo_url": photo_url,
             "score": round(score, 1) if score else None,
@@ -1336,10 +1333,9 @@ async def get_player_profile(
     assets = get_player_assets(jogador_name, team_name_sc)
     if not photo_url:
         photo_url = assets.get("photo_url")
-    # Prefer API-Football enrichment logos (media.api-sports.io), fallback to hardcoded
-    club_logo_url = assets.get("club_logo")
-    if not club_logo_url:
-        club_logo_url = CLUB_LOGOS.get(team_name_sc) if team_name_sc else None
+    # Prefer stable hardcoded logodetimes.com URL (in DIRECT_IMAGE_DOMAINS), then
+    # fall back to enrichment/CSV, then /api/team-logo/ server-side chain.
+    club_logo_url = resolve_club_logo(team_name_sc, fallback=assets.get("club_logo"))
 
     # Fallback: try other WyScout DataFrame columns for photo_url
     if not photo_url:
@@ -1378,7 +1374,11 @@ async def get_player_profile(
             "display_name": str(row.get("JogadorDisplay", "")),
             "team": str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None,
             "club_logo": club_logo_url,
-            "league_logo": assets.get("league_logo") or LEAGUE_LOGOS.get(league_actual) if league_actual else None,
+            "league_logo": resolve_league_logo(
+                league_actual,
+                league_raw=str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
+                fallback=assets.get("league_logo"),
+            ),
             "position": position,
             "age": age,
             "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
@@ -1470,10 +1470,14 @@ async def get_rankings(
         team_name = str(row.get("Equipa", "")) if pd.notna(row.get("Equipa")) else None
         assets = assets_map.get((player_name, team_name), {})
 
-        # Prefer API-Football enrichment logos, fallback to hardcoded
-        rank_club_logo = assets.get("club_logo") or (CLUB_LOGOS.get(team_name) if team_name else None)
-        rank_league_name = assets.get("league_name") or ""
-        rank_league_logo = assets.get("league_logo") or LEAGUE_LOGOS.get(rank_league_name)
+        rank_club_logo = resolve_club_logo(team_name, fallback=assets.get("club_logo"))
+        rank_league_raw = str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None
+        rank_league_actual = resolve_actual_league(row.get("Equipa"), fallback_liga_tier=rank_league_raw)
+        rank_league_logo = resolve_league_logo(
+            rank_league_actual,
+            league_raw=rank_league_raw or assets.get("league_name"),
+            fallback=assets.get("league_logo"),
+        )
 
         entries.append(RankingEntry(
             rank=rank,
@@ -1481,10 +1485,7 @@ async def get_rankings(
             display_name=str(row.get("JogadorDisplay", row.get("Jogador", ""))),
             team=team_name,
             age=_safe_float(row.get("Idade")),
-            league=resolve_actual_league(
-                row.get("Equipa"),
-                fallback_liga_tier=str(row.get("liga_tier", "")) if pd.notna(row.get("liga_tier")) else None,
-            ),
+            league=rank_league_actual,
             minutes=_safe_float(row.get("Minutos jogados:")),
             score=round(float(row.get("Score", 0)), 1),
             indices=idx_values,
@@ -1584,8 +1585,8 @@ async def get_prediction_rankings(
             "tier_origin": pred["tier_origin"],
             "tier_target": pred["tier_target"],
             "photo_url": pred_assets.get("photo_url"),
-            "club_logo": pred_assets.get("club_logo") or (CLUB_LOGOS.get(pred_team_name) if pred_team_name else None),
-            "league_logo": pred_assets.get("league_logo"),
+            "club_logo": resolve_club_logo(pred_team_name, fallback=pred_assets.get("club_logo")),
+            "league_logo": resolve_league_logo(league_origin, league_raw=liga_tier_raw, fallback=pred_assets.get("league_logo")),
         })
 
     # Sort by P(Sucesso) descending
@@ -1668,7 +1669,7 @@ async def find_similar_players(
             "name": sim_player_name,
             "display_name": str(row.get("JogadorDisplay", row.get("Jogador", ""))),
             "team": sim_team_name,
-            "club_logo": sim_assets.get("club_logo") or (CLUB_LOGOS.get(sim_team_name) if sim_team_name else None),
+            "club_logo": resolve_club_logo(sim_team_name, fallback=sim_assets.get("club_logo")),
             "photo_url": sim_assets.get("photo_url"),
             "similarity_pct": float(row.get("similarity_pct", 0)),
             "matched_metrics": int(row.get("matched_metrics", 0)),
@@ -2190,7 +2191,7 @@ async def compare_players_indices(
             "name": player_name,
             "display_name": str(row.get("JogadorDisplay", row.get("Jogador", ""))),
             "team": team_name,
-            "club_logo": assets.get("club_logo") or (CLUB_LOGOS.get(team_name) if team_name else None),
+            "club_logo": resolve_club_logo(team_name, fallback=assets.get("club_logo")),
             "league": resolve_actual_league(row.get("Equipa"), fallback_liga_tier=liga_tier_raw),
             "age": _safe_float(row.get("Idade")),
             "position_raw": str(row.get("Posição", "")) if pd.notna(row.get("Posição")) else None,
