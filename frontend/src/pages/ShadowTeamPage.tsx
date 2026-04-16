@@ -3,11 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Plus, Trash2, ChevronDown, StickyNote,
   Users, Target, ClipboardList, AlertCircle, GripVertical,
-  Search, Loader2, User,
+  Search, Loader2, User, ArrowLeftRight,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { usePlayers, usePositions } from '../hooks/usePlayers';
-import { proxyImageUrl, isProxyFallback } from '../lib/api';
-import type { PlayerSummary, PlayersQueryParams } from '../types/api';
+import api, { proxyImageUrl, isProxyFallback } from '../lib/api';
+import { getScoreColor } from '../lib/utils';
+import RadarChart from '../components/RadarChart';
+import type { PlayerSummary, PlayersQueryParams, ComparisonResponse } from '../types/api';
 
 // ── Types ──
 
@@ -961,13 +964,297 @@ function TabNotes({
   );
 }
 
+// ── Tab 5: Comparativo ──
+
+function TabComparison({ targets }: { targets: TargetPlayer[] }) {
+  const [player1Id, setPlayer1Id] = useState('');
+  const [player2Id, setPlayer2Id] = useState('');
+  const [position, setPosition] = useState('');
+
+  const { data: apiPositions = [] } = usePositions();
+
+  const player1 = targets.find((t) => t.id === player1Id);
+  const player2 = targets.find((t) => t.id === player2Id);
+
+  // Auto-detect position from selected players
+  const effectivePosition = position || player1?.position || player2?.position || 'Atacante';
+
+  const { data: comparison, isLoading, error } = useQuery({
+    queryKey: ['comparison', player1?.name, player2?.name, effectivePosition],
+    queryFn: async () => {
+      const res = await api.post('/comparison', {
+        player1: player1!.name,
+        player2: player2!.name,
+        position: effectivePosition,
+      });
+      return res.data as ComparisonResponse;
+    },
+    enabled: !!player1 && !!player2 && player1.id !== player2.id,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Selection card */}
+      <div className="card-glass p-4 space-y-4">
+        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+          Selecione dois alvos para comparar seus índices compostos.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+          {/* Player 1 */}
+          <div>
+            <label className="block text-[10px] font-semibold tracking-wider uppercase mb-1.5" style={{ color: 'var(--color-accent)' }}>
+              Jogador 1
+            </label>
+            <div className="relative">
+              <select
+                value={player1Id}
+                onChange={(e) => setPlayer1Id(e.target.value)}
+                className="appearance-none w-full pl-3 pr-8 py-2.5 rounded-lg text-sm bg-transparent border cursor-pointer"
+                style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
+              >
+                <option value="">Selecione um alvo...</option>
+                {targets.filter((t) => t.id !== player2Id).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} — {t.position} {t.score != null ? `(${t.score.toFixed(1)})` : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
+            </div>
+          </div>
+
+          {/* Player 2 */}
+          <div>
+            <label className="block text-[10px] font-semibold tracking-wider uppercase mb-1.5" style={{ color: '#3b82f6' }}>
+              Jogador 2
+            </label>
+            <div className="relative">
+              <select
+                value={player2Id}
+                onChange={(e) => setPlayer2Id(e.target.value)}
+                className="appearance-none w-full pl-3 pr-8 py-2.5 rounded-lg text-sm bg-transparent border cursor-pointer"
+                style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
+              >
+                <option value="">Selecione um alvo...</option>
+                {targets.filter((t) => t.id !== player1Id).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} — {t.position} {t.score != null ? `(${t.score.toFixed(1)})` : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
+            </div>
+          </div>
+
+          {/* Position */}
+          <div>
+            <label className="block text-[10px] font-semibold tracking-wider uppercase mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
+              Posição
+            </label>
+            <div className="relative">
+              <select
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-2.5 rounded-lg text-sm bg-transparent border cursor-pointer"
+                style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-primary)' }}
+              >
+                <option value="">Auto-detectar</option>
+                {apiPositions.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}>
+          <AlertCircle size={16} />
+          <span>Erro ao comparar: {(error as Error).message}</span>
+        </div>
+      )}
+
+      {/* Loading */}
+      {isLoading && (
+        <div className="card-glass p-8 text-center">
+          <Loader2 size={24} className="animate-spin mx-auto mb-2" style={{ color: 'var(--color-accent)' }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Carregando comparação...</p>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!player1Id && !player2Id && (
+        <div className="card-glass p-8 text-center" style={{ color: 'var(--color-text-muted)' }}>
+          <ArrowLeftRight size={32} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Selecione dois alvos acima para comparar</p>
+          {targets.length < 2 && (
+            <p className="text-xs mt-2 opacity-60">Você precisa de pelo menos 2 alvos na aba "Alvos" para usar o comparativo.</p>
+          )}
+        </div>
+      )}
+
+      {/* Comparison results */}
+      {comparison && (
+        <>
+          {/* Player info cards */}
+          <div className="grid grid-cols-2 gap-3">
+            <motion.div
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="card-glass p-4 flex items-center gap-3"
+              style={{ borderLeft: '3px solid var(--color-accent)' }}
+            >
+              {player1?.photoUrl ? (
+                <img
+                  src={proxyImageUrl(player1.photoUrl)!}
+                  alt={player1.name}
+                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                  referrerPolicy="no-referrer"
+                  onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}>
+                  <User size={16} style={{ color: 'var(--color-text-muted)' }} />
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{comparison.player1.name}</div>
+                <div className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                  {comparison.player1.team} · {comparison.player1.position_raw} · {comparison.player1.age} anos
+                </div>
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="card-glass p-4 flex items-center gap-3"
+              style={{ borderLeft: '3px solid #3b82f6' }}
+            >
+              {player2?.photoUrl ? (
+                <img
+                  src={proxyImageUrl(player2.photoUrl)!}
+                  alt={player2.name}
+                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                  referrerPolicy="no-referrer"
+                  onLoad={(e) => { if (isProxyFallback(e.target as HTMLImageElement)) (e.target as HTMLImageElement).style.display = 'none'; }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-surface-2)' }}>
+                  <User size={16} style={{ color: 'var(--color-text-muted)' }} />
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{comparison.player2.name}</div>
+                <div className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                  {comparison.player2.team} · {comparison.player2.position_raw} · {comparison.player2.age} anos
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Radar chart */}
+          <div className="card-glass p-5">
+            <div className="text-[10px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>
+              RADAR COMPARATIVO ({comparison.position})
+            </div>
+            <div className="max-w-lg mx-auto">
+              <RadarChart
+                labels={Object.keys(comparison.indices1)}
+                values={Object.values(comparison.indices1)}
+                values2={Object.keys(comparison.indices1).map((k) => comparison.indices2[k] ?? 0)}
+                color1="#ef4444"
+                color2="#3b82f6"
+                size={400}
+                playerName={comparison.player1.name}
+              />
+            </div>
+            <div className="flex items-center justify-center gap-6 mt-2">
+              <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="w-3 h-3 rounded-full" style={{ background: 'var(--color-accent)' }} />
+                {comparison.player1.name}
+              </span>
+              <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="w-3 h-3 rounded-full" style={{ background: '#3b82f6' }} />
+                {comparison.player2.name}
+              </span>
+            </div>
+          </div>
+
+          {/* Comparison table */}
+          <div className="card-glass rounded-xl overflow-hidden">
+            <div className="px-4 py-2.5" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+              <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
+                TABELA COMPARATIVA
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--color-text-muted)' }}>Índice</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--color-accent)' }}>{comparison.player1.name}</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold tracking-wider uppercase" style={{ color: '#3b82f6' }}>{comparison.player2.name}</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--color-text-muted)' }}>Diff</th>
+                    <th className="px-2 py-2.5 w-8" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparison.comparison.map((row, i) => (
+                    <motion.tr
+                      key={row.index}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: i * 0.04 }}
+                      style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+                      className="hover:bg-white/[0.02]"
+                    >
+                      <td className="px-4 py-2.5 font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>{row.index}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs" style={{ color: getScoreColor(row.player1_value) }}>
+                        {row.player1_value.toFixed(0)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs" style={{ color: getScoreColor(row.player2_value) }}>
+                        {row.player2_value.toFixed(0)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs" style={{
+                        color: row.diff > 0 ? 'var(--color-accent)' : row.diff < 0 ? '#3b82f6' : 'var(--color-text-muted)',
+                      }}>
+                        {row.diff > 0 ? '+' : ''}{row.diff.toFixed(0)}
+                      </td>
+                      <td className="px-2 py-2.5 text-center text-xs">
+                        {row.diff > 0 ? (
+                          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: 'var(--color-accent)' }} />
+                        ) : row.diff < 0 ? (
+                          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#3b82f6' }} />
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)' }}>=</span>
+                        )}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ──
 
-type ShadowTab = 'needs' | 'targets' | 'xi' | 'notes';
+type ShadowTab = 'needs' | 'targets' | 'xi' | 'comparison' | 'notes';
 
 const TABS: { id: ShadowTab; label: string }[] = [
   { id: 'needs', label: 'Necessidades' },
   { id: 'targets', label: 'Alvos' },
+  { id: 'comparison', label: 'Comparativo' },
   { id: 'xi', label: 'Shadow XI' },
   { id: 'notes', label: 'Notas' },
 ];
@@ -1038,6 +1325,7 @@ export default function ShadowTeamPage() {
       {/* Tab content */}
       {activeTab === 'needs' && <TabNeeds needs={needs} setNeeds={setNeeds} />}
       {activeTab === 'targets' && <TabTargets targets={targets} setTargets={setTargets} needs={needs} />}
+      {activeTab === 'comparison' && <TabComparison targets={targets} />}
       {activeTab === 'xi' && <TabShadowXI xi={xi} setXI={setXI} targets={targets} />}
       {activeTab === 'notes' && <TabNotes notes={notes} setNotes={setNotes} targets={targets} />}
     </motion.div>
