@@ -27,6 +27,8 @@ function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: strin
       src={proxyImageUrl(src)!}
       alt={alt}
       className={size === 'lg' ? 'player-photo-hex-lg' : 'player-photo-hex'}
+      loading="lazy"
+      decoding="async"
       referrerPolicy="no-referrer"
       onLoad={(e) => { if (isProxyFallback(e.currentTarget)) setFailed(true); }}
       onError={() => setFailed(true)}
@@ -42,6 +44,8 @@ function ClubLogo({ url, alt, className = 'w-3.5 h-3.5 object-contain' }: { url:
       src={proxyImageUrl(url)!}
       alt={alt}
       className={className}
+      loading="lazy"
+      decoding="async"
       referrerPolicy="no-referrer"
       onLoad={(e) => { if (isProxyFallback(e.currentTarget)) setFailed(true); }}
       onError={() => setFailed(true)}
@@ -86,7 +90,7 @@ export default function DashboardPage() {
     min_age: minAge ? Number(minAge) : undefined,
     max_age: maxAge ? Number(maxAge) : undefined,
     min_minutes: 0,
-    limit: 60,
+    limit: 30,
   }), [debouncedSearch, position, league, minAge, maxAge]);
 
   const { data, isLoading, isFetching } = usePlayers(queryParams);
@@ -282,7 +286,7 @@ export default function DashboardPage() {
                     key={player.id + '-' + i}
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.02 }}
+                    transition={{ delay: Math.min(i * 0.015, 0.3) }}
                     onClick={() => setSelectedPlayer(player.display_name || player.name)}
                     className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all duration-200 cursor-pointer focus-ring-inset"
                     style={{

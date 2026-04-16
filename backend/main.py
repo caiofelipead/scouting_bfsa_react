@@ -942,6 +942,15 @@ async def list_players(
     offset: int = 0,
     current_user: dict = Depends(get_current_user),
 ):
+    # Cache key based on query params (ignores user — data is the same for all)
+    cache_key = _endpoint_cache.make_key(
+        "players", position or "", league or "", search or "",
+        min_minutes, min_age or "", max_age or "", limit, offset,
+    )
+    cached = _endpoint_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     df = _get_wyscout()
     df_all = df  # keep full df for score calculation
 
@@ -1031,7 +1040,9 @@ async def list_players(
             "score": round(score, 1) if score else None,
         })
 
-    return {"total": total, "players": players}
+    result = {"total": total, "players": players}
+    _endpoint_cache.set(cache_key, result)
+    return result
 
 
 @app.get("/api/players/{player_display_name}/profile")

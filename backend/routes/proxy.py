@@ -27,6 +27,19 @@ from starlette.requests import Request
 router = APIRouter(prefix="/api", tags=["proxy"])
 limiter = Limiter(key_func=get_remote_address)
 
+# Shared aiohttp session — reused across requests to keep TCP connections alive
+_shared_session: aiohttp.ClientSession | None = None
+
+
+def _get_session() -> aiohttp.ClientSession:
+    """Get or create a shared aiohttp session for image fetching."""
+    global _shared_session
+    if _shared_session is None or _shared_session.closed:
+        connector = aiohttp.TCPConnector(limit=20, ttl_dns_cache=300, keepalive_timeout=60)
+        _shared_session = aiohttp.ClientSession(connector=connector)
+    return _shared_session
+
+
 # TTL cache for proxied images (URL -> (content_type, bytes))
 _image_cache: TTLCache = TTLCache(maxsize=2000, ttl=3600)  # 1 hour TTL
 
@@ -133,21 +146,21 @@ async def _fetch_image(url: str) -> tuple | None:
     header_strategies = _get_header_strategies(parsed)
 
     last_status = 502
+    session = _get_session()
     for headers in header_strategies:
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url,
-                    timeout=aiohttp.ClientTimeout(total=15),
-                    headers=headers,
-                    allow_redirects=True,
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        content_type = resp.content_type or "image/png"
-                        _image_cache[url] = (content_type, data)
-                        return (content_type, data)
-                    last_status = resp.status
+            async with session.get(
+                url,
+                timeout=aiohttp.ClientTimeout(total=10),
+                headers=headers,
+                allow_redirects=True,
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.read()
+                    content_type = resp.content_type or "image/png"
+                    _image_cache[url] = (content_type, data)
+                    return (content_type, data)
+                last_status = resp.status
         except aiohttp.ClientError:
             continue
 

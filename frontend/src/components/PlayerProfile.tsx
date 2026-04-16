@@ -40,6 +40,8 @@ function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: strin
       src={proxyImageUrl(url)!}
       alt={alt}
       className={size === 'lg' ? 'player-photo-hex-lg' : 'player-photo-hex'}
+      loading="lazy"
+      decoding="async"
       referrerPolicy="no-referrer"
       onLoad={(e) => { if (isProxyFallback(e.currentTarget)) setFailed(true); }}
       onError={() => setFailed(true)}
@@ -57,6 +59,8 @@ function ClubLogo({ url, alt, className = 'w-5 h-5 object-contain', fallback }: 
       src={proxyImageUrl(url)!}
       alt={alt}
       className={className}
+      loading="lazy"
+      decoding="async"
       referrerPolicy="no-referrer"
       onLoad={(e) => { if (isProxyFallback(e.currentTarget)) setFailed(true); }}
       onError={() => setFailed(true)}
@@ -73,7 +77,7 @@ const stagger = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+    transition: { staggerChildren: 0.03, delayChildren: 0.05 },
   },
 };
 
