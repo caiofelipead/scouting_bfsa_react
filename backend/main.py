@@ -530,7 +530,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     # Paths whose responses rarely change — cache aggressively
-    _CACHEABLE_PREFIXES = ("/api/config/", "/api/team-logo/", "/api/image-proxy")
+    _CACHEABLE_LONG = ("/api/config/", "/api/team-logo/", "/api/image-proxy", "/api/player-face/")
+    # Data endpoints — cache briefly to avoid redundant requests when switching tabs
+    _CACHEABLE_SHORT = ("/api/players",)
 
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -543,8 +545,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         # Add Cache-Control for static/config endpoints to reduce redundant requests
         path = request.url.path
-        if any(path.startswith(p) for p in self._CACHEABLE_PREFIXES):
+        if any(path.startswith(p) for p in self._CACHEABLE_LONG):
             response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=7200"
+        elif any(path.startswith(p) for p in self._CACHEABLE_SHORT):
+            response.headers["Cache-Control"] = "private, max-age=120, stale-while-revalidate=300"
         elif path == "/api/health":
             response.headers["Cache-Control"] = "no-cache"
 

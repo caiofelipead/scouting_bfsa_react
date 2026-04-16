@@ -6,8 +6,17 @@ const api = axios.create({
   timeout: 120_000, // 120s timeout — backend may need time to load data on cold start
 });
 
-// Pre-warm: fire a lightweight ping to wake the backend as early as possible
-axios.get('/api/ping', { timeout: 5_000 }).catch(() => {});
+// Pre-warm: fire a lightweight ping to wake the backend as early as possible,
+// then prefetch config data so it's ready when the user reaches the dashboard
+axios.get('/api/ping', { timeout: 5_000 }).then(() => {
+  // Backend is awake — prefetch config endpoints (positions, leagues) to warm caches
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    const headers = { Authorization: `Bearer ${token}` };
+    axios.get('/api/config/positions', { timeout: 10_000, headers }).catch(() => {});
+    axios.get('/api/config/leagues', { timeout: 10_000, headers }).catch(() => {});
+  }
+}).catch(() => {});
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
