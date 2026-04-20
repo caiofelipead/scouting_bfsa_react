@@ -281,25 +281,25 @@ body {
   pointer-events: none;
   overflow: hidden;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  grid-auto-rows: 120px;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-auto-rows: 140px;
   transform: rotate(-28deg);
   transform-origin: center;
-  opacity: 0.08;
+  opacity: 0.008;
   user-select: none;
   -webkit-user-select: none;
   padding: 15vh 10vw;
 }
 
 [data-theme="light"] .confidential-watermark {
-  opacity: 0.065;
+  opacity: 0.006;
 }
 
 .confidential-watermark__label {
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  font-weight: 500;
   color: var(--color-text-primary);
   white-space: nowrap;
   text-align: center;
@@ -307,7 +307,7 @@ body {
 
 @media print {
   .confidential-watermark {
-    opacity: 0.12 !important;
+    opacity: 0.1 !important;
   }
 }
 
