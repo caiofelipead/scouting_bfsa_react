@@ -125,8 +125,62 @@ def init_db():
             )
             conn.commit()
             logger.info("Admin user password reset: %s", admin_email)
+
+        _seed_viewer_users(conn, driver)
     finally:
         conn.close()
+
+
+# ── Viewer seeding (read-only presidential/board access) ──────────────
+
+VIEWER_SEEDS = [
+    {
+        "email": "adalbertobaptista@bfsa.com.br",
+        "name": "Adalberto Baptista",
+        "env_password": "PRESIDENT_PASSWORD",
+    },
+    {
+        "email": "fillipesoutto@bfsa.com.br",
+        "name": "Fillipe Soutto",
+        "env_password": "FILLIPE_PASSWORD",
+    },
+    {
+        "email": "andreleite@bfsa.com.br",
+        "name": "André Leite",
+        "env_password": "ANDRE_PASSWORD",
+    },
+]
+
+
+def _seed_viewer_users(conn, driver: str) -> None:
+    """Seed the board/president viewer accounts (read-only full access)."""
+    default_password = os.environ.get("VIEWER_DEFAULT_PASSWORD", "Botafogo@2026")
+    for seed in VIEWER_SEEDS:
+        email = seed["email"]
+        name = seed["name"]
+        password = os.environ.get(seed["env_password"]) or default_password
+        try:
+            cur = _execute(conn, driver, "SELECT id FROM users WHERE email = ?", (email,))
+            row = cur.fetchone()
+            pwd_hash = hash_password(password)
+            if row is None:
+                _execute(
+                    conn, driver,
+                    "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                    (email, pwd_hash, name, "viewer"),
+                )
+                logger.info("Viewer user created: %s", email)
+            else:
+                _execute(
+                    conn, driver,
+                    "UPDATE users SET password_hash = ?, name = ?, role = ? WHERE email = ?",
+                    (pwd_hash, name, "viewer", email),
+                )
+                logger.info("Viewer user updated: %s", email)
+            conn.commit()
+        except Exception as e:
+            logger.error("Viewer seed error for %s: %s", email, e)
+            conn.rollback()
 
 
 # ── Password & Token ──────────────────────────────────────────────────
@@ -218,7 +272,7 @@ def create_user(email: str, password: str, name: str, role: str = "analyst") -> 
         return "Formato de e-mail inválido."
     if len(password) < 6:
         return "A senha deve ter pelo menos 6 caracteres."
-    if role not in ("admin", "analyst"):
+    if role not in ("admin", "analyst", "viewer"):
         return "Papel inválido."
 
     conn, driver = _get_connection()
