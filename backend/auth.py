@@ -68,99 +68,150 @@ def _execute(conn, driver: str, sql: str, params: tuple = ()):
 
 
 def init_db():
-    """Initialize users table and seed admin user(s)."""
-    conn, driver = _get_connection()
-    try:
-        if driver == "pg":
-            _execute(conn, driver, """
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    email TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'analyst',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-        else:
-            _execute(conn, driver, """
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'analyst',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+    """Initialize users table and seed admin user(s).
 
-        if driver == "pg":
-            _execute(conn, driver, """
-                CREATE TABLE IF NOT EXISTS access_logs (
-                    id SERIAL PRIMARY KEY,
-                    email TEXT,
-                    event_type TEXT NOT NULL,
-                    path TEXT,
-                    ip TEXT,
-                    user_agent TEXT,
-                    detail TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs(created_at DESC)")
-            _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_email ON access_logs(email)")
-        else:
-            _execute(conn, driver, """
-                CREATE TABLE IF NOT EXISTS access_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email TEXT,
-                    event_type TEXT NOT NULL,
-                    path TEXT,
-                    ip TEXT,
-                    user_agent TEXT,
-                    detail TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs(created_at)")
-            _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_email ON access_logs(email)")
+    All seeding steps swallow their own exceptions so a transient DB
+    hiccup (or a legacy schema) never prevents the server from booting.
+    """
+    try:
+        conn, driver = _get_connection()
+    except Exception as e:
+        logger.error("init_db: failed to connect to database: %s", e)
+        return
+    try:
+        try:
+            _create_schema(conn, driver)
+        except Exception as e:
+            logger.error("init_db: schema bootstrap failed: %s", e)
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+        try:
+            _seed_env_admin(conn, driver)
+        except Exception as e:
+            logger.error("init_db: env admin seed failed: %s", e)
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+        try:
+            _seed_named_admins(conn, driver)
+        except Exception as e:
+            logger.error("init_db: named admin seed failed: %s", e)
+
+        try:
+            _seed_viewer_users(conn, driver)
+        except Exception as e:
+            logger.error("init_db: viewer seed failed: %s", e)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _create_schema(conn, driver: str) -> None:
+    if driver == "pg":
+        _execute(conn, driver, """
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                name TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'analyst',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    else:
+        _execute(conn, driver, """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                name TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'analyst',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    conn.commit()
+
+    if driver == "pg":
+        _execute(conn, driver, """
+            CREATE TABLE IF NOT EXISTS access_logs (
+                id SERIAL PRIMARY KEY,
+                email TEXT,
+                event_type TEXT NOT NULL,
+                path TEXT,
+                ip TEXT,
+                user_agent TEXT,
+                detail TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        for stmt in (
+            "CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs(created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_access_logs_email ON access_logs(email)",
+        ):
+            try:
+                _execute(conn, driver, stmt)
+                conn.commit()
+            except Exception as e:
+                logger.warning("init_db: index creation skipped (%s): %s", stmt, e)
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+    else:
+        _execute(conn, driver, """
+            CREATE TABLE IF NOT EXISTS access_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT,
+                event_type TEXT NOT NULL,
+                path TEXT,
+                ip TEXT,
+                user_agent TEXT,
+                detail TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs(created_at)")
+        _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_email ON access_logs(email)")
         conn.commit()
 
-        # Seed admin user from environment variables (no hardcoded credentials)
-        admin_email = os.environ.get("ADMIN_EMAIL")
-        admin_password = os.environ.get("ADMIN_PASSWORD")
-        admin_name = os.environ.get("ADMIN_NAME", "Administrador")
 
-        if not admin_email or not admin_password:
-            logger.warning("ADMIN_EMAIL and ADMIN_PASSWORD env vars not set — skipping admin seed")
-            return
+def _seed_env_admin(conn, driver: str) -> None:
+    admin_email = os.environ.get("ADMIN_EMAIL")
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    admin_name = os.environ.get("ADMIN_NAME", "Administrador")
 
-        cur = _execute(conn, driver, "SELECT id, password_hash FROM users WHERE email = ?", (admin_email,))
-        row = cur.fetchone()
-        new_hash = hash_password(admin_password)
+    if not admin_email or not admin_password:
+        logger.warning("ADMIN_EMAIL and ADMIN_PASSWORD env vars not set — skipping admin seed")
+        return
 
-        if row is None:
-            _execute(
-                conn, driver,
-                "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
-                (admin_email, new_hash, admin_name, "admin"),
-            )
-            conn.commit()
-            logger.info("Admin user created: %s", admin_email)
-        else:
-            # Always reset password to guarantee login works after deploy
-            _execute(
-                conn, driver,
-                "UPDATE users SET password_hash = ?, role = ? WHERE email = ?",
-                (new_hash, "admin", admin_email),
-            )
-            conn.commit()
-            logger.info("Admin user password reset: %s", admin_email)
+    cur = _execute(conn, driver, "SELECT id, password_hash FROM users WHERE email = ?", (admin_email,))
+    row = cur.fetchone()
+    new_hash = hash_password(admin_password)
 
-        _seed_named_admins(conn, driver)
-        _seed_viewer_users(conn, driver)
-    finally:
-        conn.close()
+    if row is None:
+        _execute(
+            conn, driver,
+            "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+            (admin_email, new_hash, admin_name, "admin"),
+        )
+        conn.commit()
+        logger.info("Admin user created: %s", admin_email)
+    else:
+        _execute(
+            conn, driver,
+            "UPDATE users SET password_hash = ?, role = ? WHERE email = ?",
+            (new_hash, "admin", admin_email),
+        )
+        conn.commit()
+        logger.info("Admin user password reset: %s", admin_email)
 
 
 # ── Named admin seeding ───────────────────────────────────────────────
