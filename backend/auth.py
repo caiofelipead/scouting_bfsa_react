@@ -157,9 +157,65 @@ def init_db():
             conn.commit()
             logger.info("Admin user password reset: %s", admin_email)
 
+        _seed_named_admins(conn, driver)
         _seed_viewer_users(conn, driver)
     finally:
         conn.close()
+
+
+# ── Named admin seeding ───────────────────────────────────────────────
+
+ADMIN_SEEDS = [
+    {
+        "username": "caiofelipe",
+        "name": "Caio Felipe",
+        "env_password": "CAIOFELIPE_PASSWORD",
+        "legacy_emails": [
+            "caiofelipe@bfsa.com.br",
+            "caiofelipe@botafogo-sp.com",
+        ],
+    },
+]
+
+
+def _seed_named_admins(conn, driver: str) -> None:
+    """Seed well-known admin accounts using plain usernames."""
+    fallback = (
+        os.environ.get("ADMIN_PASSWORD")
+        or os.environ.get("VIEWER_DEFAULT_PASSWORD")
+        or "mercadobfsa"
+    )
+    for seed in ADMIN_SEEDS:
+        username = seed["username"]
+        name = seed["name"]
+        password = os.environ.get(seed["env_password"]) or fallback
+        try:
+            for legacy in seed.get("legacy_emails", []):
+                if legacy == username:
+                    continue
+                _execute(conn, driver, "DELETE FROM users WHERE email = ?", (legacy,))
+
+            cur = _execute(conn, driver, "SELECT id FROM users WHERE email = ?", (username,))
+            row = cur.fetchone()
+            pwd_hash = hash_password(password)
+            if row is None:
+                _execute(
+                    conn, driver,
+                    "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                    (username, pwd_hash, name, "admin"),
+                )
+                logger.info("Named admin created: %s", username)
+            else:
+                _execute(
+                    conn, driver,
+                    "UPDATE users SET password_hash = ?, name = ?, role = ? WHERE email = ?",
+                    (pwd_hash, name, "admin", username),
+                )
+                logger.info("Named admin updated: %s", username)
+            conn.commit()
+        except Exception as e:
+            logger.error("Admin seed error for %s: %s", username, e)
+            conn.rollback()
 
 
 # ── Viewer seeding (read-only presidential/board access) ──────────────
