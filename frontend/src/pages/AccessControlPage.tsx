@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Lock,
@@ -9,6 +9,9 @@ import {
   X as XIcon,
   AlertTriangle,
   ScrollText,
+  RefreshCw,
+  LogIn,
+  MousePointerClick,
 } from 'lucide-react';
 import api from '../lib/api';
 import type { User } from '../types/api';
@@ -19,6 +22,61 @@ interface AdminUser {
   name: string;
   role: string;
   created_at: string | null;
+}
+
+interface AccessLog {
+  id: number;
+  email: string | null;
+  event_type: string;
+  path: string | null;
+  ip: string | null;
+  user_agent: string | null;
+  detail: string | null;
+  created_at: string | null;
+}
+
+const EVENT_META: Record<string, { label: string; color: string; icon: typeof LogIn }> = {
+  login_success: { label: 'Login',         color: 'var(--color-elite)',     icon: LogIn },
+  login_failure: { label: 'Login falhou',  color: 'var(--color-accent)',    icon: XIcon },
+  page_view:     { label: 'Abriu aba',     color: '#3b82f6',                icon: MousePointerClick },
+  user_created:  { label: 'Usuário criado', color: 'var(--color-above)',    icon: UserIcon },
+  user_deleted:  { label: 'Usuário removido', color: 'var(--color-accent)', icon: UserIcon },
+};
+
+function eventMeta(type: string) {
+  return EVENT_META[type] ?? { label: type, color: 'var(--color-text-muted)', icon: ScrollText };
+}
+
+function formatTimestamp(iso: string | null): string {
+  if (!iso) return '—';
+  // Backend returns UTC timestamps without timezone info; parse as UTC.
+  const normalized = iso.includes('T') ? iso : iso.replace(' ', 'T');
+  const withZ = normalized.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(normalized)
+    ? normalized
+    : normalized + 'Z';
+  const d = new Date(withZ);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function shortUserAgent(ua: string | null): string {
+  if (!ua) return '—';
+  const m = ua.match(/(Chrome|Firefox|Safari|Edg|OPR)\/([\d.]+)/);
+  const browser = m ? `${m[1].replace('Edg', 'Edge').replace('OPR', 'Opera')} ${m[2].split('.')[0]}` : 'Desconhecido';
+  let os = 'Outro';
+  if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Mac OS X|Macintosh/.test(ua)) os = 'macOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/iPhone|iPad|iOS/.test(ua)) os = 'iOS';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  return `${browser} · ${os}`;
 }
 
 interface PermissionRow {
@@ -87,6 +145,29 @@ export default function AccessControlPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [logs, setLogs] = useState<AccessLog[] | null>(null);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [logFilterUser, setLogFilterUser] = useState<string>('');
+  const [logFilterEvent, setLogFilterEvent] = useState<string>('');
+
+  const fetchLogs = useCallback(async () => {
+    if (!isAdmin) return;
+    setLogsLoading(true);
+    setLogsError(null);
+    try {
+      const params: Record<string, string | number> = { limit: 300 };
+      if (logFilterUser) params.email = logFilterUser;
+      if (logFilterEvent) params.event_type = logFilterEvent;
+      const res = await api.get<AccessLog[]>('/admin/access-logs', { params });
+      setLogs(res.data);
+    } catch (e: any) {
+      setLogsError(e?.response?.data?.detail || e?.message || 'Erro ao carregar registros');
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [isAdmin, logFilterUser, logFilterEvent]);
+
   useEffect(() => {
     if (!isAdmin) return;
     let cancelled = false;
@@ -109,6 +190,10 @@ export default function AccessControlPage() {
       cancelled = true;
     };
   }, [isAdmin]);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
 
   return (
     <div className="space-y-8 pb-10">
@@ -314,7 +399,7 @@ export default function AccessControlPage() {
                       className="text-left px-4 py-3 font-[var(--font-display)] text-[10px] tracking-[0.15em] font-semibold"
                       style={{ color: 'var(--color-text-muted)' }}
                     >
-                      E-MAIL
+                      USUÁRIO
                     </th>
                     <th
                       className="text-left px-4 py-3 font-[var(--font-display)] text-[10px] tracking-[0.15em] font-semibold"
@@ -364,7 +449,7 @@ export default function AccessControlPage() {
                           className="px-4 py-2.5 font-[var(--font-mono)] text-[11px]"
                           style={{ color: 'var(--color-text-muted)' }}
                         >
-                          {u.created_at ? u.created_at.split('.')[0].replace('T', ' ') : '—'}
+                          {formatTimestamp(u.created_at)}
                         </td>
                       </tr>
                     );
@@ -375,6 +460,165 @@ export default function AccessControlPage() {
           </div>
         )}
       </section>
+
+      {/* Access logs — admin only */}
+      {isAdmin && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2
+              className="text-[10px] tracking-[0.2em] font-[var(--font-display)] font-semibold"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              REGISTRO DE ACESSOS
+            </h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={logFilterUser}
+                onChange={(e) => setLogFilterUser(e.target.value)}
+                className="text-xs rounded px-2 py-1.5 outline-none input-focus"
+                style={{
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border-subtle)',
+                  color: 'var(--color-text-primary)',
+                  fontFamily: 'var(--font-body)',
+                }}
+              >
+                <option value="">Todos os usuários</option>
+                {(users ?? []).map((u) => (
+                  <option key={u.id} value={u.email}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </select>
+              <select
+                value={logFilterEvent}
+                onChange={(e) => setLogFilterEvent(e.target.value)}
+                className="text-xs rounded px-2 py-1.5 outline-none input-focus"
+                style={{
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border-subtle)',
+                  color: 'var(--color-text-primary)',
+                  fontFamily: 'var(--font-body)',
+                }}
+              >
+                <option value="">Todos os eventos</option>
+                <option value="login_success">Login</option>
+                <option value="login_failure">Login falhou</option>
+                <option value="page_view">Abriu aba</option>
+                <option value="user_created">Usuário criado</option>
+                <option value="user_deleted">Usuário removido</option>
+              </select>
+              <button
+                onClick={fetchLogs}
+                disabled={logsLoading}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded btn-ghost focus-ring cursor-pointer disabled:opacity-50"
+                style={{ color: 'var(--color-text-secondary)' }}
+                title="Atualizar"
+              >
+                <RefreshCw size={13} strokeWidth={1.5} className={logsLoading ? 'animate-spin' : ''} />
+                Atualizar
+              </button>
+            </div>
+          </div>
+
+          {logsError && <div className="banner-error rounded-xl p-4 text-xs">{logsError}</div>}
+
+          {!logsError && logs && logs.length === 0 && !logsLoading && (
+            <div className="card-glass rounded-xl p-6 text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              Nenhum registro encontrado com esses filtros.
+            </div>
+          )}
+
+          {!logsError && logs && logs.length > 0 && (
+            <div className="card-glass rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+                      {['DATA / HORA', 'USUÁRIO', 'EVENTO', 'DETALHES', 'IP', 'DISPOSITIVO'].map((h) => (
+                        <th
+                          key={h}
+                          className="text-left px-3 py-2.5 font-[var(--font-display)] text-[10px] tracking-[0.15em] font-semibold"
+                          style={{ color: 'var(--color-text-muted)' }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map((log, i) => {
+                      const meta = eventMeta(log.event_type);
+                      const Icon = meta.icon;
+                      return (
+                        <tr
+                          key={log.id}
+                          style={{
+                            borderBottom:
+                              i === logs.length - 1
+                                ? 'none'
+                                : '1px solid var(--color-border-subtle)',
+                          }}
+                        >
+                          <td
+                            className="px-3 py-2 font-[var(--font-mono)] text-[11px] whitespace-nowrap"
+                            style={{ color: 'var(--color-text-secondary)' }}
+                          >
+                            {formatTimestamp(log.created_at)}
+                          </td>
+                          <td
+                            className="px-3 py-2 font-[var(--font-mono)]"
+                            style={{ color: log.email ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}
+                          >
+                            {log.email || '—'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className="inline-flex items-center gap-1.5 font-[var(--font-mono)] text-[10px] tracking-[0.08em] font-semibold px-2 py-0.5 rounded whitespace-nowrap"
+                              style={{ background: 'var(--color-surface-2)', color: meta.color }}
+                            >
+                              <Icon size={11} strokeWidth={2} />
+                              {meta.label}
+                            </span>
+                          </td>
+                          <td
+                            className="px-3 py-2 font-[var(--font-mono)] text-[11px]"
+                            style={{ color: 'var(--color-text-secondary)' }}
+                          >
+                            {log.path || log.detail || '—'}
+                            {log.path && log.detail && (
+                              <span className="block text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                                {log.detail}
+                              </span>
+                            )}
+                          </td>
+                          <td
+                            className="px-3 py-2 font-[var(--font-mono)] text-[11px] whitespace-nowrap"
+                            style={{ color: 'var(--color-text-muted)' }}
+                          >
+                            {log.ip || '—'}
+                          </td>
+                          <td
+                            className="px-3 py-2 text-[11px]"
+                            style={{ color: 'var(--color-text-muted)' }}
+                          >
+                            {shortUserAgent(log.user_agent)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <p className="text-[10px] italic" style={{ color: 'var(--color-text-muted)' }}>
+            Os registros são mantidos para auditoria. Em caso de suspeita de vazamento, use estes
+            dados para identificar o usuário, horário e dispositivo responsáveis.
+          </p>
+        </section>
+      )}
     </div>
   );
 }

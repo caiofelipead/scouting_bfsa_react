@@ -43,11 +43,12 @@ class TestJWT:
 
 
 class TestUserCRUD:
-    def test_create_user_validates_email(self, auth_db):
+    def test_create_user_validates_identifier(self, auth_db):
         init_db()
-        err = create_user("not-an-email", "ValidPass1", "Test")
+        # Spaces are invalid for both username and email patterns.
+        err = create_user("not an email", "ValidPass1", "Test")
         assert err is not None
-        assert "e-mail" in err.lower()
+        assert "inv" in err.lower()
 
     def test_create_user_validates_password_length(self, auth_db):
         init_db()

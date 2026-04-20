@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useAuth } from './hooks/useAuth';
 import LoginPage from './components/LoginPage';
 import Layout, { type TabId } from './components/Layout';
+import api from './lib/api';
 
 // Lazy-loaded pages — only loaded when the user navigates to them
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -77,6 +78,12 @@ function App() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+
+  // Audit: log page navigation (fire-and-forget; silent on failure).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    api.post('/audit/page-view', { tab: activeTab }).catch(() => {});
+  }, [activeTab, isAuthenticated]);
 
   if (!isAuthenticated || !user) {
     return <LoginPage onLogin={login} loading={loading} error={error} />;
