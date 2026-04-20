@@ -24,6 +24,7 @@ import {
   UserPlus,
   RefreshCw,
   Check,
+  Lock,
 } from 'lucide-react';
 import type { User } from '../types/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -48,7 +49,8 @@ export type TabId =
   | 'scouting_report'
   | 'coaches'
   | 'shadow_team'
-  | 'player_card';
+  | 'player_card'
+  | 'access_control';
 
 interface LayoutProps {
   user: User;
@@ -93,6 +95,7 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
     items: [
       { id: 'coaches', label: 'Treinadores', icon: <Users size={18} strokeWidth={1.5} /> },
       { id: 'shadow_team', label: 'Shadow Team', icon: <Shield size={18} strokeWidth={1.5} /> },
+      { id: 'access_control', label: 'Controle de Acesso', icon: <Lock size={18} strokeWidth={1.5} /> },
     ],
   },
   {
@@ -105,12 +108,13 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
   },
 ];
 
-// Users allowed to see the Treinadores tab
-const COACHES_ALLOWED_EMAILS = ['caiofelipe', 'andreleite', 'fillipesoutto'];
+// Users allowed to see the Treinadores tab (analysts); admins & viewers always can.
+const COACHES_ALLOWED_EMAILS = ['caiofelipe', 'andreleite', 'fillipesoutto', 'adalbertobaptista'];
 
-function filterNavForUser(email: string) {
+function filterNavForUser(email: string, role: string) {
   const emailLower = email.toLowerCase();
-  const canSeeCoaches = COACHES_ALLOWED_EMAILS.some((u) => emailLower.includes(u));
+  const isPrivileged = role === 'admin' || role === 'viewer';
+  const canSeeCoaches = isPrivileged || COACHES_ALLOWED_EMAILS.some((u) => emailLower.includes(u));
   return NAV_SECTIONS.map((section) => ({
     ...section,
     items: section.items.filter((item) => item.id !== 'coaches' || canSeeCoaches),
@@ -127,7 +131,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
   const [syncDone, setSyncDone] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
-  const userNavSections = filterNavForUser(user.email);
+  const userNavSections = filterNavForUser(user.email, user.role);
   const userNavItems = userNavSections.flatMap((s) => s.items);
   const isAdmin = user.role === 'admin';
 
@@ -156,6 +160,13 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
   return (
     <div className="min-h-screen flex relative">
       <div className="noise-overlay" />
+      <div className="confidential-watermark" aria-hidden="true">
+        {Array.from({ length: 80 }).map((_, i) => (
+          <span key={i} className="confidential-watermark__label">
+            CONFIDENCIAL · BOTAFOGO-SA · {user.email}
+          </span>
+        ))}
+      </div>
 
       {/* ── Sidebar (Desktop) ─────────────────────────────────────── */}
       <aside

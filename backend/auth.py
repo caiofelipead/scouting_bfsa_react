@@ -93,6 +93,37 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+        if driver == "pg":
+            _execute(conn, driver, """
+                CREATE TABLE IF NOT EXISTS access_logs (
+                    id SERIAL PRIMARY KEY,
+                    email TEXT,
+                    event_type TEXT NOT NULL,
+                    path TEXT,
+                    ip TEXT,
+                    user_agent TEXT,
+                    detail TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs(created_at DESC)")
+            _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_email ON access_logs(email)")
+        else:
+            _execute(conn, driver, """
+                CREATE TABLE IF NOT EXISTS access_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT,
+                    event_type TEXT NOT NULL,
+                    path TEXT,
+                    ip TEXT,
+                    user_agent TEXT,
+                    detail TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs(created_at)")
+            _execute(conn, driver, "CREATE INDEX IF NOT EXISTS idx_access_logs_email ON access_logs(email)")
         conn.commit()
 
         # Seed admin user from environment variables (no hardcoded credentials)
@@ -125,8 +156,131 @@ def init_db():
             )
             conn.commit()
             logger.info("Admin user password reset: %s", admin_email)
+
+        _seed_named_admins(conn, driver)
+        _seed_viewer_users(conn, driver)
     finally:
         conn.close()
+
+
+# ── Named admin seeding ───────────────────────────────────────────────
+
+ADMIN_SEEDS = [
+    {
+        "username": "caiofelipe",
+        "name": "Caio Felipe",
+        "env_password": "CAIOFELIPE_PASSWORD",
+        "legacy_emails": [
+            "caiofelipe@bfsa.com.br",
+            "caiofelipe@botafogo-sp.com",
+        ],
+    },
+]
+
+
+def _seed_named_admins(conn, driver: str) -> None:
+    """Seed well-known admin accounts using plain usernames."""
+    fallback = (
+        os.environ.get("ADMIN_PASSWORD")
+        or os.environ.get("VIEWER_DEFAULT_PASSWORD")
+        or "mercadobfsa"
+    )
+    for seed in ADMIN_SEEDS:
+        username = seed["username"]
+        name = seed["name"]
+        password = os.environ.get(seed["env_password"]) or fallback
+        try:
+            for legacy in seed.get("legacy_emails", []):
+                if legacy == username:
+                    continue
+                _execute(conn, driver, "DELETE FROM users WHERE email = ?", (legacy,))
+
+            cur = _execute(conn, driver, "SELECT id FROM users WHERE email = ?", (username,))
+            row = cur.fetchone()
+            pwd_hash = hash_password(password)
+            if row is None:
+                _execute(
+                    conn, driver,
+                    "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                    (username, pwd_hash, name, "admin"),
+                )
+                logger.info("Named admin created: %s", username)
+            else:
+                _execute(
+                    conn, driver,
+                    "UPDATE users SET password_hash = ?, name = ?, role = ? WHERE email = ?",
+                    (pwd_hash, name, "admin", username),
+                )
+                logger.info("Named admin updated: %s", username)
+            conn.commit()
+        except Exception as e:
+            logger.error("Admin seed error for %s: %s", username, e)
+            conn.rollback()
+
+
+# ── Viewer seeding (read-only presidential/board access) ──────────────
+
+VIEWER_SEEDS = [
+    {
+        "username": "adalbertobaptista",
+        "name": "Adalberto Baptista",
+        "env_password": "PRESIDENT_PASSWORD",
+        "legacy_emails": ["adalbertobaptista@bfsa.com.br"],
+    },
+    {
+        "username": "fillipesoutto",
+        "name": "Fillipe Soutto",
+        "env_password": "FILLIPE_PASSWORD",
+        "legacy_emails": ["fillipesoutto@bfsa.com.br"],
+    },
+    {
+        "username": "andreleite",
+        "name": "André Leite",
+        "env_password": "ANDRE_PASSWORD",
+        "legacy_emails": ["andreleite@bfsa.com.br"],
+    },
+]
+
+
+def _seed_viewer_users(conn, driver: str) -> None:
+    """Seed the board/president viewer accounts (read-only full access).
+
+    Uses plain usernames (no e-mail) as login identifiers. Legacy e-mail
+    entries from earlier seeds are removed to keep the credential unique.
+    """
+    default_password = os.environ.get("VIEWER_DEFAULT_PASSWORD", "mercadobfsa")
+    for seed in VIEWER_SEEDS:
+        username = seed["username"]
+        name = seed["name"]
+        password = os.environ.get(seed["env_password"]) or default_password
+        try:
+            # Remove stale legacy e-mail entries from earlier deploys.
+            for legacy in seed.get("legacy_emails", []):
+                if legacy == username:
+                    continue
+                _execute(conn, driver, "DELETE FROM users WHERE email = ?", (legacy,))
+
+            cur = _execute(conn, driver, "SELECT id FROM users WHERE email = ?", (username,))
+            row = cur.fetchone()
+            pwd_hash = hash_password(password)
+            if row is None:
+                _execute(
+                    conn, driver,
+                    "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                    (username, pwd_hash, name, "viewer"),
+                )
+                logger.info("Viewer user created: %s", username)
+            else:
+                _execute(
+                    conn, driver,
+                    "UPDATE users SET password_hash = ?, name = ?, role = ? WHERE email = ?",
+                    (pwd_hash, name, "viewer", username),
+                )
+                logger.info("Viewer user updated: %s", username)
+            conn.commit()
+        except Exception as e:
+            logger.error("Viewer seed error for %s: %s", username, e)
+            conn.rollback()
 
 
 # ── Password & Token ──────────────────────────────────────────────────
@@ -213,12 +367,14 @@ def create_user(email: str, password: str, name: str, role: str = "analyst") -> 
     name = name.strip()
     if not email or not password or not name:
         return "Todos os campos são obrigatórios."
-    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-    if not re.match(pattern, email):
-        return "Formato de e-mail inválido."
+    # Accept either a valid e-mail or a simple alphanumeric username (3+ chars).
+    email_re = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    username_re = r"^[a-zA-Z0-9_.-]{3,}$"
+    if not (re.match(email_re, email) or re.match(username_re, email)):
+        return "Identificador inválido. Use um nome de usuário ou e-mail válido."
     if len(password) < 6:
         return "A senha deve ter pelo menos 6 caracteres."
-    if role not in ("admin", "analyst"):
+    if role not in ("admin", "analyst", "viewer"):
         return "Papel inválido."
 
     conn, driver = _get_connection()
@@ -257,6 +413,110 @@ def delete_user(user_id: int) -> Optional[str]:
     except Exception as e:
         logger.error("Delete user error: %s", e)
         return f"Erro no banco de dados: {e}"
+    finally:
+        conn.close()
+
+
+# ── Access Logs ───────────────────────────────────────────────────────
+
+def log_access(
+    email: Optional[str],
+    event_type: str,
+    path: Optional[str] = None,
+    ip: Optional[str] = None,
+    user_agent: Optional[str] = None,
+    detail: Optional[str] = None,
+) -> None:
+    """Insert an access log entry. Never raises — logging failures are swallowed."""
+    try:
+        conn, driver = _get_connection()
+        try:
+            _execute(
+                conn, driver,
+                """INSERT INTO access_logs (email, event_type, path, ip, user_agent, detail)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    (email or "").strip().lower() or None,
+                    event_type,
+                    (path or "")[:500] or None,
+                    (ip or "")[:64] or None,
+                    (user_agent or "")[:300] or None,
+                    (detail or "")[:500] or None,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning("log_access failed: %s", e)
+
+
+def list_access_logs(
+    limit: int = 200,
+    offset: int = 0,
+    email: Optional[str] = None,
+    event_type: Optional[str] = None,
+) -> list[dict]:
+    conn, driver = _get_connection()
+    try:
+        limit = max(1, min(int(limit), 1000))
+        offset = max(0, int(offset))
+        clauses = []
+        params: list = []
+        if email:
+            clauses.append("email = ?")
+            params.append(email.strip().lower())
+        if event_type:
+            clauses.append("event_type = ?")
+            params.append(event_type)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        sql = (
+            "SELECT id, email, event_type, path, ip, user_agent, detail, created_at "
+            f"FROM access_logs{where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"
+        )
+        params.extend([limit, offset])
+        cur = _execute(conn, driver, sql, tuple(params))
+        rows = cur.fetchall()
+        return [
+            {
+                "id": r[0],
+                "email": r[1],
+                "event_type": r[2],
+                "path": r[3],
+                "ip": r[4],
+                "user_agent": r[5],
+                "detail": r[6],
+                "created_at": str(r[7]) if r[7] else None,
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error("List access logs error: %s", e)
+        return []
+    finally:
+        conn.close()
+
+
+def purge_access_logs(days: int = 180) -> int:
+    """Delete access logs older than `days` days. Returns rows removed."""
+    days = max(1, int(days))
+    conn, driver = _get_connection()
+    try:
+        if driver == "pg":
+            cur = _execute(
+                conn, driver,
+                "DELETE FROM access_logs WHERE created_at < NOW() - INTERVAL '%s days'" % days,
+            )
+        else:
+            cur = _execute(
+                conn, driver,
+                f"DELETE FROM access_logs WHERE created_at < datetime('now', '-{days} days')",
+            )
+        conn.commit()
+        return cur.rowcount if cur.rowcount is not None else 0
+    except Exception as e:
+        logger.error("Purge logs error: %s", e)
+        return 0
     finally:
         conn.close()
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Mail, AlertCircle } from 'lucide-react';
+import { Lock, User as UserIcon, AlertCircle } from 'lucide-react';
 
 interface LoginPageProps {
   onLogin: (email: string, password: string) => Promise<boolean>;
@@ -60,19 +60,22 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
               className="block text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase mb-2"
               style={{ color: 'var(--color-text-muted)' }}
             >
-              E-MAIL
+              USUÁRIO
             </label>
             <div className="relative">
-              <Mail
+              <UserIcon
                 size={14}
                 className="absolute left-3 top-1/2 -translate-y-1/2"
                 style={{ color: 'var(--color-text-muted)' }}
               />
               <input
-                type="email"
+                type="text"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@botafogo-sp.com"
+                onChange={(e) => setEmail(e.target.value.trim().toLowerCase())}
+                placeholder="seunome"
                 required
                 className="w-full pl-9 pr-3 py-2.5 rounded text-sm outline-none input-focus"
                 style={{

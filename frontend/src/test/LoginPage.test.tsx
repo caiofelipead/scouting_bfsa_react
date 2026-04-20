@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import LoginPage from '../components/LoginPage';
@@ -15,9 +15,9 @@ vi.mock('framer-motion', () => ({
 describe('LoginPage', () => {
   const mockLogin = vi.fn().mockResolvedValue(true);
 
-  it('renders email and password fields', () => {
+  it('renders username and password fields', () => {
     render(<LoginPage onLogin={mockLogin} loading={false} error={null} />);
-    expect(screen.getByPlaceholderText(/admin@botafogo/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/seunome/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText('******')).toBeInTheDocument();
   });
 
@@ -37,19 +37,19 @@ describe('LoginPage', () => {
     expect(btn).toBeDisabled();
   });
 
-  it('calls onLogin with email and password on submit', async () => {
+  it('calls onLogin with username and password on submit', async () => {
     const user = userEvent.setup();
     render(<LoginPage onLogin={mockLogin} loading={false} error={null} />);
 
-    const emailInput = screen.getByPlaceholderText(/admin@botafogo/i);
+    const emailInput = screen.getByPlaceholderText(/seunome/i);
     const passwordInput = screen.getByPlaceholderText('******');
 
-    await user.type(emailInput, 'test@example.com');
+    await user.type(emailInput, 'adalbertobaptista');
     await user.type(passwordInput, 'MyPassword1');
     await user.click(screen.getByRole('button', { name: /entrar/i }));
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'MyPassword1');
+      expect(mockLogin).toHaveBeenCalledWith('adalbertobaptista', 'MyPassword1');
     });
   });
 
