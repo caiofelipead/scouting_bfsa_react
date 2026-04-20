@@ -285,21 +285,21 @@ body {
   grid-auto-rows: 140px;
   transform: rotate(-28deg);
   transform-origin: center;
-  opacity: 0.008;
+  opacity: 0.022;
   user-select: none;
   -webkit-user-select: none;
   padding: 15vh 10vw;
 }
 
 [data-theme="light"] .confidential-watermark {
-  opacity: 0.006;
+  opacity: 0.018;
 }
 
 .confidential-watermark__label {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  font-weight: 700;
   color: var(--color-text-primary);
   white-space: nowrap;
   text-align: center;
