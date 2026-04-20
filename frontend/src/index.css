@@ -285,14 +285,14 @@ body {
   grid-auto-rows: 140px;
   transform: rotate(-28deg);
   transform-origin: center;
-  opacity: 0.035;
+  opacity: 0.018;
   user-select: none;
   -webkit-user-select: none;
   padding: 15vh 10vw;
 }
 
 [data-theme="light"] .confidential-watermark {
-  opacity: 0.03;
+  opacity: 0.014;
 }
 
 .confidential-watermark__label {
