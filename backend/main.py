@@ -1577,6 +1577,7 @@ async def get_prediction_rankings(
             "display_name": str(row.get("JogadorDisplay", row.get("Jogador", ""))),
             "team": pred_team_name,
             "age": age,
+            "nationality": str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
             "league": league_origin,
             "minutes": minutes,
             "ssp": round(ssp, 1),

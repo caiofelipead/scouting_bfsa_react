@@ -7,6 +7,11 @@ import { getScoreColor, formatNumber } from '../lib/utils';
 import api, { proxyImageUrl, isProxyFallback } from '../lib/api';
 import type { RankingsQueryParams } from '../types/api';
 import PlayerProfile from '../components/PlayerProfile';
+import PlayerFiltersBar, {
+  applyPlayerFilters,
+  EMPTY_PLAYER_FILTERS,
+  type PlayerFilterState,
+} from '../components/PlayerFiltersBar';
 
 interface PredictionRankingEntry {
   rank: number;
@@ -14,6 +19,7 @@ interface PredictionRankingEntry {
   display_name: string;
   team: string | null;
   age: number;
+  nationality: string | null;
   league: string;
   minutes: number;
   ssp: number;
@@ -48,6 +54,7 @@ export default function RankingsPage() {
   const [minMinutes, setMinMinutes] = useState(500);
   const [league, setLeague] = useState('');
   const [topN, setTopN] = useState(50);
+  const [filters, setFilters] = useState<PlayerFilterState>(EMPTY_PLAYER_FILTERS);
   const [leagueTarget, setLeagueTarget] = useState('Serie B Brasil');
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -104,6 +111,31 @@ export default function RankingsPage() {
     const first = rankings.players[0];
     return Object.keys(first.indices || {});
   }, [rankings, mode]);
+
+  // Client-side filter application (applies to whichever mode is active)
+  const filteredSsp = useMemo(
+    () => (rankings?.players ? applyPlayerFilters(rankings.players, filters) : []),
+    [rankings, filters],
+  );
+
+  // PredictionRankingEntry uses `ssp` instead of `score`; map it so applyPlayerFilters
+  // can use minScore against SSP directly.
+  const filteredPred = useMemo(() => {
+    if (!predRanking?.players) return [];
+    const shimmed = predRanking.players.map((p) => ({ ...p, score: p.ssp }));
+    return applyPlayerFilters(shimmed, filters).map(({ score: _drop, ...rest }) => rest as PredictionRankingEntry);
+  }, [predRanking, filters]);
+
+  // Nationalities derived from the currently-loaded dataset (for the select)
+  const availableNationalities = useMemo(() => {
+    const set = new Set<string>();
+    const rows: { nationality?: string | null }[] =
+      mode === 'ssp'
+        ? rankings?.players ?? []
+        : predRanking?.players ?? [];
+    for (const r of rows) if (r.nationality) set.add(r.nationality);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [rankings, predRanking, mode]);
 
   return (
     <div className="space-y-5">
@@ -188,15 +220,25 @@ export default function RankingsPage() {
         </div>
       </div>
 
+      {/* Secondary filters (client-side) */}
+      <div className="pt-2" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+        <PlayerFiltersBar
+          value={filters}
+          onChange={setFilters}
+          nationalities={availableNationalities}
+          scoreLabel={mode === 'ssp' ? 'MIN SSP' : 'MIN SSP'}
+        />
+      </div>
+
       {/* Info bar */}
       {mode === 'ssp' && rankings && (
         <div className="px-4 py-2 rounded text-xs" style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-muted)' }}>
-          {rankings.total} jogadores classificados para {rankings.position} | Min. {minMinutes} minutos
+          {filteredSsp.length} / {rankings.total} jogadores classificados para {rankings.position} | Min. {minMinutes} minutos
         </div>
       )}
       {mode === 'prediction' && predRanking && (
         <div className="px-4 py-2 rounded text-xs" style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-muted)' }}>
-          {predRanking.total} jogadores | {predRanking.position} → {predRanking.league_target} | Min. {minMinutes} minutos
+          {filteredPred.length} / {predRanking.total} jogadores | {predRanking.position} → {predRanking.league_target} | Min. {minMinutes} minutos
         </div>
       )}
 
@@ -233,8 +275,8 @@ export default function RankingsPage() {
                       ))}
                     </tr>
                   ))
-                ) : rankings && rankings.players.length > 0 ? (
-                  rankings.players.map((entry, i) => (
+                ) : rankings && filteredSsp.length > 0 ? (
+                  filteredSsp.map((entry, i) => (
                     <motion.tr key={entry.rank} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }} style={{ borderBottom: '1px solid var(--color-border-subtle)' }} className="group table-row-interactive cursor-pointer" onClick={() => setSelectedPlayer(entry.display_name || entry.name)}>
                       <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs" style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>{entry.rank}</td>
                       <td className="px-3 py-2.5">
@@ -316,8 +358,8 @@ export default function RankingsPage() {
                       ))}
                     </tr>
                   ))
-                ) : predRanking && predRanking.players.length > 0 ? (
-                  predRanking.players.map((entry, i) => {
+                ) : predRanking && filteredPred.length > 0 ? (
+                  filteredPred.map((entry, i) => {
                     const prob = entry.p_success * 100;
                     const riskColor = RISK_COLORS[entry.risk_level] || 'var(--color-text-muted)';
                     return (

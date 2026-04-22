@@ -1,10 +1,15 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ScatterChart as ScatterIcon, SlidersHorizontal, RotateCcw, Search } from 'lucide-react';
+import { ScatterChart as ScatterIcon, SlidersHorizontal } from 'lucide-react';
 // @ts-expect-error — .jsx component (intentionally untyped per request)
 import ScatterPlot from '../components/ScatterPlot';
 import { useRankings, usePositions, useLeagues } from '../hooks/usePlayers';
 import PlayerProfile from '../components/PlayerProfile';
+import PlayerFiltersBar, {
+  applyPlayerFilters,
+  EMPTY_PLAYER_FILTERS,
+  type PlayerFilterState,
+} from '../components/PlayerFiltersBar';
 import type { RankingsQueryParams, RankingEntry } from '../types/api';
 
 interface ScatterPoint {
@@ -28,13 +33,7 @@ export default function ScatterPlotPage() {
   const [topN, setTopN] = useState<number>(DEFAULT_TOP_N);
 
   // ── Client-side refinements ──
-  const [ageMin, setAgeMin] = useState<string>('');
-  const [ageMax, setAgeMax] = useState<string>('');
-  const [nationality, setNationality] = useState<string>('');
-  const [teamQuery, setTeamQuery] = useState<string>('');
-  const [nameQuery, setNameQuery] = useState<string>('');
-  const [minScore, setMinScore] = useState<string>('');
-  const [maxMinutes, setMaxMinutes] = useState<string>('');
+  const [filters, setFilters] = useState<PlayerFilterState>(EMPTY_PLAYER_FILTERS);
 
   // ── Chart config ──
   const [xAxis, setXAxis] = useState<string>('');
@@ -74,28 +73,10 @@ export default function ScatterPlotPage() {
   }, [rawPlayers]);
 
   // Apply client-side filters
-  const filteredPlayers = useMemo(() => {
-    const ageMinN = ageMin !== '' ? Number(ageMin) : null;
-    const ageMaxN = ageMax !== '' ? Number(ageMax) : null;
-    const maxMinutesN = maxMinutes !== '' ? Number(maxMinutes) : null;
-    const minScoreN = minScore !== '' ? Number(minScore) : null;
-    const teamLc = teamQuery.trim().toLowerCase();
-    const nameLc = nameQuery.trim().toLowerCase();
-
-    return rawPlayers.filter((p) => {
-      if (ageMinN != null && (p.age == null || p.age < ageMinN)) return false;
-      if (ageMaxN != null && (p.age == null || p.age > ageMaxN)) return false;
-      if (maxMinutesN != null && (p.minutes == null || p.minutes > maxMinutesN)) return false;
-      if (minScoreN != null && (p.score == null || p.score < minScoreN)) return false;
-      if (nationality && p.nationality !== nationality) return false;
-      if (teamLc && !(p.team || '').toLowerCase().includes(teamLc)) return false;
-      if (nameLc) {
-        const label = (p.display_name || p.name || '').toLowerCase();
-        if (!label.includes(nameLc)) return false;
-      }
-      return true;
-    });
-  }, [rawPlayers, ageMin, ageMax, maxMinutes, minScore, nationality, teamQuery, nameQuery]);
+  const filteredPlayers = useMemo(
+    () => applyPlayerFilters(rawPlayers, filters),
+    [rawPlayers, filters],
+  );
 
   const effectiveX = xAxis || availableIndices[0] || '';
   const effectiveY = yAxis || availableIndices[1] || availableIndices[0] || '';
@@ -132,16 +113,6 @@ export default function ScatterPlotPage() {
       })
       .filter((v): v is ScatterPoint => v !== null);
   }, [filteredPlayers, effectiveX, effectiveY, highlightLabels]);
-
-  const clientFilterCount = [
-    ageMin, ageMax, nationality, teamQuery, nameQuery, minScore, maxMinutes,
-  ].filter((v) => v !== '' && v != null).length;
-
-  const resetAll = () => {
-    setAgeMin(''); setAgeMax('');
-    setNationality(''); setTeamQuery(''); setNameQuery('');
-    setMinScore(''); setMaxMinutes('');
-  };
 
   return (
     <div className="space-y-5">
@@ -270,116 +241,12 @@ export default function ScatterPlotPage() {
         </div>
 
         {/* Row 2 — client-side refinements */}
-        <div
-          className="flex flex-wrap items-end gap-3 pt-3"
-          style={{ borderTop: '1px solid var(--color-border-subtle)' }}
-        >
-          <FilterGroup label="JOGADOR">
-            <div className="relative">
-              <Search size={12} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
-              <input
-                type="text"
-                value={nameQuery}
-                placeholder="Buscar..."
-                onChange={(e) => setNameQuery(e.target.value)}
-                className="input-thin pl-7 w-40"
-              />
-            </div>
-          </FilterGroup>
-
-          <FilterGroup label="TIME">
-            <div className="relative">
-              <Search size={12} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
-              <input
-                type="text"
-                value={teamQuery}
-                placeholder="Buscar..."
-                onChange={(e) => setTeamQuery(e.target.value)}
-                className="input-thin pl-7 w-40"
-              />
-            </div>
-          </FilterGroup>
-
-          <FilterGroup label="NACIONALIDADE">
-            <select
-              value={nationality}
-              onChange={(e) => setNationality(e.target.value)}
-              className="input-thin cursor-pointer"
-            >
-              <option value="">Todas</option>
-              {availableNationalities.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </FilterGroup>
-
-          <FilterGroup label="IDADE MIN">
-            <input
-              type="number"
-              value={ageMin}
-              placeholder="16"
-              min={14}
-              max={50}
-              onChange={(e) => setAgeMin(e.target.value)}
-              className="input-thin w-16"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            />
-          </FilterGroup>
-
-          <FilterGroup label="IDADE MAX">
-            <input
-              type="number"
-              value={ageMax}
-              placeholder="40"
-              min={14}
-              max={50}
-              onChange={(e) => setAgeMax(e.target.value)}
-              className="input-thin w-16"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            />
-          </FilterGroup>
-
-          <FilterGroup label="MAX MIN">
-            <input
-              type="number"
-              value={maxMinutes}
-              placeholder="5000"
-              min={0}
-              onChange={(e) => setMaxMinutes(e.target.value)}
-              className="input-thin w-20"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            />
-          </FilterGroup>
-
-          <FilterGroup label="MIN SSP">
-            <input
-              type="number"
-              value={minScore}
-              placeholder="50"
-              min={0}
-              max={100}
-              step={1}
-              onChange={(e) => setMinScore(e.target.value)}
-              className="input-thin w-20"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            />
-          </FilterGroup>
-
-          <button
-            type="button"
-            onClick={resetAll}
-            disabled={clientFilterCount === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              background: clientFilterCount > 0 ? 'var(--color-accent-glow)' : 'var(--color-surface-1)',
-              color: clientFilterCount > 0 ? 'var(--color-accent)' : 'var(--color-text-muted)',
-              border: `1px solid ${clientFilterCount > 0 ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
-            }}
-            title="Limpar filtros secundários"
-          >
-            <RotateCcw size={12} strokeWidth={1.5} />
-            Limpar{clientFilterCount > 0 ? ` (${clientFilterCount})` : ''}
-          </button>
+        <div className="pt-3" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+          <PlayerFiltersBar
+            value={filters}
+            onChange={setFilters}
+            nationalities={availableNationalities}
+          />
         </div>
       </div>
 
@@ -397,7 +264,7 @@ export default function ScatterPlotPage() {
             xLabel={effectiveX}
             yLabel={effectiveY}
             title={`${effectiveY} vs ${effectiveX}`}
-            subtitle={buildSubtitle({ position, league, minMinutes, ageMin, ageMax, nationality, teamQuery, nameQuery, minScore, maxMinutes })}
+            subtitle={buildSubtitle({ position, league, minMinutes, filters })}
             footnote={`*Amostra de ${scatterPoints.length} jogadores · outliers destacados > μ + ${minSigma}σ`}
             minOutlierSigma={minSigma}
             highlightCategories={['TOP SSP']}
@@ -437,17 +304,19 @@ export default function ScatterPlotPage() {
 }
 
 function buildSubtitle(f: {
-  position: string; league: string; minMinutes: number;
-  ageMin: string; ageMax: string; nationality: string;
-  teamQuery: string; nameQuery: string; minScore: string; maxMinutes: string;
+  position: string;
+  league: string;
+  minMinutes: number;
+  filters: PlayerFilterState;
 }): string {
+  const { filters: ff } = f;
   const parts: string[] = [f.position, f.league || 'Todas as ligas', `minutos ≥ ${f.minMinutes}`];
-  if (f.ageMin || f.ageMax) parts.push(`idade ${f.ageMin || '—'}–${f.ageMax || '—'}`);
-  if (f.nationality) parts.push(f.nationality);
-  if (f.teamQuery) parts.push(`time: "${f.teamQuery}"`);
-  if (f.nameQuery) parts.push(`nome: "${f.nameQuery}"`);
-  if (f.minScore) parts.push(`SSP ≥ ${f.minScore}`);
-  if (f.maxMinutes) parts.push(`minutos ≤ ${f.maxMinutes}`);
+  if (ff.ageMin || ff.ageMax) parts.push(`idade ${ff.ageMin || '—'}–${ff.ageMax || '—'}`);
+  if (ff.nationality) parts.push(ff.nationality);
+  if (ff.teamQuery) parts.push(`time: "${ff.teamQuery}"`);
+  if (ff.nameQuery) parts.push(`nome: "${ff.nameQuery}"`);
+  if (ff.minScore) parts.push(`SSP ≥ ${ff.minScore}`);
+  if (ff.maxMinutes) parts.push(`minutos ≤ ${ff.maxMinutes}`);
   return parts.join(' · ');
 }
 
