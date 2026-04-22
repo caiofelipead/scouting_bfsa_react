@@ -3,24 +3,28 @@ import { motion } from 'framer-motion';
 
 /*
  * Opta-style scatter plot.
+ *
+ * Visual language (inspired by Opta Analyst charts):
+ *   - Most points rendered in a neutral gray (the sample).
+ *   - "Above-average" outliers (μ + k·σ on either axis) are tinted and labeled.
+ *   - "Highlight" points (e.g. TOP SSP) are rendered in the accent color.
+ *   - Mean reference lines (dashed) on both axes; optional ±k·σ dashed guides.
+ *
  * Props:
- *   points:      array of { x, y, label, category?, team?, age?, minutes?, meta? }
- *   xLabel:      string — x-axis title
- *   yLabel:      string — y-axis title
- *   title:       string — chart title
- *   subtitle:    string — chart subtitle
- *   footnote:    string — lower-right disclaimer (e.g. "*Min. 500 minutes")
- *   categoryColors: map { category -> #hex }
- *   highlightCategories: array of category strings that should render in accent
- *   minOutlierSigma: number (default 1) — label points that exceed mean ± n·SD on either axis
- *   width / height: viewport dimensions in px (default 980 × 560)
- *   onPointClick: (point) => void
+ *   points:              array of { x, y, label, category?, team?, meta? }
+ *   xLabel / yLabel:     axis titles
+ *   title / subtitle:    heading block
+ *   footnote:            bottom-right disclaimer
+ *   highlightCategories: array of category strings rendered in accent (always labeled)
+ *   minOutlierSigma:     numeric threshold for outlier detection (default 1)
+ *   maxLabels:           cap on outlier labels to avoid clutter (default 14)
+ *   width / height:      viewport dimensions in px
+ *   onPointClick:        (point) => void
  */
 
-const DEFAULT_PALETTE = [
-  '#8b5cf6', '#22c55e', '#3b82f6', '#f59e0b', '#06b6d4',
-  '#ec4899', '#10b981', '#eab308', '#f97316', '#a855f7',
-];
+const HIGHLIGHT_COLOR = 'var(--color-accent)';
+const OUTLIER_COLOR = '#8b5cf6'; // soft violet — mirrors Opta's purple above-median tone
+const SAMPLE_COLOR = 'rgba(161, 161, 170, 0.28)';
 
 function computeStats(values) {
   const n = values.length;
@@ -37,9 +41,7 @@ function computeStats(values) {
 }
 
 function niceTicks(min, max, count = 5) {
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-    return [min];
-  }
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) return [min];
   const range = max - min;
   const rough = range / count;
   const mag = Math.pow(10, Math.floor(Math.log10(rough)));
@@ -66,6 +68,54 @@ function formatTick(v) {
   return v.toFixed(2);
 }
 
+/**
+ * Greedy label placer: given candidate labels with desired (x, y), tries four
+ * offset positions (right, left, up-right, down-right) and picks the first that
+ * doesn't collide with already-placed labels. Returns { placed, rejected }.
+ */
+function placeLabels(candidates, innerW, innerH) {
+  const placed = [];
+  const charW = 5.6;
+  const labelH = 12;
+  const offsets = [
+    { dx: 10, dy: 4, anchor: 'start' },
+    { dx: -10, dy: 4, anchor: 'end' },
+    { dx: 10, dy: -8, anchor: 'start' },
+    { dx: -10, dy: -8, anchor: 'end' },
+    { dx: 0, dy: -10, anchor: 'middle' },
+    { dx: 0, dy: 14, anchor: 'middle' },
+  ];
+
+  for (const c of candidates) {
+    let done = false;
+    for (const o of offsets) {
+      const w = (c.label?.length || 0) * charW;
+      let tx = c.cx + o.dx;
+      let ty = c.cy + o.dy;
+      let x1;
+      if (o.anchor === 'start') x1 = tx;
+      else if (o.anchor === 'end') x1 = tx - w;
+      else x1 = tx - w / 2;
+      const y1 = ty - labelH;
+      const box = { x1, y1, x2: x1 + w, y2: y1 + 2 };
+
+      // Keep inside plot area with a small margin
+      if (box.x1 < 2 || box.x2 > innerW - 2 || box.y1 < 2 || box.y2 > innerH - 2) continue;
+
+      const collides = placed.some((p) => !(box.x2 < p.box.x1 || box.x1 > p.box.x2 || box.y2 < p.box.y1 || box.y1 > p.box.y2));
+      if (collides) continue;
+
+      placed.push({ ...c, tx, ty, anchor: o.anchor, box });
+      done = true;
+      break;
+    }
+    if (!done) {
+      // skip — too crowded
+    }
+  }
+  return placed;
+}
+
 export default function ScatterPlot({
   points = [],
   xLabel = 'X',
@@ -73,9 +123,9 @@ export default function ScatterPlot({
   title = 'Scatter',
   subtitle = '',
   footnote = '',
-  categoryColors,
   highlightCategories = [],
   minOutlierSigma = 1,
+  maxLabels = 14,
   width = 980,
   height = 560,
   onPointClick,
@@ -86,27 +136,11 @@ export default function ScatterPlot({
   const innerW = width - margin.left - margin.right;
   const innerH = height - margin.top - margin.bottom;
 
-  // Build category -> color map (stable)
-  const colorMap = useMemo(() => {
-    if (categoryColors) return categoryColors;
-    const seen = new Map();
-    let i = 0;
-    for (const p of points) {
-      const cat = p.category || 'default';
-      if (!seen.has(cat)) {
-        seen.set(cat, DEFAULT_PALETTE[i % DEFAULT_PALETTE.length]);
-        i += 1;
-      }
-    }
-    return Object.fromEntries(seen);
-  }, [points, categoryColors]);
-
   const xs = useMemo(() => points.map((p) => p.x).filter(Number.isFinite), [points]);
   const ys = useMemo(() => points.map((p) => p.y).filter(Number.isFinite), [points]);
   const xStats = useMemo(() => computeStats(xs), [xs]);
   const yStats = useMemo(() => computeStats(ys), [ys]);
 
-  // Axis domains padded a bit beyond min/max
   const xPad = (xStats.max - xStats.min) * 0.05 || 1;
   const yPad = (yStats.max - yStats.min) * 0.05 || 1;
   const xDomain = [Math.max(0, xStats.min - xPad), xStats.max + xPad];
@@ -118,24 +152,54 @@ export default function ScatterPlot({
   const xTicks = useMemo(() => niceTicks(xDomain[0], xDomain[1], 6), [xDomain[0], xDomain[1]]);
   const yTicks = useMemo(() => niceTicks(yDomain[0], yDomain[1], 6), [yDomain[0], yDomain[1]]);
 
-  // Outlier = exceeds mean + k·SD on x or y
   const k = minOutlierSigma;
-  const isOutlier = (p) => {
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return false;
-    const xOut = p.x > xStats.mean + k * xStats.sd;
-    const yOut = p.y > yStats.mean + k * yStats.sd;
-    return xOut || yOut;
-  };
-  const isHighlighted = (p) => highlightCategories.includes(p.category);
 
-  // Pre-compute label positions; simple anti-overlap by offsetting slightly based on index parity
-  const labeledPoints = useMemo(
-    () => points.map((p, i) => ({ ...p, _i: i, _outlier: isOutlier(p), _highlight: isHighlighted(p) })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [points, xStats.mean, xStats.sd, yStats.mean, yStats.sd, highlightCategories.join(',')]
+  // Classify each point and compute its screen position + a ranking score so
+  // we can pick only the most extreme outliers for labeling.
+  const classified = useMemo(() => {
+    const zx = (v) => (xStats.sd > 0 ? (v - xStats.mean) / xStats.sd : 0);
+    const zy = (v) => (yStats.sd > 0 ? (v - yStats.mean) / yStats.sd : 0);
+    return points.map((p, i) => {
+      const highlight = highlightCategories.includes(p.category);
+      const valid = Number.isFinite(p.x) && Number.isFinite(p.y);
+      const aboveX = valid && p.x > xStats.mean + k * xStats.sd;
+      const aboveY = valid && p.y > yStats.mean + k * yStats.sd;
+      const outlier = aboveX || aboveY;
+      const score = valid ? Math.hypot(zx(p.x), zy(p.y)) : 0;
+      return {
+        ...p,
+        _i: i,
+        _valid: valid,
+        _highlight: highlight,
+        _outlier: outlier,
+        _score: score,
+        _cx: valid ? xScale(p.x) : 0,
+        _cy: valid ? yScale(p.y) : 0,
+      };
+    });
+  }, [points, xStats.mean, xStats.sd, yStats.mean, yStats.sd, k, innerW, innerH, highlightCategories.join(',')]);
+
+  // Labels: all highlights + top-N outliers ranked by z-score magnitude.
+  const labelCandidates = useMemo(() => {
+    const highlights = classified.filter((p) => p._valid && p._highlight);
+    const outliers = classified
+      .filter((p) => p._valid && p._outlier && !p._highlight)
+      .sort((a, b) => b._score - a._score)
+      .slice(0, Math.max(0, maxLabels - highlights.length));
+    return [...highlights, ...outliers].map((p) => ({
+      id: p._i,
+      cx: p._cx,
+      cy: p._cy,
+      label: p.label,
+      highlight: p._highlight,
+    }));
+  }, [classified, maxLabels]);
+
+  const placedLabels = useMemo(
+    () => placeLabels(labelCandidates, innerW, innerH),
+    [labelCandidates, innerW, innerH],
   );
-
-  const legendEntries = Object.entries(colorMap);
+  const labeledIds = useMemo(() => new Set(placedLabels.map((l) => l.id)), [placedLabels]);
 
   return (
     <div className="w-full">
@@ -148,10 +212,10 @@ export default function ScatterPlot({
           borderRadius: 12,
           border: '1px solid var(--color-border-subtle)',
           fontFamily: 'var(--font-body)',
-          overflow: 'visible',
+          overflow: 'hidden',
         }}
       >
-        {/* ── Title / subtitle / brand ─────────────────────────── */}
+        {/* Title / subtitle / brand */}
         <text
           x={margin.left}
           y={28}
@@ -174,8 +238,8 @@ export default function ScatterPlot({
             {subtitle}
           </text>
         )}
-        <g transform={`translate(${width - margin.right - 90}, 24)`}>
-          <rect x={0} y={-10} width={10} height={10} fill="var(--color-accent)" rx={1} />
+        <g transform={`translate(${width - margin.right - 108}, 24)`}>
+          <rect x={0} y={-10} width={10} height={10} fill={HIGHLIGHT_COLOR} rx={1} />
           <text
             x={14}
             y={-1}
@@ -189,9 +253,8 @@ export default function ScatterPlot({
           </text>
         </g>
 
-        {/* ── Plot area ────────────────────────────────────────── */}
+        {/* Plot area */}
         <g transform={`translate(${margin.left}, ${margin.top})`}>
-          {/* Frame */}
           <rect
             x={0}
             y={0}
@@ -210,7 +273,7 @@ export default function ScatterPlot({
                 x2={innerW}
                 y1={yScale(t)}
                 y2={yScale(t)}
-                stroke="rgba(255,255,255,0.05)"
+                stroke="rgba(255,255,255,0.04)"
                 strokeWidth={1}
               />
               <text
@@ -234,7 +297,7 @@ export default function ScatterPlot({
                 x2={xScale(t)}
                 y1={0}
                 y2={innerH}
-                stroke="rgba(255,255,255,0.05)"
+                stroke="rgba(255,255,255,0.04)"
                 strokeWidth={1}
               />
               <text
@@ -250,13 +313,13 @@ export default function ScatterPlot({
             </g>
           ))}
 
-          {/* Mean lines */}
+          {/* Mean lines (dashed) */}
           <line
             x1={xScale(xStats.mean)}
             x2={xScale(xStats.mean)}
             y1={0}
             y2={innerH}
-            stroke="rgba(255,255,255,0.35)"
+            stroke="rgba(255,255,255,0.28)"
             strokeWidth={1}
             strokeDasharray="4 4"
           />
@@ -265,7 +328,7 @@ export default function ScatterPlot({
             x2={innerW}
             y1={yScale(yStats.mean)}
             y2={yScale(yStats.mean)}
-            stroke="rgba(255,255,255,0.35)"
+            stroke="rgba(255,255,255,0.28)"
             strokeWidth={1}
             strokeDasharray="4 4"
           />
@@ -291,55 +354,40 @@ export default function ScatterPlot({
             média {yLabel}
           </text>
 
-          {/* ± 1 SD lines (softer) */}
-          {xStats.sd > 0 && [xStats.mean + k * xStats.sd, xStats.mean - k * xStats.sd].map((v, i) =>
-            v >= xDomain[0] && v <= xDomain[1] ? (
-              <line
-                key={`xsd-${i}`}
-                x1={xScale(v)}
-                x2={xScale(v)}
-                y1={0}
-                y2={innerH}
-                stroke="rgba(255,255,255,0.10)"
-                strokeWidth={1}
-                strokeDasharray="2 4"
+          {/* Sample points (muted) */}
+          {classified.map((p) => {
+            if (!p._valid || p._highlight || p._outlier) return null;
+            return (
+              <circle
+                key={`s-${p._i}`}
+                cx={p._cx}
+                cy={p._cy}
+                r={3.2}
+                fill={SAMPLE_COLOR}
+                onMouseEnter={() => setHover(p)}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => onPointClick && onPointClick(p)}
+                style={{ cursor: onPointClick ? 'pointer' : 'default' }}
               />
-            ) : null
-          )}
-          {yStats.sd > 0 && [yStats.mean + k * yStats.sd, yStats.mean - k * yStats.sd].map((v, i) =>
-            v >= yDomain[0] && v <= yDomain[1] ? (
-              <line
-                key={`ysd-${i}`}
-                x1={0}
-                x2={innerW}
-                y1={yScale(v)}
-                y2={yScale(v)}
-                stroke="rgba(255,255,255,0.10)"
-                strokeWidth={1}
-                strokeDasharray="2 4"
-              />
-            ) : null
-          )}
+            );
+          })}
 
-          {/* Points — non-outliers first (muted) */}
-          {labeledPoints.map((p) => {
-            if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
-            const highlight = p._highlight;
-            const outlier = p._outlier;
-            if (highlight || outlier) return null;
-            const cx = xScale(p.x);
-            const cy = yScale(p.y);
+          {/* Outlier points (violet) */}
+          {classified.map((p) => {
+            if (!p._valid || p._highlight || !p._outlier) return null;
+            const labeled = labeledIds.has(p._i);
             return (
               <motion.circle
-                key={`pt-${p._i}`}
-                cx={cx}
-                cy={cy}
-                r={4}
-                fill="rgba(161, 161, 170, 0.35)"
-                stroke="rgba(255,255,255,0.08)"
-                strokeWidth={0.5}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                key={`o-${p._i}`}
+                cx={p._cx}
+                cy={p._cy}
+                r={labeled ? 5 : 4}
+                fill={OUTLIER_COLOR}
+                fillOpacity={labeled ? 0.95 : 0.65}
+                stroke="var(--color-void)"
+                strokeWidth={1}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.4, delay: Math.min(0.3, p._i * 0.003) }}
                 onMouseEnter={() => setHover(p)}
                 onMouseLeave={() => setHover(null)}
@@ -349,65 +397,62 @@ export default function ScatterPlot({
             );
           })}
 
-          {/* Points — outliers (colored + labeled) */}
-          {labeledPoints.map((p) => {
-            if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
-            const highlight = p._highlight;
-            const outlier = p._outlier;
-            if (!(highlight || outlier)) return null;
-            const cx = xScale(p.x);
-            const cy = yScale(p.y);
-            const color = highlight
-              ? 'var(--color-accent)'
-              : colorMap[p.category] || DEFAULT_PALETTE[0];
+          {/* Highlighted points (accent) */}
+          {classified.map((p) => {
+            if (!p._valid || !p._highlight) return null;
             return (
-              <g key={`ptH-${p._i}`}>
-                <motion.circle
-                  cx={cx}
-                  cy={cy}
-                  r={highlight ? 6.5 : 5.5}
-                  fill={color}
-                  stroke="var(--color-void)"
-                  strokeWidth={1.5}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20, delay: Math.min(0.4, p._i * 0.003) }}
-                  onMouseEnter={() => setHover(p)}
-                  onMouseLeave={() => setHover(null)}
-                  onClick={() => onPointClick && onPointClick(p)}
-                  style={{ cursor: onPointClick ? 'pointer' : 'default' }}
-                />
-                <text
-                  x={cx + 9}
-                  y={cy + 3}
-                  fontSize={highlight ? 11 : 10}
-                  fontFamily="var(--font-body)"
-                  fontWeight={highlight ? 700 : 500}
-                  fill={highlight ? color : 'var(--color-text-primary)'}
-                  style={{ pointerEvents: 'none' }}
-                >
-                  {p.label}
-                </text>
-              </g>
+              <motion.circle
+                key={`h-${p._i}`}
+                cx={p._cx}
+                cy={p._cy}
+                r={6.5}
+                fill={HIGHLIGHT_COLOR}
+                stroke="var(--color-void)"
+                strokeWidth={1.5}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20, delay: Math.min(0.35, p._i * 0.003) }}
+                onMouseEnter={() => setHover(p)}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => onPointClick && onPointClick(p)}
+                style={{ cursor: onPointClick ? 'pointer' : 'default' }}
+              />
             );
           })}
 
-          {/* Hover cursor crosshair */}
-          {hover && Number.isFinite(hover.x) && Number.isFinite(hover.y) && (
+          {/* Labels — placed with anti-collision */}
+          {placedLabels.map((l) => (
+            <text
+              key={`lbl-${l.id}`}
+              x={l.tx}
+              y={l.ty}
+              textAnchor={l.anchor}
+              fontSize={l.highlight ? 11 : 10}
+              fontFamily="var(--font-body)"
+              fontWeight={l.highlight ? 700 : 500}
+              fill={l.highlight ? HIGHLIGHT_COLOR : 'var(--color-text-primary)'}
+              style={{ pointerEvents: 'none' }}
+            >
+              {l.label}
+            </text>
+          ))}
+
+          {/* Hover crosshair */}
+          {hover && hover._valid && (
             <>
               <line
                 x1={0}
                 x2={innerW}
-                y1={yScale(hover.y)}
-                y2={yScale(hover.y)}
+                y1={hover._cy}
+                y2={hover._cy}
                 stroke="rgba(227, 6, 19, 0.35)"
                 strokeWidth={1}
                 strokeDasharray="2 3"
                 pointerEvents="none"
               />
               <line
-                x1={xScale(hover.x)}
-                x2={xScale(hover.x)}
+                x1={hover._cx}
+                x2={hover._cx}
                 y1={0}
                 y2={innerH}
                 stroke="rgba(227, 6, 19, 0.35)"
@@ -460,31 +505,14 @@ export default function ScatterPlot({
         )}
       </svg>
 
-      {/* ── Legend + hover tooltip ───────────────────────────── */}
+      {/* Compact legend + hover readout */}
       <div className="flex items-center justify-between mt-3 px-1">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <div className="flex items-center gap-4">
           {highlightCategories.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
-              <span className="text-[10px] font-[var(--font-display)] tracking-[0.12em] uppercase" style={{ color: 'var(--color-text-secondary)' }}>
-                Destaque
-              </span>
-            </div>
+            <LegendDot color="var(--color-accent)" label="Destaque" />
           )}
-          {legendEntries.map(([cat, color]) => (
-            <div key={cat} className="flex items-center gap-1.5">
-              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: color }} />
-              <span className="text-[10px] font-[var(--font-display)] tracking-[0.12em] uppercase" style={{ color: 'var(--color-text-secondary)' }}>
-                {cat}
-              </span>
-            </div>
-          ))}
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(161, 161, 170, 0.6)' }} />
-            <span className="text-[10px] font-[var(--font-display)] tracking-[0.12em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
-              Amostra
-            </span>
-          </div>
+          <LegendDot color={OUTLIER_COLOR} label={`Acima da média (+${minOutlierSigma}σ)`} />
+          <LegendDot color="rgba(161, 161, 170, 0.7)" label="Amostra" />
         </div>
         <div className="text-[10px] font-[var(--font-mono)]" style={{ color: 'var(--color-text-muted)' }}>
           {hover ? (
@@ -499,6 +527,20 @@ export default function ScatterPlot({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function LegendDot({ color, label }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: color }} />
+      <span
+        className="text-[10px] font-[var(--font-display)] tracking-[0.12em] uppercase"
+        style={{ color: 'var(--color-text-secondary)' }}
+      >
+        {label}
+      </span>
     </div>
   );
 }
