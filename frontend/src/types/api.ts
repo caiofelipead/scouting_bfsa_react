@@ -71,6 +71,7 @@ export interface RankingEntry {
   display_name: string | null;
   team: string | null;
   age: number | null;
+  nationality: string | null;
   league: string | null;
   minutes: number | null;
   score: number;

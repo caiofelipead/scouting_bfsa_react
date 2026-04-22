@@ -1485,6 +1485,7 @@ async def get_rankings(
             display_name=str(row.get("JogadorDisplay", row.get("Jogador", ""))),
             team=team_name,
             age=_safe_float(row.get("Idade")),
+            nationality=str(row.get("Naturalidade", "")) if pd.notna(row.get("Naturalidade")) else None,
             league=rank_league_actual,
             minutes=_safe_float(row.get("Minutos jogados:")),
             score=round(float(row.get("Score", 0)), 1),

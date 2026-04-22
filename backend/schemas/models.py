@@ -92,6 +92,7 @@ class RankingEntry(BaseModel):
     display_name: Optional[str] = None
     team: Optional[str] = None
     age: Optional[float] = None
+    nationality: Optional[str] = None
     league: Optional[str] = None
     minutes: Optional[float] = None
     score: float
