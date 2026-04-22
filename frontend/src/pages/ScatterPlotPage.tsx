@@ -203,7 +203,7 @@ export default function ScatterPlotPage() {
       <div className="card-glass p-4">
         {isLoading ? (
           <div className="skeleton h-[520px] w-full rounded-lg" />
-        ) : pointsWithHighlights.length === 0 ? (
+        ) : scatterPoints.length === 0 ? (
           <div className="py-20 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
             Nenhum dado disponivel para os filtros selecionados.
           </div>
