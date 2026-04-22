@@ -25,6 +25,7 @@ import {
   RefreshCw,
   Check,
   Lock,
+  ScatterChart,
 } from 'lucide-react';
 import type { User } from '../types/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -50,6 +51,7 @@ export type TabId =
   | 'coaches'
   | 'shadow_team'
   | 'player_card'
+  | 'scatterplot'
   | 'access_control';
 
 interface LayoutProps {
@@ -65,6 +67,7 @@ const NAV_SECTIONS: { title?: string; items: { id: TabId; label: string; icon: R
     title: 'ANALISE',
     items: [
       { id: 'dashboard', label: 'Dashboard Geral', icon: <BarChart3 size={18} strokeWidth={1.5} /> },
+      { id: 'scatterplot', label: 'Scatter Plot', icon: <ScatterChart size={18} strokeWidth={1.5} /> },
       { id: 'indices', label: 'Indices', icon: <FileBarChart size={18} strokeWidth={1.5} /> },
       { id: 'report', label: 'Relatorio', icon: <FileText size={18} strokeWidth={1.5} /> },
       { id: 'comparison', label: 'Comparativo', icon: <ArrowLeftRight size={18} strokeWidth={1.5} /> },
