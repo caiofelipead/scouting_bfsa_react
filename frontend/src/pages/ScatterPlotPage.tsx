@@ -11,7 +11,7 @@ interface ScatterPoint {
   x: number;
   y: number;
   label: string;
-  category: string;
+  category: string | null;
   team: string | null;
   age: number | null;
   minutes: number | null;
@@ -54,29 +54,7 @@ export default function ScatterPlotPage() {
   const effectiveX = xAxis || availableIndices[0] || '';
   const effectiveY = yAxis || availableIndices[1] || availableIndices[0] || '';
 
-  // Build scatter points
-  const scatterPoints = useMemo<ScatterPoint[]>(() => {
-    if (!effectiveX || !effectiveY) return [];
-    return players
-      .map<ScatterPoint | null>((p) => {
-        const x = p.indices?.[effectiveX];
-        const y = p.indices?.[effectiveY];
-        if (typeof x !== 'number' || typeof y !== 'number') return null;
-        return {
-          x,
-          y,
-          label: p.display_name || p.name,
-          category: p.league || 'Sem liga',
-          team: p.team,
-          age: p.age,
-          minutes: p.minutes,
-          meta: p,
-        };
-      })
-      .filter((v): v is ScatterPoint => v !== null);
-  }, [players, effectiveX, effectiveY]);
-
-  // Highlight top-N by Score (SSP) so they stand out in accent red
+  // Top-3 SSP are rendered in accent red + always labeled.
   const highlightLabels = useMemo(
     () => new Set(
       [...players]
@@ -87,12 +65,27 @@ export default function ScatterPlotPage() {
     [players],
   );
 
-  // Rewrite scatter points: if top-3 SSP, put them in special category "TOP SSP" for red highlight.
-  const pointsWithHighlights = useMemo<ScatterPoint[]>(() => {
-    return scatterPoints.map((p) => (
-      highlightLabels.has(p.label) ? { ...p, category: 'TOP SSP' } : p
-    ));
-  }, [scatterPoints, highlightLabels]);
+  const scatterPoints = useMemo<ScatterPoint[]>(() => {
+    if (!effectiveX || !effectiveY) return [];
+    return players
+      .map<ScatterPoint | null>((p) => {
+        const x = p.indices?.[effectiveX];
+        const y = p.indices?.[effectiveY];
+        if (typeof x !== 'number' || typeof y !== 'number') return null;
+        const label = p.display_name || p.name;
+        return {
+          x,
+          y,
+          label,
+          category: highlightLabels.has(label) ? 'TOP SSP' : null,
+          team: p.team,
+          age: p.age,
+          minutes: p.minutes,
+          meta: p,
+        };
+      })
+      .filter((v): v is ScatterPoint => v !== null);
+  }, [players, effectiveX, effectiveY, highlightLabels]);
 
   return (
     <div className="space-y-5">
@@ -216,7 +209,7 @@ export default function ScatterPlotPage() {
           </div>
         ) : (
           <ScatterPlot
-            points={pointsWithHighlights}
+            points={scatterPoints}
             xLabel={effectiveX}
             yLabel={effectiveY}
             title={`${effectiveY} vs ${effectiveX}`}
@@ -224,6 +217,7 @@ export default function ScatterPlotPage() {
             footnote={`*Amostra de ${players.length} jogadores · outliers destacados > μ + ${minSigma}σ`}
             minOutlierSigma={minSigma}
             highlightCategories={['TOP SSP']}
+            maxLabels={12}
             onPointClick={(pt: ScatterPoint) => setSelectedPlayer(pt.label)}
           />
         )}
