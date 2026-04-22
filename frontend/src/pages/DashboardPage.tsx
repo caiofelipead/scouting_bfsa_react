@@ -6,6 +6,11 @@ import { usePlayers, usePositions, useLeagues } from '../hooks/usePlayers';
 import { cn, getScoreColor, formatNumber } from '../lib/utils';
 import { proxyImageUrl, isProxyFallback } from '../lib/api';
 import type { PlayersQueryParams } from '../types/api';
+import PlayerFiltersBar, {
+  applyPlayerFilters,
+  EMPTY_PLAYER_FILTERS,
+  type PlayerFilterState,
+} from '../components/PlayerFiltersBar';
 
 function PlayerPhoto({ url, alt, size = 'sm' }: { url: string | null; alt: string; size?: 'sm' | 'lg' }) {
   const [failed, setFailed] = useState(false);
@@ -71,6 +76,7 @@ export default function DashboardPage() {
   const [maxAge, setMaxAge] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [clientFilters, setClientFilters] = useState<PlayerFilterState>(EMPTY_PLAYER_FILTERS);
 
   const { data: positions = [] } = usePositions();
   const { data: leagues = [] } = useLeagues();
@@ -90,15 +96,24 @@ export default function DashboardPage() {
     min_age: minAge ? Number(minAge) : undefined,
     max_age: maxAge ? Number(maxAge) : undefined,
     min_minutes: 0,
-    limit: 30,
+    limit: 120,
   }), [debouncedSearch, position, league, minAge, maxAge]);
 
   const { data, isLoading, isFetching } = usePlayers(queryParams);
-  // Sort players by SSP (scout_score) descending
-  const players = useMemo(() => {
+  // Sort players by SSP (scout_score) descending, then apply client-side refinements.
+  const sortedPlayers = useMemo(() => {
     const list = data?.players ?? [];
     return [...list].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   }, [data]);
+  const players = useMemo(
+    () => applyPlayerFilters(sortedPlayers, clientFilters),
+    [sortedPlayers, clientFilters],
+  );
+  const availableNationalities = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of sortedPlayers) if (p.nationality) set.add(p.nationality);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [sortedPlayers]);
   const total = data?.total ?? 0;
 
   return (
@@ -235,6 +250,16 @@ export default function DashboardPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Client-side refinements (operate on the loaded window) */}
+        <div className="pt-2">
+          <PlayerFiltersBar
+            value={clientFilters}
+            onChange={setClientFilters}
+            nationalities={availableNationalities}
+            hiddenFields={['nameQuery', 'ageMin', 'ageMax']}
+          />
+        </div>
       </div>
 
       {/* Content: list + profile */}

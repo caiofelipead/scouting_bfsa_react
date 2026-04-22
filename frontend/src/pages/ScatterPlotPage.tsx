@@ -5,6 +5,11 @@ import { ScatterChart as ScatterIcon, SlidersHorizontal } from 'lucide-react';
 import ScatterPlot from '../components/ScatterPlot';
 import { useRankings, usePositions, useLeagues } from '../hooks/usePlayers';
 import PlayerProfile from '../components/PlayerProfile';
+import PlayerFiltersBar, {
+  applyPlayerFilters,
+  EMPTY_PLAYER_FILTERS,
+  type PlayerFilterState,
+} from '../components/PlayerFiltersBar';
 import type { RankingsQueryParams, RankingEntry } from '../types/api';
 
 interface ScatterPoint {
@@ -18,15 +23,24 @@ interface ScatterPoint {
   meta: RankingEntry;
 }
 
+const DEFAULT_TOP_N = 300;
+
 export default function ScatterPlotPage() {
+  // ── Server-side (affect /api/rankings query) ──
   const [position, setPosition] = useState<string>('Atacante');
   const [league, setLeague] = useState<string>('');
   const [minMinutes, setMinMinutes] = useState<number>(500);
-  const [topN] = useState<number>(150);
+  const [topN, setTopN] = useState<number>(DEFAULT_TOP_N);
+
+  // ── Client-side refinements ──
+  const [filters, setFilters] = useState<PlayerFilterState>(EMPTY_PLAYER_FILTERS);
+
+  // ── Chart config ──
   const [xAxis, setXAxis] = useState<string>('');
   const [yAxis, setYAxis] = useState<string>('');
-  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [minSigma, setMinSigma] = useState<number>(1);
+
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
 
   const { data: positions = [] } = usePositions();
   const { data: leagues = [] } = useLeagues();
@@ -39,35 +53,48 @@ export default function ScatterPlotPage() {
   }), [position, minMinutes, league, topN]);
 
   const { data, isLoading, isFetching } = useRankings(queryParams);
-  const players = data?.players ?? [];
+  const rawPlayers = data?.players ?? [];
 
-  // Available indices from the first player (they all share the same keys per position)
+  // Derived lists for dropdowns (from the currently-loaded dataset)
   const availableIndices = useMemo(() => {
     const set = new Set<string>();
-    for (const p of players) {
+    for (const p of rawPlayers) {
       for (const k of Object.keys(p.indices || {})) set.add(k);
     }
     return Array.from(set);
-  }, [players]);
+  }, [rawPlayers]);
 
-  // Seed axis choices when available
+  const availableNationalities = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of rawPlayers) {
+      if (p.nationality) set.add(p.nationality);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [rawPlayers]);
+
+  // Apply client-side filters
+  const filteredPlayers = useMemo(
+    () => applyPlayerFilters(rawPlayers, filters),
+    [rawPlayers, filters],
+  );
+
   const effectiveX = xAxis || availableIndices[0] || '';
   const effectiveY = yAxis || availableIndices[1] || availableIndices[0] || '';
 
-  // Top-3 SSP are rendered in accent red + always labeled.
+  // Top-3 SSP among the filtered players are highlighted.
   const highlightLabels = useMemo(
     () => new Set(
-      [...players]
+      [...filteredPlayers]
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
         .slice(0, 3)
         .map((p) => p.display_name || p.name),
     ),
-    [players],
+    [filteredPlayers],
   );
 
   const scatterPoints = useMemo<ScatterPoint[]>(() => {
     if (!effectiveX || !effectiveY) return [];
-    return players
+    return filteredPlayers
       .map<ScatterPoint | null>((p) => {
         const x = p.indices?.[effectiveX];
         const y = p.indices?.[effectiveY];
@@ -85,7 +112,7 @@ export default function ScatterPlotPage() {
         };
       })
       .filter((v): v is ScatterPoint => v !== null);
-  }, [players, effectiveX, effectiveY, highlightLabels]);
+  }, [filteredPlayers, effectiveX, effectiveY, highlightLabels]);
 
   return (
     <div className="space-y-5">
@@ -97,7 +124,7 @@ export default function ScatterPlotPage() {
             Scatter Plot
           </h1>
           <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-            Plote quaisquer dois indices com destaque automatico de outliers (media ± {minSigma}·SD).
+            Filtre por posição, liga, idade, nacionalidade, time e score; escolha dois índices para plotar.
           </p>
         </div>
         <div className="flex items-center gap-2 text-[10px] font-[var(--font-mono)]" style={{ color: 'var(--color-text-muted)' }}>
@@ -109,12 +136,13 @@ export default function ScatterPlotPage() {
               style={{ width: 12, height: 12 }}
             />
           )}
-          <span>{players.length} jogadores</span>
+          <span>{filteredPlayers.length} / {rawPlayers.length} jogadores</span>
         </div>
       </div>
 
       {/* Filter bar */}
-      <div className="card-glass p-4">
+      <div className="card-glass p-4 space-y-3">
+        {/* Row 1 — core query (drives backend request) */}
         <div className="flex flex-wrap items-end gap-3">
           <FilterGroup label="POSICAO">
             <select
@@ -145,8 +173,22 @@ export default function ScatterPlotPage() {
             <input
               type="number"
               value={minMinutes}
+              min={0}
               onChange={(e) => setMinMinutes(Number(e.target.value) || 0)}
-              className="input-thin w-24"
+              className="input-thin w-20"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+          </FilterGroup>
+
+          <FilterGroup label="TOP N">
+            <input
+              type="number"
+              value={topN}
+              min={20}
+              max={500}
+              step={50}
+              onChange={(e) => setTopN(Math.min(500, Math.max(20, Number(e.target.value) || DEFAULT_TOP_N)))}
+              className="input-thin w-20"
               style={{ fontFamily: 'var(--font-mono)' }}
             />
           </FilterGroup>
@@ -197,6 +239,15 @@ export default function ScatterPlotPage() {
             </div>
           </FilterGroup>
         </div>
+
+        {/* Row 2 — client-side refinements */}
+        <div className="pt-3" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+          <PlayerFiltersBar
+            value={filters}
+            onChange={setFilters}
+            nationalities={availableNationalities}
+          />
+        </div>
       </div>
 
       {/* Chart */}
@@ -205,7 +256,7 @@ export default function ScatterPlotPage() {
           <div className="skeleton h-[520px] w-full rounded-lg" />
         ) : scatterPoints.length === 0 ? (
           <div className="py-20 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Nenhum dado disponivel para os filtros selecionados.
+            Nenhum jogador corresponde aos filtros atuais.
           </div>
         ) : (
           <ScatterPlot
@@ -213,8 +264,8 @@ export default function ScatterPlotPage() {
             xLabel={effectiveX}
             yLabel={effectiveY}
             title={`${effectiveY} vs ${effectiveX}`}
-            subtitle={`${position} · ${league || 'Todas as ligas'} · minutos ≥ ${minMinutes}`}
-            footnote={`*Amostra de ${players.length} jogadores · outliers destacados > μ + ${minSigma}σ`}
+            subtitle={buildSubtitle({ position, league, minMinutes, filters })}
+            footnote={`*Amostra de ${scatterPoints.length} jogadores · outliers destacados > μ + ${minSigma}σ`}
             minOutlierSigma={minSigma}
             highlightCategories={['TOP SSP']}
             maxLabels={12}
@@ -250,6 +301,23 @@ export default function ScatterPlotPage() {
       `}</style>
     </div>
   );
+}
+
+function buildSubtitle(f: {
+  position: string;
+  league: string;
+  minMinutes: number;
+  filters: PlayerFilterState;
+}): string {
+  const { filters: ff } = f;
+  const parts: string[] = [f.position, f.league || 'Todas as ligas', `minutos ≥ ${f.minMinutes}`];
+  if (ff.ageMin || ff.ageMax) parts.push(`idade ${ff.ageMin || '—'}–${ff.ageMax || '—'}`);
+  if (ff.nationality) parts.push(ff.nationality);
+  if (ff.teamQuery) parts.push(`time: "${ff.teamQuery}"`);
+  if (ff.nameQuery) parts.push(`nome: "${ff.nameQuery}"`);
+  if (ff.minScore) parts.push(`SSP ≥ ${ff.minScore}`);
+  if (ff.maxMinutes) parts.push(`minutos ≤ ${ff.maxMinutes}`);
+  return parts.join(' · ');
 }
 
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
