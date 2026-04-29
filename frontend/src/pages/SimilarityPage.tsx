@@ -51,11 +51,11 @@ export default function SimilarityPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <Users size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <Users size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Similaridade
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="page-subtitle">
           Cosine similarity ponderada por posicao + proximity bonus (POSITION_WEIGHTS)
         </p>
       </div>
@@ -75,7 +75,7 @@ export default function SimilarityPage() {
       <div className="card-glass rounded-lg p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-end">
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
               JOGADOR REFERENCIA
             </label>
             <div className="relative">
@@ -109,7 +109,7 @@ export default function SimilarityPage() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
             <select value={position} onChange={(e) => setPosition(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
               {positions.length > 0 ? (
                 positions.map((p) => <option key={p} value={p}>{p}</option>)
@@ -129,12 +129,12 @@ export default function SimilarityPage() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>TOP N</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>TOP N</label>
             <input type="number" value={topN} onChange={(e) => setTopN(Number(e.target.value))} className="w-16 px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }} />
           </div>
 
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>MIN MIN</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>MIN MIN</label>
             <input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} className="w-20 px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }} />
           </div>
 
@@ -153,7 +153,7 @@ export default function SimilarityPage() {
       {result && (
         <div className="card-glass rounded-lg overflow-hidden">
           <div className="px-4 py-2.5" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-            <span className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-[11px] font-[var(--font-display)] tracking-[0.14em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>
               SIMILARES A {result.reference_player} ({result.position}) — {result.similar_players.length} resultados
             </span>
           </div>
@@ -161,11 +161,11 @@ export default function SimilarityPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                  <th className="px-3 py-2.5 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>#</th>
-                  <th className="px-3 py-2.5 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Jogador</th>
-                  <th className="px-3 py-2.5 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Equipa</th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Metricas</th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-accent)' }}>Similaridade</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>#</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>Jogador</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>Equipa</th>
+                  <th className="px-3 py-2.5 text-right text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>Metricas</th>
+                  <th className="px-3 py-2.5 text-right text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-accent)' }}>Similaridade</th>
                 </tr>
               </thead>
               <tbody>

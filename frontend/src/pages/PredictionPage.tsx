@@ -59,11 +59,11 @@ export default function PredictionPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <Target size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <Target size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Predicao de Sucesso
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="page-subtitle">
           Modelo baseado em SSP + idade + nivel da liga + minutagem
         </p>
       </div>
@@ -77,7 +77,7 @@ export default function PredictionPage() {
       <div className="card-glass rounded-lg p-5 space-y-4" style={{ overflow: 'visible' }}>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3 items-end" style={{ overflow: 'visible' }}>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR</label>
             <div className="relative">
               <input type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)} placeholder="Digite o nome..." className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
               {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
@@ -93,13 +93,13 @@ export default function PredictionPage() {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>LIGA ORIGEM</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>LIGA ORIGEM</label>
             <select value={leagueOrigin} onChange={(e) => setLeagueOrigin(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
               {LIGAS.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>LIGA ALVO</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>LIGA ALVO</label>
             <select value={leagueTarget} onChange={(e) => setLeagueTarget(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
               {LIGAS.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
@@ -128,25 +128,25 @@ export default function PredictionPage() {
           {/* Main metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-glass rounded-lg p-4 text-center">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>SSP</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>SSP</div>
               <div className="text-2xl font-[var(--font-mono)] font-bold mt-1" style={{ color: getScoreColor(result.ssp_score) }}>{result.ssp_score.toFixed(1)}</div>
               <div className="text-[9px]" style={{ color: 'var(--color-text-muted)' }}>/100</div>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-glass rounded-lg p-4 text-center">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>P(SUCESSO)</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>P(SUCESSO)</div>
               <div className="text-2xl font-[var(--font-mono)] font-bold mt-1" style={{ color: pred.success_probability >= 0.65 ? '#22c55e' : pred.success_probability >= 0.40 ? '#eab308' : '#ef4444' }}>
                 {(pred.success_probability * 100).toFixed(0)}%
               </div>
               <div className="text-[9px]" style={{ color: 'var(--color-text-muted)' }}>Probabilidade</div>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card-glass rounded-lg p-4 text-center">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>RISCO</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>RISCO</div>
               <div className="text-xl font-[var(--font-display)] font-bold mt-1 uppercase" style={{ color: riskColors[pred.risk_level] || '#6b7280' }}>
                 {pred.risk_level}
               </div>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card-glass rounded-lg p-4 text-center">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>GAP DE LIGA</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>GAP DE LIGA</div>
               <div className="text-2xl font-[var(--font-mono)] font-bold mt-1" style={{ color: pred.league_gap > 2 ? '#ef4444' : pred.league_gap > 0 ? '#eab308' : '#22c55e' }}>
                 {pred.league_gap > 0 ? '+' : ''}{pred.league_gap.toFixed(1)}
               </div>
@@ -156,7 +156,7 @@ export default function PredictionPage() {
 
           {/* Factor decomposition */}
           <div className="card-glass rounded-lg p-5">
-            <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase mb-4" style={{ color: 'var(--color-text-muted)' }}>DECOMPOSICAO DOS FATORES</div>
+            <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase mb-4" style={{ color: 'var(--color-text-muted)' }}>DECOMPOSICAO DOS FATORES</div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
                 { label: 'SSP Ajustado', value: pred.ssp_contribution, fmt: (v: number) => v.toFixed(3), help: 'SSP descontado pela liga de origem' },

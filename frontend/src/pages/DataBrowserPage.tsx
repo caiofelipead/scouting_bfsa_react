@@ -59,11 +59,11 @@ export default function DataBrowserPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <Database size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <Database size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Dados
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Explorar dados brutos de todas as fontes</p>
+        <p className="page-subtitle">Explorar dados brutos de todas as fontes</p>
       </div>
 
       {error && (
@@ -113,7 +113,7 @@ export default function DataBrowserPage() {
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
                 {(data?.columns ?? []).map(col => (
-                  <th key={col} className="px-3 py-2.5 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
+                  <th key={col} className="px-3 py-2.5 text-left text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
                     {col}
                   </th>
                 ))}

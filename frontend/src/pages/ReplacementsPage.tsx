@@ -80,11 +80,11 @@ export default function ReplacementsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <Users size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <Users size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Substitutos
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="page-subtitle">
           Motor de substituicao multi-metodo — KickClone (2025), Cosine + Mahalanobis + Cluster
         </p>
       </div>
@@ -98,7 +98,7 @@ export default function ReplacementsPage() {
       <div className="card-glass rounded-lg p-5 space-y-4" style={{ overflow: 'visible' }}>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3 items-end" style={{ overflow: 'visible' }}>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR ALVO</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR ALVO</label>
             <div className="relative">
               <input type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)} placeholder="Buscar jogador para substituir..." className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
               {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
@@ -114,21 +114,21 @@ export default function ReplacementsPage() {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
             <select value={position} onChange={(e) => setPosition(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
               <option value="">Auto</option>
               {(positions || []).map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>IDADE</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>IDADE</label>
             <div className="flex gap-1">
               <input type="number" value={ageMin} onChange={(e) => setAgeMin(e.target.value)} placeholder="Min" className="w-16 px-2 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
               <input type="number" value={ageMax} onChange={(e) => setAgeMax(e.target.value)} placeholder="Max" className="w-16 px-2 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>TOP N</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>TOP N</label>
             <input type="number" value={topN} onChange={(e) => setTopN(Number(e.target.value))} className="w-16 px-2 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
           </div>
           <button

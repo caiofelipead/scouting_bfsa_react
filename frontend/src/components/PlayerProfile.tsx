@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Video,
   DollarSign,
+  Activity,
 } from 'lucide-react';
 import RadarChart from './RadarChart';
 import PositionPitch from './PositionPitch';
@@ -182,7 +183,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span
-                  className="px-2.5 py-1 rounded-full text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold"
+                  className="px-2.5 py-1 rounded-full text-[11px] font-[var(--font-display)] tracking-[0.14em] font-semibold uppercase"
                   style={{
                     background: 'var(--color-accent-glow)',
                     color: 'var(--color-accent)',
@@ -235,31 +236,31 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                 )}
 
                 {/* Meta row */}
-                <div className="flex flex-wrap items-center gap-4 mt-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3">
                   {summary.age && (
-                    <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      <User size={12} strokeWidth={1.5} />
-                      {summary.age} anos
+                    <span className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--color-text-secondary)' }}>
+                      <User size={13} strokeWidth={1.75} style={{ color: 'var(--color-text-muted)' }} />
+                      <span className="stat-num font-semibold">{summary.age}</span> anos
                     </span>
                   )}
                   {summary.nationality && (
-                    <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    <span className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--color-text-secondary)' }}>
                       {getFlagUrl(summary.nationality) ? (
                         <img
                           src={getFlagUrl(summary.nationality, 20)!}
                           alt={summary.nationality}
-                          style={{ width: 16, height: 12, objectFit: 'cover', borderRadius: 1 }}
+                          style={{ width: 18, height: 13, objectFit: 'cover', borderRadius: 2 }}
                         />
                       ) : (
-                        <MapPin size={12} strokeWidth={1.5} />
+                        <MapPin size={13} strokeWidth={1.75} style={{ color: 'var(--color-text-muted)' }} />
                       )}
                       {summary.nationality}
                     </span>
                   )}
                   {summary.minutes_played && (
-                    <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      <Clock size={12} strokeWidth={1.5} />
-                      {formatNumber(summary.minutes_played)} min
+                    <span className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--color-text-secondary)' }}>
+                      <Clock size={13} strokeWidth={1.75} style={{ color: 'var(--color-text-muted)' }} />
+                      <span className="stat-num font-semibold">{formatNumber(summary.minutes_played)}</span> min
                     </span>
                   )}
                 </div>
@@ -273,26 +274,23 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
           {/* Scout Score bar */}
           {scout_score !== null && (
             <div
-              className="px-6 py-3 flex items-center justify-between"
-              style={{ borderTop: '1px solid var(--color-border-subtle)' }}
+              className="px-6 py-3.5 flex items-center justify-between"
+              style={{ borderTop: '1px solid var(--color-border-active)' }}
             >
               <div className="flex items-center gap-2">
-                <Target size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
-                <span
-                  className="text-xs font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  SSP (SCOUT SCORE PREDITIVO)
+                <Target size={15} strokeWidth={1.75} style={{ color: 'var(--color-accent)' }} />
+                <span className="eyebrow-strong" style={{ color: 'var(--color-text-secondary)' }}>
+                  SSP — Scout Score Preditivo
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-[var(--font-mono)] font-bold', getScoreClass(scout_score))}>
+                <span className={cn('px-3 py-1 rounded-md text-[14px] stat-num font-bold', getScoreClass(scout_score))}>
                   {scout_score.toFixed(1)}
                 </span>
                 {performance_class && (
                   <span
-                    className="text-[10px] font-[var(--font-display)] tracking-[0.1em]"
-                    style={{ color: 'var(--color-text-muted)' }}
+                    className="text-[11px] font-[var(--font-display)] tracking-[0.1em] font-semibold uppercase"
+                    style={{ color: 'var(--color-text-secondary)' }}
                   >
                     {getPerformanceLabel(performance_class)}
                   </span>
@@ -304,27 +302,28 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
           {/* Projection Score (PDI) bar */}
           {projection_score !== null && projection_score !== undefined && (
             <div
-              className="px-6 py-3 flex items-center justify-between"
+              className="px-6 py-3.5 flex items-center justify-between"
               style={{ borderTop: '1px solid var(--color-border-subtle)' }}
             >
               <div className="flex items-center gap-2">
-                <TrendingUp size={14} strokeWidth={1.5} style={{ color: getPdiColor(projection_score) }} />
-                <span
-                  className="text-xs font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  NOTA DE PROJECAO (PDI)
+                <TrendingUp size={15} strokeWidth={1.75} style={{ color: getPdiColor(projection_score) }} />
+                <span className="eyebrow-strong" style={{ color: 'var(--color-text-secondary)' }}>
+                  Nota de Projeção (PDI)
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <span
-                  className="px-2.5 py-0.5 rounded-full text-xs font-[var(--font-mono)] font-bold"
-                  style={{ color: getPdiColor(projection_score), background: `${getPdiColor(projection_score)}15` }}
+                  className="px-3 py-1 rounded-md text-[14px] stat-num font-bold"
+                  style={{
+                    color: getPdiColor(projection_score),
+                    background: `${getPdiColor(projection_score)}1F`,
+                    border: `1px solid ${getPdiColor(projection_score)}40`,
+                  }}
                 >
                   {projection_score.toFixed(1)}
                 </span>
                 <span
-                  className="text-[10px] font-[var(--font-display)] tracking-[0.1em]"
+                  className="text-[11px] font-[var(--font-display)] tracking-[0.1em] font-semibold uppercase"
                   style={{ color: getPdiColor(projection_score) }}
                 >
                   {getPdiLabel(projection_score)}
@@ -339,12 +338,9 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
           <motion.div variants={fadeUp} className="card-glass overflow-hidden">
             <div className="p-6">
               <div className="flex items-center gap-2 mb-4">
-                <FileText size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
-                <span
-                  className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  ANALISE DO SCOUT
+                <FileText size={15} strokeWidth={1.75} style={{ color: 'var(--color-accent)' }} />
+                <span className="eyebrow-strong">
+                  Análise do Scout
                 </span>
                 {analises.modelo && (
                   <span
@@ -375,11 +371,11 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                         border: '1px solid var(--color-border-subtle)',
                       }}
                     >
-                      <div className="text-[9px] mb-1 leading-tight uppercase" style={{ color: 'var(--color-text-muted)' }}>
+                      <div className="text-[10px] mb-1.5 leading-tight uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>
                         {SCORE_LABELS[key] || key}
                       </div>
                       <div
-                        className="text-xl font-[var(--font-mono)] font-bold"
+                        className="text-[22px] stat-num font-bold"
                         style={{ color: getAnalysisScoreColor(value) }}
                       >
                         {value.toFixed(1)}
@@ -392,15 +388,15 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               {/* Analysis text */}
               {analises.analysis_text && (
                 <div
-                  className="text-xs leading-relaxed p-3 rounded-lg mb-4"
+                  className="text-[13px] leading-relaxed p-4 rounded-lg mb-4"
                   style={{
                     background: 'var(--color-surface-2)',
                     color: 'var(--color-text-secondary)',
                     border: '1px solid var(--color-border-subtle)',
                   }}
                 >
-                  <div className="text-[9px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold mb-2" style={{ color: 'var(--color-text-muted)' }}>
-                    PARECER
+                  <div className="eyebrow mb-2.5">
+                    Parecer
                   </div>
                   {analises.analysis_text}
                 </div>
@@ -410,17 +406,17 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
               {(analises.faixa_salarial || analises.transfer_luvas) && (
                 <div className="flex flex-wrap gap-3 mb-4">
                   {analises.faixa_salarial && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px]" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
-                      <DollarSign size={11} strokeWidth={1.5} style={{ color: 'var(--color-text-muted)' }} />
-                      <span style={{ color: 'var(--color-text-muted)' }}>Salario:</span>
-                      <span style={{ color: 'var(--color-text-primary)' }}>{analises.faixa_salarial}</span>
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-[12px]" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+                      <DollarSign size={13} strokeWidth={1.75} style={{ color: 'var(--color-text-muted)' }} />
+                      <span className="eyebrow" style={{ fontSize: '10px' }}>Salário:</span>
+                      <span className="font-semibold stat-num" style={{ color: 'var(--color-text-primary)' }}>{analises.faixa_salarial}</span>
                     </div>
                   )}
                   {analises.transfer_luvas && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px]" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
-                      <DollarSign size={11} strokeWidth={1.5} style={{ color: 'var(--color-text-muted)' }} />
-                      <span style={{ color: 'var(--color-text-muted)' }}>Transfer/Luvas:</span>
-                      <span style={{ color: 'var(--color-text-primary)' }}>{analises.transfer_luvas}</span>
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-[12px]" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+                      <DollarSign size={13} strokeWidth={1.75} style={{ color: 'var(--color-text-muted)' }} />
+                      <span className="eyebrow" style={{ fontSize: '10px' }}>Transfer/Luvas:</span>
+                      <span className="font-semibold stat-num" style={{ color: 'var(--color-text-primary)' }}>{analises.transfer_luvas}</span>
                     </div>
                   )}
                 </div>
@@ -469,12 +465,9 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
           {/* Radar */}
           <motion.div variants={fadeUp} className="card-glass p-6">
             <div className="flex items-center gap-2 mb-4">
-              <BarChart3 size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
-              <span
-                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                PERCENTIS POR POSICAO
+              <BarChart3 size={15} strokeWidth={1.75} style={{ color: 'var(--color-accent)' }} />
+              <span className="eyebrow-strong">
+                Percentis por Posição
               </span>
             </div>
             {radarData && radarData.labels.length > 0 ? (
@@ -490,13 +483,13 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
 
             {/* Percentile detail grid */}
             {percentiles && Object.keys(percentiles).length > 0 && (
-              <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1">
+              <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-1.5 pt-4" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
                 {Object.entries(percentiles).map(([metric, value]) => (
                   <div key={metric} className="flex items-center justify-between">
-                    <span className="text-[10px] truncate pr-1" style={{ color: 'var(--color-text-muted)' }}>
+                    <span className="text-[11px] truncate pr-2" style={{ color: 'var(--color-text-secondary)' }}>
                       {metric}
                     </span>
-                    <span className="text-[10px] font-[var(--font-mono)] font-semibold" style={{ color: getScoreColor(value) }}>
+                    <span className="text-[11px] stat-num font-bold" style={{ color: getScoreColor(value) }}>
                       P{value.toFixed(0)}
                     </span>
                   </div>
@@ -508,15 +501,12 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
           {/* Composite Indices */}
           <motion.div variants={fadeUp} className="card-glass p-6 flex flex-col">
             <div className="flex items-center gap-2 mb-4">
-              <Trophy size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
-              <span
-                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                INDICES COMPOSTOS
+              <Trophy size={15} strokeWidth={1.75} style={{ color: 'var(--color-accent)' }} />
+              <span className="eyebrow-strong">
+                Índices Compostos
               </span>
             </div>
-            <div className="flex-1 space-y-3">
+            <div className="flex-1 space-y-3.5">
               {Object.entries(indices).map(([name, value], i) => (
                 <motion.div
                   key={name}
@@ -524,20 +514,20 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.15 + i * 0.06 }}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[12.5px] font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                       {name}
                     </span>
                     <span
-                      className="text-xs font-[var(--font-mono)] font-semibold"
+                      className="text-[12.5px] stat-num font-bold"
                       style={{ color: getScoreColor(value) }}
                     >
                       {value.toFixed(1)}
                     </span>
                   </div>
                   <div
-                    className="h-1.5 rounded-full overflow-hidden"
-                    style={{ background: 'var(--color-surface-2)' }}
+                    className="h-2 rounded-full overflow-hidden"
+                    style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}
                   >
                     <motion.div
                       className="h-full rounded-full"
@@ -559,24 +549,21 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
         <motion.div variants={fadeUp} className="card-glass p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <ChevronRight size={14} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
-              <span
-                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                SKILLCORNER {scOverride ? `(${scOverride})` : ''}
+              <Activity size={15} strokeWidth={1.75} style={{ color: 'var(--color-accent)' }} />
+              <span className="eyebrow-strong">
+                SkillCorner {scOverride ? <span style={{ color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, marginLeft: 6 }}>· {scOverride}</span> : null}
               </span>
             </div>
             <button
               onClick={() => setScSearchOpen(!scSearchOpen)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] transition-colors cursor-pointer font-medium"
               style={{
                 background: scSearchOpen ? 'var(--color-accent-glow)' : 'var(--color-surface-2)',
-                color: scSearchOpen ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                color: scSearchOpen ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 border: `1px solid ${scSearchOpen ? 'rgba(227,6,19,0.3)' : 'var(--color-border-subtle)'}`,
               }}
             >
-              <Search size={10} strokeWidth={1.5} />
+              <Search size={11} strokeWidth={1.75} />
               Buscar atleta
             </button>
           </div>
@@ -643,8 +630,8 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
           )}
 
         {skillcorner && Object.keys(skillcorner).length > 0 && (
-          <div className="mb-4">
-            <div className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>INDICES</div>
+          <div className="mb-5">
+            <div className="eyebrow mb-3">Índices</div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {Object.entries(skillcorner).map(([name, value], i) => (
                 <motion.div
@@ -659,13 +646,13 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                   }}
                 >
                   <div
-                    className="text-[10px] mb-1 leading-tight"
+                    className="text-[11px] mb-1.5 leading-tight font-medium"
                     style={{ color: 'var(--color-text-muted)' }}
                   >
                     {name.replace(/ index$/i, '')}
                   </div>
                   <div
-                    className="text-lg font-[var(--font-mono)] font-bold"
+                    className="text-[20px] stat-num font-bold"
                     style={{ color: 'var(--color-text-primary)' }}
                   >
                     {typeof value === 'number' ? value.toFixed(2) : value}
@@ -679,7 +666,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
         {/* Physical data */}
         {skillcorner_physical && Object.keys(skillcorner_physical).length > 0 && (
           <div>
-            <div className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>DADOS FISICOS</div>
+            <div className="eyebrow mb-3">Dados Físicos</div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               {Object.entries(skillcorner_physical).map(([name, value], i) => (
                 <motion.div
@@ -694,13 +681,13 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
                   }}
                 >
                   <div
-                    className="text-[10px] mb-1 leading-tight"
+                    className="text-[11px] mb-1.5 leading-tight font-medium"
                     style={{ color: 'var(--color-text-muted)' }}
                   >
                     {name}
                   </div>
                   <div
-                    className="text-lg font-[var(--font-mono)] font-bold"
+                    className="text-[20px] stat-num font-bold"
                     style={{ color: 'var(--color-text-primary)' }}
                   >
                     {typeof value === 'number' ? value.toFixed(2) : value}
@@ -713,7 +700,7 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
 
         {/* No data message */}
         {(!skillcorner || Object.keys(skillcorner).length === 0) && (!skillcorner_physical || Object.keys(skillcorner_physical).length === 0) && (
-          <div className="text-[10px] py-2" style={{ color: 'var(--color-text-muted)' }}>
+          <div className="text-[12px] py-3 text-center" style={{ color: 'var(--color-text-muted)' }}>
             Nenhum dado SkillCorner encontrado. Use "Buscar atleta" para selecionar manualmente.
           </div>
         )}
@@ -723,68 +710,65 @@ export default function PlayerProfile({ playerDisplayName, onClose }: PlayerProf
         {prediction && (
           <motion.div variants={fadeUp} className="card-glass p-6">
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp size={14} strokeWidth={1.5} style={{ color: prediction.success_probability >= 0.65 ? '#22c55e' : prediction.success_probability >= 0.40 ? '#eab308' : '#ef4444' }} />
-              <span
-                className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase font-semibold"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                PREDICAO DE SUCESSO (CONTRATACAO)
+              <TrendingUp size={15} strokeWidth={1.75} style={{ color: prediction.success_probability >= 0.65 ? '#22c55e' : prediction.success_probability >= 0.40 ? '#eab308' : '#ef4444' }} />
+              <span className="eyebrow-strong">
+                Predição de Sucesso (Contratação)
               </span>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {/* P(Sucesso) main */}
               <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
-                <div className="text-[10px] mb-1" style={{ color: 'var(--color-text-muted)' }}>P(Sucesso)</div>
-                <div className="text-2xl font-[var(--font-mono)] font-bold" style={{ color: prediction.success_probability >= 0.65 ? '#22c55e' : prediction.success_probability >= 0.40 ? '#eab308' : '#ef4444' }}>
+                <div className="text-[11px] mb-1.5 font-medium" style={{ color: 'var(--color-text-muted)' }}>P(Sucesso)</div>
+                <div className="text-[26px] stat-num font-bold leading-none" style={{ color: prediction.success_probability >= 0.65 ? '#22c55e' : prediction.success_probability >= 0.40 ? '#eab308' : '#ef4444' }}>
                   {(prediction.success_probability * 100).toFixed(0)}%
                 </div>
-                <div className="text-[9px] font-[var(--font-display)] tracking-wider uppercase mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <div className="text-[10px] font-[var(--font-display)] tracking-wider uppercase mt-1.5 font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
                   Risco: {prediction.risk_level}
                 </div>
               </div>
 
               {/* League Gap */}
               <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
-                <div className="text-[10px] mb-1" style={{ color: 'var(--color-text-muted)' }}>Gap de Liga</div>
-                <div className="text-lg font-[var(--font-mono)] font-bold" style={{ color: prediction.league_gap > 2 ? '#ef4444' : prediction.league_gap > 0 ? '#eab308' : '#22c55e' }}>
+                <div className="text-[11px] mb-1.5 font-medium" style={{ color: 'var(--color-text-muted)' }}>Gap de Liga</div>
+                <div className="text-[20px] stat-num font-bold leading-none" style={{ color: prediction.league_gap > 2 ? '#ef4444' : prediction.league_gap > 0 ? '#eab308' : '#22c55e' }}>
                   {prediction.league_gap > 0 ? '+' : ''}{prediction.league_gap.toFixed(1)}
                 </div>
-                <div className="text-[9px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <div className="text-[11px] mt-1.5 stat-num" style={{ color: 'var(--color-text-secondary)' }}>
                   Tier {prediction.tier_origin.toFixed(1)} → {prediction.tier_target.toFixed(1)}
                 </div>
               </div>
 
               {/* Age Factor */}
               <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
-                <div className="text-[10px] mb-1" style={{ color: 'var(--color-text-muted)' }}>Fator Idade</div>
-                <div className="text-lg font-[var(--font-mono)] font-bold" style={{ color: getScoreColor(prediction.age_factor * 100) }}>
+                <div className="text-[11px] mb-1.5 font-medium" style={{ color: 'var(--color-text-muted)' }}>Fator Idade</div>
+                <div className="text-[20px] stat-num font-bold leading-none" style={{ color: getScoreColor(prediction.age_factor * 100) }}>
                   {(prediction.age_factor * 100).toFixed(0)}%
                 </div>
-                <div className="text-[9px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Pico aos 26 anos</div>
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--color-text-secondary)' }}>Pico aos 26 anos</div>
               </div>
 
               {/* Minutes Factor */}
               <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
-                <div className="text-[10px] mb-1" style={{ color: 'var(--color-text-muted)' }}>Regularidade</div>
-                <div className="text-lg font-[var(--font-mono)] font-bold" style={{ color: getScoreColor(prediction.minutes_factor * 100) }}>
+                <div className="text-[11px] mb-1.5 font-medium" style={{ color: 'var(--color-text-muted)' }}>Regularidade</div>
+                <div className="text-[20px] stat-num font-bold leading-none" style={{ color: getScoreColor(prediction.minutes_factor * 100) }}>
                   {(prediction.minutes_factor * 100).toFixed(0)}%
                 </div>
-                <div className="text-[9px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Min jogados / 3000</div>
+                <div className="text-[11px] mt-1.5" style={{ color: 'var(--color-text-secondary)' }}>Min jogados / 3000</div>
               </div>
             </div>
 
             {/* SSP Lambda weights */}
             {ssp_lambdas && (
-              <div className="pt-3" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
-                <div className="text-[9px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold mb-2" style={{ color: 'var(--color-text-muted)' }}>
-                  SSP LAMBDAS (COMPOSICAO DO SCORE)
+              <div className="pt-4" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+                <div className="eyebrow mb-2.5">
+                  SSP Lambdas (Composição do Score)
                 </div>
                 <div className="flex gap-2">
                   {Object.entries(ssp_lambdas).map(([key, weight]) => (
-                    <div key={key} className="flex-1 text-center p-2 rounded-lg" style={{ background: 'var(--color-surface-2)' }}>
-                      <div className="text-[9px] uppercase" style={{ color: 'var(--color-text-muted)' }}>{key}</div>
-                      <div className="text-xs font-[var(--font-mono)] font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                    <div key={key} className="flex-1 text-center p-2.5 rounded-lg" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+                      <div className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>{key}</div>
+                      <div className="text-[14px] stat-num font-bold mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
                         {(weight * 100).toFixed(0)}%
                       </div>
                     </div>

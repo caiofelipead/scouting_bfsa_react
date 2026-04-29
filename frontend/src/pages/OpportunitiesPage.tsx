@@ -59,11 +59,11 @@ export default function OpportunitiesPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <Gem size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <Gem size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Oportunidades de Mercado
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="page-subtitle">
           Deteccao de talentos subvalorizados — inspirado em Brighton, Brentford, Midtjylland
         </p>
       </div>
@@ -77,18 +77,18 @@ export default function OpportunitiesPage() {
       <div className="card-glass rounded-lg p-5">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
             <select value={position} onChange={(e) => setPosition(e.target.value)} className="w-full px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
               <option value="">Todas</option>
               {(positions || []).map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>MIN MINUTOS</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>MIN MINUTOS</label>
             <input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>TOP N</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>TOP N</label>
             <input type="number" value={topN} onChange={(e) => setTopN(Number(e.target.value))} className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
           </div>
           <button
@@ -105,7 +105,7 @@ export default function OpportunitiesPage() {
       {results.length > 0 && (
         <div className="card-glass rounded-lg overflow-hidden">
           <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-            <span className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>
               {results.length} OPORTUNIDADES ENCONTRADAS
             </span>
           </div>

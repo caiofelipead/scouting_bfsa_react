@@ -15,7 +15,7 @@ function PlayerSearchInput({ label, value, onChange, onSelect, players, showDrop
 }) {
   return (
     <div>
-      <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>{label}</label>
+      <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>{label}</label>
       <div className="relative">
         <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder="Digite o nome..." className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
         {showDropdown && players.length > 0 && (
@@ -70,11 +70,11 @@ export default function ComparisonPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <ArrowLeftRight size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <ArrowLeftRight size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Comparativo
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Comparacao de indices compostos entre dois jogadores</p>
+        <p className="page-subtitle">Comparacao de indices compostos entre dois jogadores</p>
       </div>
 
       {error && (
@@ -88,7 +88,7 @@ export default function ComparisonPage() {
           <PlayerSearchInput label="JOGADOR 1" value={search1} onChange={handleSearch1} onSelect={(v) => { setPlayer1(v); setSearch1(v); setDebounced1(''); }} players={results1?.players ?? []} showDropdown={debounced1.length >= 2 && !player1} />
           <PlayerSearchInput label="JOGADOR 2" value={search2} onChange={handleSearch2} onSelect={(v) => { setPlayer2(v); setSearch2(v); setDebounced2(''); }} players={results2?.players ?? []} showDropdown={debounced2.length >= 2 && !player2} />
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
             <select value={position} onChange={(e) => setPosition(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
               {(positions.length > 0 ? positions : ['Atacante','Extremo','Meia','Volante','Lateral direito','Lateral esquerdo','Zagueiro','Goleiro']).map(p => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -124,7 +124,7 @@ export default function ComparisonPage() {
 
           {/* Dual radar */}
           <div className="card-glass rounded-lg p-5">
-            <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>RADAR COMPARATIVO ({comparison.position})</div>
+            <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>RADAR COMPARATIVO ({comparison.position})</div>
             <div className="max-w-lg mx-auto">
               <RadarChart
                 labels={Object.keys(comparison.indices1)}
@@ -145,16 +145,16 @@ export default function ComparisonPage() {
           {/* Comparison table */}
           <div className="card-glass rounded-lg overflow-hidden">
             <div className="px-4 py-2.5" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-              <span className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase" style={{ color: 'var(--color-text-muted)' }}>TABELA COMPARATIVA</span>
+              <span className="text-[11px] font-[var(--font-display)] tracking-[0.14em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>TABELA COMPARATIVA</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                    <th className="px-3 py-2.5 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Indice</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-accent)' }}>{comparison.player1.name}</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: '#3b82f6' }}>{comparison.player2.name}</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Diff</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>Indice</th>
+                    <th className="px-3 py-2.5 text-right text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-accent)' }}>{comparison.player1.name}</th>
+                    <th className="px-3 py-2.5 text-right text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: '#3b82f6' }}>{comparison.player2.name}</th>
+                    <th className="px-3 py-2.5 text-right text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>Diff</th>
                     <th className="px-3 py-2.5 text-center text-[10px]" style={{ color: 'var(--color-text-muted)' }}></th>
                   </tr>
                 </thead>
@@ -182,7 +182,7 @@ export default function ComparisonPage() {
         <div className="card-glass rounded-lg overflow-hidden">
           <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
             <Activity size={13} style={{ color: 'var(--color-accent)' }} />
-            <span className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-[11px] font-[var(--font-display)] tracking-[0.14em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>
               SKILLCORNER — METRICAS FISICAS
             </span>
             <div className="ml-auto flex gap-2">
@@ -210,10 +210,10 @@ export default function ComparisonPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                  <th className="px-3 py-2.5 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Metrica</th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-accent)' }}>{comparison?.player1.name || player1}</th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: '#3b82f6' }}>{comparison?.player2.name || player2}</th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>Diff</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>Metrica</th>
+                  <th className="px-3 py-2.5 text-right text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-accent)' }}>{comparison?.player1.name || player1}</th>
+                  <th className="px-3 py-2.5 text-right text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: '#3b82f6' }}>{comparison?.player2.name || player2}</th>
+                  <th className="px-3 py-2.5 text-right text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>Diff</th>
                 </tr>
               </thead>
               <tbody>

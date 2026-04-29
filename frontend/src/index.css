@@ -29,13 +29,20 @@
   --color-below: #ef4444;
 
   /* Text */
-  --color-text-primary: #FFFFFF;
-  --color-text-secondary: #A1A1AA;
-  --color-text-muted: #71717A;
+  --color-text-primary: #FAFAFA;
+  --color-text-secondary: #D4D4D8;
+  --color-text-muted: #A1A1AA;
+  --color-text-faint: #71717A;
 
   /* Borders */
-  --color-border-subtle: rgba(255, 255, 255, 0.06);
-  --color-border-active: rgba(255, 255, 255, 0.12);
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-active: rgba(255, 255, 255, 0.16);
+  --color-border-strong: rgba(255, 255, 255, 0.22);
+
+  /* Elevation shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.25);
+  --shadow-md: 0 6px 24px rgba(0,0,0,0.30);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.40);
 
   /* Transitions */
   --transition-fast: 150ms ease;
@@ -46,22 +53,28 @@
 /* ── Light theme overrides ────────────────────────────────────────── */
 
 [data-theme="light"] {
-  --color-void: #F5F5F7;
-  --color-surface-0: #EEEEF0;
-  --color-surface-1: #E8E8EC;
-  --color-surface-2: #DFDFE3;
-  --color-surface-3: #D4D4D8;
+  --color-void: #F4F4F6;
+  --color-surface-0: #EEEEF1;
+  --color-surface-1: #FFFFFF;
+  --color-surface-2: #F8F8FA;
+  --color-surface-3: #E4E4E7;
 
   --color-accent: #C8050F;
   --color-accent-dim: #A00410;
   --color-accent-glow: rgba(200, 5, 15, 0.10);
 
   --color-text-primary: #18181B;
-  --color-text-secondary: #52525B;
-  --color-text-muted: #A1A1AA;
+  --color-text-secondary: #3F3F46;
+  --color-text-muted: #52525B;
+  --color-text-faint: #71717A;
 
-  --color-border-subtle: rgba(0, 0, 0, 0.08);
-  --color-border-active: rgba(0, 0, 0, 0.14);
+  --color-border-subtle: rgba(0, 0, 0, 0.10);
+  --color-border-active: rgba(0, 0, 0, 0.18);
+  --color-border-strong: rgba(0, 0, 0, 0.28);
+
+  --shadow-sm: 0 1px 2px rgba(15,15,20,0.05);
+  --shadow-md: 0 4px 16px rgba(15,15,20,0.06);
+  --shadow-lg: 0 12px 32px rgba(15,15,20,0.08);
 }
 
 [data-theme="light"] body {
@@ -74,20 +87,21 @@
 }
 
 [data-theme="light"] .card-glass {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(245, 245, 247, 0.35) 100%);
-  border-color: rgba(255, 255, 255, 0.55);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 248, 250, 0.85) 100%);
+  border-color: rgba(0, 0, 0, 0.10);
   box-shadow:
-    0 8px 32px rgba(0,0,0,0.06),
-    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 4px 18px rgba(15,15,20,0.06),
+    0 1px 0 rgba(255,255,255,0.85) inset,
     0 -1px 0 rgba(0,0,0,0.03) inset;
 }
 
 [data-theme="light"] .card-glass-accent {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(245, 245, 247, 0.25) 100%);
-  border-color: rgba(200, 5, 15, 0.12);
+  background: linear-gradient(135deg, rgba(255, 252, 252, 0.95) 0%, rgba(252, 246, 247, 0.85) 100%);
+  border-color: rgba(200, 5, 15, 0.30);
   box-shadow:
-    0 4px 20px rgba(0,0,0,0.04),
-    0 0 24px rgba(200, 5, 15, 0.03);
+    0 4px 18px rgba(15,15,20,0.06),
+    0 0 24px rgba(200, 5, 15, 0.05),
+    0 1px 0 rgba(255,255,255,0.7) inset;
 }
 
 [data-theme="light"] .skeleton {
@@ -129,14 +143,14 @@
 }
 
 .glass-panel-sm {
-  background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.025) 100%);
+  border: 1px solid rgba(255,255,255,0.10);
   backdrop-filter: blur(24px) saturate(1.3);
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
   border-radius: 14px;
   box-shadow:
-    0 2px 12px rgba(0,0,0,0.12),
-    0 1px 0 rgba(255,255,255,0.03) inset;
+    0 2px 14px rgba(0,0,0,0.14),
+    0 1px 0 rgba(255,255,255,0.04) inset;
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
@@ -257,6 +271,82 @@ body {
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  letter-spacing: -0.005em;
+}
+
+/* ── Typography utilities (Opta / StatsBomb-inspired) ─────────────── */
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+}
+
+.page-subtitle {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+/* Uppercase eyebrow labels — used for "POSICAO", "RESULTADOS", section headers */
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  line-height: 1.3;
+}
+
+.eyebrow-strong {
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+}
+
+/* Numeric data cells — a touch more readable than the surrounding prose */
+.stat-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  letter-spacing: -0.01em;
+}
+
+/* Big metric value — for hero stats (used by /Indices breakdown, /PDF cards, etc.) */
+.metric-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+}
+
+/* Strong dividers (replaces inline borderBottom rgba(255,255,255,0.06)) */
+.divider {
+  border-color: var(--color-border-subtle) !important;
+}
+.divider-strong {
+  border-color: var(--color-border-active) !important;
 }
 
 /* ── Noise texture overlay ────────────────────────────────────────── */
@@ -314,63 +404,82 @@ body {
 /* ── Card glass (Glassmorphism sutil) ─────────────────────────────── */
 
 .card-glass {
-  background: linear-gradient(135deg, rgba(40, 40, 42, 0.45) 0%, rgba(22, 22, 24, 0.3) 100%);
+  background: linear-gradient(135deg, rgba(40, 40, 42, 0.50) 0%, rgba(22, 22, 24, 0.35) 100%);
   backdrop-filter: blur(40px) saturate(1.4) brightness(1.05);
   -webkit-backdrop-filter: blur(40px) saturate(1.4) brightness(1.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 14px;
   box-shadow:
-    0 8px 32px rgba(0,0,0,0.18),
-    0 1px 0 rgba(255,255,255,0.06) inset,
-    0 -1px 0 rgba(0,0,0,0.15) inset;
+    0 10px 36px rgba(0,0,0,0.22),
+    0 1px 0 rgba(255,255,255,0.07) inset,
+    0 -1px 0 rgba(0,0,0,0.18) inset;
 }
 
 .card-glass-accent {
-  background: linear-gradient(135deg, rgba(28, 28, 28, 0.35) 0%, rgba(20, 20, 20, 0.25) 100%);
+  background: linear-gradient(135deg, rgba(34, 24, 24, 0.42) 0%, rgba(22, 18, 18, 0.30) 100%);
   backdrop-filter: blur(32px) saturate(1.3);
   -webkit-backdrop-filter: blur(32px) saturate(1.3);
-  border: 1px solid rgba(227, 6, 19, 0.18);
+  border: 1px solid rgba(227, 6, 19, 0.28);
   border-radius: 14px;
   box-shadow:
-    0 4px 20px rgba(0,0,0,0.12),
-    0 0 32px rgba(227, 6, 19, 0.05);
+    0 6px 24px rgba(0,0,0,0.18),
+    0 0 32px rgba(227, 6, 19, 0.08),
+    0 1px 0 rgba(255,255,255,0.05) inset;
 }
 
 /* ── Score badges ─────────────────────────────────────────────────── */
 
-.score-elite { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.25); }
-.score-above { background: rgba(234, 179, 8, 0.12); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.25); }
-.score-average { background: rgba(249, 115, 22, 0.12); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.25); }
-.score-below { background: rgba(249, 115, 22, 0.12); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.25); }
-.score-discard { background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); }
+.score-elite { background: rgba(34, 197, 94, 0.16); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.35); }
+.score-above { background: rgba(234, 179, 8, 0.16); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.35); }
+.score-average { background: rgba(249, 115, 22, 0.16); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.35); }
+.score-below { background: rgba(249, 115, 22, 0.16); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.35); }
+.score-discard { background: rgba(239, 68, 68, 0.16); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); }
+
+/* Light variants: deeper colors for the same backgrounds */
+[data-theme="light"] .score-elite { color: #15803d; border-color: rgba(34, 197, 94, 0.40); }
+[data-theme="light"] .score-above { color: #a16207; border-color: rgba(234, 179, 8, 0.45); }
+[data-theme="light"] .score-average { color: #c2410c; border-color: rgba(249, 115, 22, 0.40); }
+[data-theme="light"] .score-below { color: #c2410c; border-color: rgba(249, 115, 22, 0.40); }
+[data-theme="light"] .score-discard { color: #b91c1c; border-color: rgba(239, 68, 68, 0.40); }
 
 /* ── Recommendation badges ────────────────────────────────────────── */
 
 .badge-top-target {
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.14);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.30);
+  font-weight: 600;
 }
 .badge-high-priority {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.30);
+  font-weight: 600;
 }
 .badge-monitor {
-  background: rgba(234, 179, 8, 0.1);
-  color: #eab308;
-  border: 1px solid rgba(234, 179, 8, 0.2);
+  background: rgba(234, 179, 8, 0.14);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.30);
+  font-weight: 600;
 }
 .badge-evaluate {
-  background: rgba(249, 115, 22, 0.1);
-  color: #f97316;
-  border: 1px solid rgba(249, 115, 22, 0.2);
+  background: rgba(249, 115, 22, 0.14);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.30);
+  font-weight: 600;
 }
 .badge-discard {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.30);
+  font-weight: 600;
 }
+
+[data-theme="light"] .badge-top-target { color: #15803d; border-color: rgba(34, 197, 94, 0.40); }
+[data-theme="light"] .badge-high-priority { color: #1d4ed8; border-color: rgba(59, 130, 246, 0.40); }
+[data-theme="light"] .badge-monitor { color: #a16207; border-color: rgba(234, 179, 8, 0.45); }
+[data-theme="light"] .badge-evaluate { color: #c2410c; border-color: rgba(249, 115, 22, 0.40); }
+[data-theme="light"] .badge-discard { color: #b91c1c; border-color: rgba(239, 68, 68, 0.40); }
 
 /* ── Skeleton screens ─────────────────────────────────────────────── */
 
@@ -460,10 +569,40 @@ body {
   transition: background var(--transition-fast);
 }
 .table-row-interactive:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
 }
 [data-theme="light"] .table-row-interactive:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.035);
+}
+
+/* ── Universal data table styling (Opta-style tight tables) ──────── */
+
+/* Make every <table>'s header row render the muted label style without
+   touching every page. Uses Tailwind's class system as a no-op fallback. */
+table thead tr {
+  border-bottom: 1px solid var(--color-border-active);
+  background: rgba(255, 255, 255, 0.015);
+}
+[data-theme="light"] table thead tr {
+  background: rgba(0, 0, 0, 0.02);
+}
+table thead th {
+  font-feature-settings: 'tnum' 1;
+  white-space: nowrap;
+}
+table tbody tr {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+table tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* Card-glass header bars: the eyebrow text inside should render brighter
+   than var(--color-text-muted) which had been faint. */
+.card-glass-header,
+.glass-panel > header {
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 0.625rem 1rem;
 }
 
 /* Player name hover — uses accent color instead of hardcoded blue */
@@ -490,10 +629,66 @@ body {
 
 /* ── Scrollbar ────────────────────────────────────────────────────── */
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-surface-3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-3);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-faint); background-clip: padding-box; }
+
+/* ── Form controls — visual baseline ──────────────────────────────── */
+/* Pages may override these via inline styles; the rule provides a sane
+   default for any field that doesn't set its own border/background. */
+
+select,
+input[type="text"],
+input[type="number"],
+input[type="search"],
+input[type="email"],
+input[type="password"] {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  transition: border-color var(--transition-base), background-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+select:hover,
+input[type="text"]:hover,
+input[type="number"]:hover,
+input[type="search"]:hover,
+input[type="email"]:hover,
+input[type="password"]:hover {
+  border-color: var(--color-border-active);
+}
+
+select:focus,
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="search"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+  outline: none;
+  border-color: var(--color-accent-dim);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+select option {
+  background: var(--color-surface-1);
+  color: var(--color-text-primary);
+}
+
+/* Placeholder readability — both themes */
+::placeholder { color: var(--color-text-faint); opacity: 1; }
+
+/* Selection color */
+::selection {
+  background: var(--color-accent-glow);
+  color: var(--color-text-primary);
+}
 
 /* ── Player photo styles ──────────────────────────────────────────── */
 

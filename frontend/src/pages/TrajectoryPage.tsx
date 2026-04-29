@@ -55,11 +55,11 @@ export default function TrajectoryPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <TrendingUp size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <TrendingUp size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Trajetoria de Carreira
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="page-subtitle">
           Previsao de evolucao com Gradient Boosting — Decroos et al. (2019), Pappalardo et al. (2019)
         </p>
       </div>
@@ -73,7 +73,7 @@ export default function TrajectoryPage() {
       <div className="card-glass rounded-lg p-5 space-y-4" style={{ overflow: 'visible' }}>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end" style={{ overflow: 'visible' }}>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR</label>
             <div className="relative">
               <input type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)} placeholder="Digite o nome do jogador..." className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
               {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
@@ -110,7 +110,7 @@ export default function TrajectoryPage() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-glass rounded-lg p-4 text-center">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>RATING ATUAL</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>RATING ATUAL</div>
               <div className="text-2xl font-[var(--font-mono)] font-bold mt-1" style={{ color: getScoreColor(result.current_rating_estimate ?? 50) }}>
                 {result.current_rating_estimate?.toFixed(1) ?? '-'}
               </div>
@@ -118,7 +118,7 @@ export default function TrajectoryPage() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-glass rounded-lg p-4 text-center">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>RATING PROJETADO</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>RATING PROJETADO</div>
               <div className="text-2xl font-[var(--font-mono)] font-bold mt-1" style={{ color: getScoreColor(result.predicted_rating_next_season ?? 50) }}>
                 {result.predicted_rating_next_season?.toFixed(1) ?? '-'}
               </div>
@@ -126,7 +126,7 @@ export default function TrajectoryPage() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card-glass rounded-lg p-4 text-center">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>TENDENCIA</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>TENDENCIA</div>
               <div className="text-xl font-[var(--font-display)] font-bold mt-1 uppercase" style={{ color: trendLabel(result.trajectory_score).color }}>
                 {trendLabel(result.trajectory_score).text}
               </div>
@@ -136,7 +136,7 @@ export default function TrajectoryPage() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card-glass rounded-lg p-4 text-center">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>AJUSTE LIGA</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>AJUSTE LIGA</div>
               <div className="text-2xl font-[var(--font-mono)] font-bold mt-1" style={{ color: 'var(--color-text-primary)' }}>
                 {result.league_adjustment_factor?.toFixed(3) ?? '-'}
               </div>
@@ -146,7 +146,7 @@ export default function TrajectoryPage() {
 
           {result.top_features && Object.keys(result.top_features).length > 0 && (
             <div className="card-glass rounded-lg p-5">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase mb-4" style={{ color: 'var(--color-text-muted)' }}>FEATURES MAIS IMPORTANTES</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase mb-4" style={{ color: 'var(--color-text-muted)' }}>FEATURES MAIS IMPORTANTES</div>
               <div className="space-y-2">
                 {Object.entries(result.top_features).map(([feat, importance], i) => (
                   <div key={feat} className="flex items-center gap-3">

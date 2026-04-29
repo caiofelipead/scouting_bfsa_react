@@ -176,37 +176,37 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
         className="hidden lg:flex flex-col fixed top-0 left-0 h-screen z-30"
         style={{
           width: '280px',
-          background: theme === 'dark' ? 'rgba(14, 14, 14, 0.85)' : 'rgba(255, 255, 255, 0.82)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          background: theme === 'dark' ? 'rgba(12, 12, 12, 0.92)' : 'rgba(255, 255, 255, 0.92)',
+          backdropFilter: 'blur(20px) saturate(1.2)',
+          WebkitBackdropFilter: 'blur(20px) saturate(1.2)',
           borderRight: '1px solid var(--color-border-subtle)',
         }}
       >
         {/* Brand */}
-        <div className="px-5 py-5 flex items-center gap-3">
+        <div className="px-5 py-5 flex items-center gap-3" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
           <img
             src="/3154_imgbank_1685113109.png"
             alt="Logo Botafogo-SP"
             className="w-9 h-9 object-contain"
           />
-          <div>
-            <div className="font-[var(--font-display)] text-sm font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>
+          <div className="min-w-0">
+            <div className="font-[var(--font-display)] text-[15px] font-bold tracking-tight leading-tight" style={{ color: 'var(--color-text-primary)' }}>
               SCOUTING
             </div>
-            <div className="text-[9px] tracking-[0.2em] font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-              BOTAFOGO-SA
+            <div className="text-[10px] tracking-[0.18em] font-semibold mt-0.5" style={{ color: 'var(--color-accent)' }}>
+              BOTAFOGO·SA
             </div>
           </div>
         </div>
 
         {/* Nav sections */}
-        <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-4">
+        <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-5">
           {userNavSections.map((section, si) => (
             <div key={si}>
               {section.title && (
                 <div
-                  className="px-3 mb-2 text-[9px] font-[var(--font-display)] tracking-[0.2em] font-semibold"
-                  style={{ color: 'var(--color-text-muted)' }}
+                  className="px-3 mb-2 eyebrow"
+                  style={{ fontSize: '10px', letterSpacing: '0.18em' }}
                 >
                   {section.title}
                 </div>
@@ -223,6 +223,12 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
                         background: active ? 'var(--color-accent-glow)' : 'transparent',
                         color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                       }}
+                      onMouseEnter={(e) => {
+                        if (!active) e.currentTarget.style.background = 'var(--color-surface-1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!active) e.currentTarget.style.background = 'transparent';
+                      }}
                     >
                       {/* Vertical red indicator for active */}
                       {active && (
@@ -236,7 +242,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
                       <span style={{ color: active ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
                         {item.icon}
                       </span>
-                      <span className="font-[var(--font-body)] text-[13px] font-medium">{item.label}</span>
+                      <span className="font-[var(--font-body)] text-[13.5px] font-medium tracking-tight">{item.label}</span>
                     </button>
                   );
                 })}
@@ -251,10 +257,10 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
           style={{ borderTop: '1px solid var(--color-border-subtle)' }}
         >
           <div className="min-w-0">
-            <div className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
+            <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
               {user.name}
             </div>
-            <div className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+            <div className="text-[11px] truncate uppercase tracking-wider font-medium" style={{ color: 'var(--color-text-muted)' }}>
               {user.role}
             </div>
           </div>
@@ -358,13 +364,13 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
                 <Shield size={18} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
                 <div className="font-[var(--font-display)] text-sm font-bold">SCOUTING BFSA</div>
               </div>
-              <nav className="flex-1 px-3 space-y-4 overflow-y-auto">
+              <nav className="flex-1 px-3 space-y-5 overflow-y-auto pt-2">
                 {userNavSections.map((section, si) => (
                   <div key={si}>
                     {section.title && (
                       <div
-                        className="px-3 mb-2 text-[9px] font-[var(--font-display)] tracking-[0.2em] font-semibold"
-                        style={{ color: 'var(--color-text-muted)' }}
+                        className="px-3 mb-2 eyebrow"
+                        style={{ fontSize: '10px', letterSpacing: '0.18em' }}
                       >
                         {section.title}
                       </div>
@@ -394,7 +400,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
                             <span style={{ color: active ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
                               {item.icon}
                             </span>
-                            <span className="font-[var(--font-body)] text-[13px] font-medium">{item.label}</span>
+                            <span className="font-[var(--font-body)] text-[13.5px] font-medium tracking-tight">{item.label}</span>
                           </button>
                         );
                       })}
@@ -456,7 +462,7 @@ export default function Layout({ user, activeTab, onTabChange, onLogout, childre
           )}
         </AnimatePresence>
 
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6" style={{ marginLeft: '0' }}>
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-7 lg:py-8" style={{ marginLeft: '0' }}>
           {children}
         </div>
       </main>

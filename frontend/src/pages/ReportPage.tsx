@@ -47,11 +47,11 @@ export default function ReportPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <FileBarChart size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <FileBarChart size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Relatorio
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Graficos de relatorio com indices compostos e posicionamento</p>
+        <p className="page-subtitle">Graficos de relatorio com indices compostos e posicionamento</p>
       </div>
 
       {indicesError && (
@@ -63,7 +63,7 @@ export default function ReportPage() {
       <div className="card-glass rounded-lg p-5">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR</label>
             <div className="relative">
               <input type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)} placeholder="Digite o nome..." className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
               {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
@@ -79,7 +79,7 @@ export default function ReportPage() {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO PARA INDICES</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO PARA INDICES</label>
             <select value={position} onChange={(e) => setPosition(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
               {(positions.length > 0 ? positions : ['Atacante','Extremo','Meia','Volante','Lateral direito','Lateral esquerdo','Zagueiro','Goleiro']).map(p => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -109,13 +109,13 @@ export default function ReportPage() {
           {/* Perfil de Indices + Rankings */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="card-glass rounded-lg p-5">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>PERFIL DE INDICES</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>PERFIL DE INDICES</div>
               {indexEntries.length > 0 && (
                 <RadarChart labels={indexEntries.map(([k]) => k)} values={indexEntries.map(([, v]) => v)} size={360} />
               )}
             </div>
             <div className="card-glass rounded-lg p-5">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>RANKINGS</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>RANKINGS</div>
               <div className="space-y-2.5">
                 {indexEntries.map(([name, value], i) => (
                   <motion.div key={name} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}>
@@ -135,7 +135,7 @@ export default function ReportPage() {
           {/* Percentile radar (WyScout top metrics) */}
           {radarData && radarData.labels.length > 0 && (
             <div className="card-glass rounded-lg p-5">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>PERCENTIS POR POSICAO (TOP METRICAS)</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>PERCENTIS POR POSICAO (TOP METRICAS)</div>
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4">
                 <RadarChart labels={radarData.labels} values={radarData.values} size={360} playerName={indicesData.summary.name} />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 content-start">
@@ -153,7 +153,7 @@ export default function ReportPage() {
           {/* Metric breakdown */}
           {indicesData.breakdown && (
             <div className="card-glass rounded-lg p-5">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase mb-4" style={{ color: 'var(--color-text-muted)' }}>DETALHAMENTO POR INDICE</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase mb-4" style={{ color: 'var(--color-text-muted)' }}>DETALHAMENTO POR INDICE</div>
               {Object.entries(indicesData.breakdown).map(([idxName, metrics]) => (
                 <div key={idxName} className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
