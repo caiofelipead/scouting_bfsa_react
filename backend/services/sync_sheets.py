@@ -67,12 +67,29 @@ def _get_sheets_service():
 
 
 def _download_sheet_api(sheet_id: str, sheet_name: str) -> pd.DataFrame:
-    """Download a sheet tab via Google Sheets API (authenticated)."""
+    """Download a sheet tab via Google Sheets API (authenticated).
+
+    Returns an empty DataFrame (not None) when the tab is missing so callers
+    can no-op gracefully without aborting a multi-tab sync.
+    """
+    from googleapiclient.errors import HttpError
+
     service = _get_sheets_service()
-    result = service.spreadsheets().values().get(
-        spreadsheetId=sheet_id,
-        range=sheet_name,
-    ).execute()
+    try:
+        result = service.spreadsheets().values().get(
+            spreadsheetId=sheet_id,
+            range=sheet_name,
+        ).execute()
+    except HttpError as e:
+        msg = str(e)
+        if "Unable to parse range" in msg:
+            logger.warning(
+                "Sheets tab '%s' not found in spreadsheet %s — skipping sync",
+                sheet_name, sheet_id,
+            )
+        else:
+            logger.error("Sheets API error for tab '%s': %s", sheet_name, e)
+        return pd.DataFrame()
 
     values = result.get("values", [])
     if not values:
