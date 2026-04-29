@@ -1,24 +1,45 @@
 import axios from 'axios';
+import { apiUrl, VERCEL_PROXIED_PREFIXES } from '../config/api';
 
+/**
+ * Centralized HTTP client.
+ *
+ * Callers continue to use paths relative to /api (e.g. `api.get('/players')`).
+ * The request interceptor below routes each request through `apiUrl()` so
+ * analytics endpoints hit Render directly while asset endpoints keep using
+ * the Vercel-proxied (edge-cached) relative paths.
+ */
 const api = axios.create({
-  baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
   timeout: 120_000, // 120s timeout — backend may need time to load data on cold start
 });
 
-// Pre-warm: fire a lightweight ping to wake the backend as early as possible,
-// then prefetch config data so it's ready when the user reaches the dashboard
-axios.get('/api/ping', { timeout: 5_000 }).then(() => {
-  // Backend is awake — prefetch config endpoints (positions, leagues) to warm caches
-  const token = localStorage.getItem('access_token');
-  if (token) {
-    const headers = { Authorization: `Bearer ${token}` };
-    axios.get('/api/config/positions', { timeout: 10_000, headers }).catch(() => {});
-    axios.get('/api/config/leagues', { timeout: 10_000, headers }).catch(() => {});
-  }
-}).catch(() => {});
+/** Resolve a caller-supplied URL to its final absolute or proxied form. */
+function resolveRequestUrl(url: string | undefined): string | undefined {
+  if (!url) return url;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  // Caller already wrote an /api/... path → forward as-is.
+  if (url.startsWith('/api/')) return apiUrl(url);
+  // Caller wrote a path relative to the legacy /api baseURL (e.g. '/players').
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return apiUrl(`/api${path}`);
+}
+
+// Pre-warm: ping the backend to wake it, then prefetch config endpoints.
+axios
+  .get(apiUrl('/api/ping'), { timeout: 5_000 })
+  .then(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      const headers = { Authorization: `Bearer ${token}` };
+      axios.get(apiUrl('/api/config/positions'), { timeout: 10_000, headers }).catch(() => {});
+      axios.get(apiUrl('/api/config/leagues'), { timeout: 10_000, headers }).catch(() => {});
+    }
+  })
+  .catch(() => {});
 
 api.interceptors.request.use((config) => {
+  config.url = resolveRequestUrl(config.url);
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -131,7 +152,10 @@ const DIRECT_IMAGE_DOMAINS = [
 /**
  * Route external image URLs through the backend proxy to avoid CORS/hotlink 403 errors.
  * Trusted CDN domains bypass the proxy (browsers load them directly).
- * Local/relative URLs pass through unchanged.
+ *
+ * Image proxy / team-logo / player-face URLs are intentionally returned as
+ * relative paths so they go through the Vercel rewrite + edge cache rather
+ * than counting against Render bandwidth on every cache miss.
  */
 export function proxyImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -167,4 +191,5 @@ export function isProxyFallback(img: HTMLImageElement): boolean {
   return img.naturalWidth <= 1 && img.naturalHeight <= 1;
 }
 
+export { apiUrl, VERCEL_PROXIED_PREFIXES };
 export default api;

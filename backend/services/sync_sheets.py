@@ -7,6 +7,7 @@ Can be run as a standalone script (cron) or triggered via API endpoint.
 
 import os
 import io
+import gc
 import json
 import base64
 import logging
@@ -67,12 +68,29 @@ def _get_sheets_service():
 
 
 def _download_sheet_api(sheet_id: str, sheet_name: str) -> pd.DataFrame:
-    """Download a sheet tab via Google Sheets API (authenticated)."""
+    """Download a sheet tab via Google Sheets API (authenticated).
+
+    Returns an empty DataFrame (not None) when the tab is missing so callers
+    can no-op gracefully without aborting a multi-tab sync.
+    """
+    from googleapiclient.errors import HttpError
+
     service = _get_sheets_service()
-    result = service.spreadsheets().values().get(
-        spreadsheetId=sheet_id,
-        range=sheet_name,
-    ).execute()
+    try:
+        result = service.spreadsheets().values().get(
+            spreadsheetId=sheet_id,
+            range=sheet_name,
+        ).execute()
+    except HttpError as e:
+        msg = str(e)
+        if "Unable to parse range" in msg:
+            logger.warning(
+                "Sheets tab '%s' not found in spreadsheet %s — skipping sync",
+                sheet_name, sheet_id,
+            )
+        else:
+            logger.error("Sheets API error for tab '%s': %s", sheet_name, e)
+        return pd.DataFrame()
 
     values = result.get("values", [])
     if not values:
@@ -120,6 +138,7 @@ def sync_all_sheets() -> Dict[str, int]:
 
     results = {}
     for key, sheet_name in SHEET_NAMES.items():
+        df = None
         try:
             df = _download_sheet(GOOGLE_SHEET_ID, sheet_name)
             count = upsert_sheet_data(key, df)
@@ -127,6 +146,11 @@ def sync_all_sheets() -> Dict[str, int]:
         except Exception as e:
             logger.error("Sync failed for '%s': %s", key, e)
             results[key] = -1
+        finally:
+            # Free the per-tab DataFrame before moving to the next tab so
+            # peak RSS stays bounded on the 512MB Render instance.
+            del df
+            gc.collect()
 
     logger.info("Sync complete: %s", results)
     return results
@@ -139,6 +163,7 @@ def sync_coach_sheets() -> Dict[str, int]:
     coach_keys = ["treinadores_perfil", "treinadores_historico"]
     results = {}
     for key in coach_keys:
+        df = None
         try:
             sheet_name = SHEET_NAMES[key]
             df = _download_sheet(GOOGLE_SHEET_ID, sheet_name)
@@ -147,6 +172,9 @@ def sync_coach_sheets() -> Dict[str, int]:
         except Exception as e:
             logger.error("Sync failed for '%s': %s", key, e)
             results[key] = -1
+        finally:
+            del df
+            gc.collect()
 
     logger.info("Coach sync complete: %s", results)
     return results
@@ -161,7 +189,11 @@ def sync_single_sheet(sheet_key: str) -> int:
         raise ValueError(f"Unknown sheet key: {sheet_key}")
 
     df = _download_sheet(GOOGLE_SHEET_ID, sheet_name)
-    return upsert_sheet_data(sheet_key, df)
+    try:
+        return upsert_sheet_data(sheet_key, df)
+    finally:
+        del df
+        gc.collect()
 
 
 # Allow running as standalone: python -m services.sync_sheets

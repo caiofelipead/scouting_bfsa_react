@@ -68,6 +68,24 @@ def safe_numeric_cast(series: pd.Series) -> pd.Series:
     return pd.to_numeric(cleaned, errors="coerce")
 
 
+def downcast_numeric(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert float64 → float32 and int64 → int32 columns in place.
+
+    Halves the memory footprint of player/event DataFrames (~50% saving on
+    the wide WyScout frame) without changing values for typical scouting
+    metrics. Returns the same DataFrame for chainable use.
+    """
+    if df is None or len(df) == 0:
+        return df
+    float64_cols = df.select_dtypes(include=["float64"]).columns
+    if len(float64_cols) > 0:
+        df[float64_cols] = df[float64_cols].astype(np.float32)
+    int64_cols = df.select_dtypes(include=["int64"]).columns
+    if len(int64_cols) > 0:
+        df[int64_cols] = df[int64_cols].astype(np.int32)
+    return df
+
+
 def validate_url(url: str, pattern: re.Pattern) -> bool:
     if not url or not isinstance(url, str):
         return False

@@ -101,11 +101,10 @@ try:
 except ImportError:
     HAS_SKLEARN = False
 
-try:
-    import xgboost as xgb
-    HAS_XGB = True
-except ImportError:
-    HAS_XGB = False
+# Detect XGBoost availability without importing the ~80MB native lib;
+# the actual `import xgboost as xgb` happens lazily inside fit() below.
+import importlib.util as _importlib_util
+HAS_XGB = _importlib_util.find_spec("xgboost") is not None
 
 from services.league_power_model import (
     get_opta_league_power,
@@ -686,6 +685,7 @@ class MarketValueModel:
 
         # XGBoost ou fallback para GradientBoosting
         if HAS_XGB:
+            import xgboost as xgb  # lazy: skip ~80MB load when only sklearn fallback is used
             self.model = xgb.XGBRegressor(
                 n_estimators=200,
                 max_depth=5,

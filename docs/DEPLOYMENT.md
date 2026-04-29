@@ -33,15 +33,27 @@
 ```json
 {
   "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://scouting-bfsa-react.onrender.com/api/:path*"
-    }
+    { "source": "/api/team-logo/:path*",   "destination": "https://scouting-bfsa-react.onrender.com/api/team-logo/:path*" },
+    { "source": "/api/image-proxy/:path*", "destination": "https://scouting-bfsa-react.onrender.com/api/image-proxy/:path*" },
+    { "source": "/api/player-face/:path*", "destination": "https://scouting-bfsa-react.onrender.com/api/player-face/:path*" },
+    { "source": "/api/config/:path*",      "destination": "https://scouting-bfsa-react.onrender.com/api/config/:path*" }
   ]
 }
 ```
 
-Todas as chamadas `/api/*` sao redirecionadas automaticamente para o backend no Render.
+Apenas 4 prefixos de **assets** (logos, faces, image-proxy e config)
+passam pelo proxy do Vercel — eles batem no edge cache (`s-maxage`) e
+quase nunca chegam ao Render.
+
+Todos os demais endpoints analiticos (rankings, players, similarity,
+trajectory, contract_impact, vaep, playerank, etc.) sao chamados
+**direto no Render** pelo helper `frontend/src/config/api.ts::apiUrl()`.
+Isso evita que payloads JSON pesados consumam o **Origin Transfer**
+do plano Hobby do Vercel (10 GB/mes).
+
+> Atenção: a variável `CORS_ORIGINS` no Render PRECISA incluir o domínio
+> Vercel servido aos usuários (ex: `https://scouting-bfsa-react.vercel.app`),
+> caso contrário os preflights vindos do browser falham.
 
 ### Deploy Automatico
 
@@ -66,7 +78,7 @@ Todas as chamadas `/api/*` sao redirecionadas automaticamente para o backend no 
 | **Root Directory** | `backend` |
 | **Build Command** | `pip install -r requirements.txt` |
 | **Start Command** | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
-| **Plan** | Free (com cold start) ou Starter |
+| **Plan** | **Standard (2 GB RAM) recomendado** — Starter (512 MB) entrava em OOM com a carga atual mesmo após otimizações de RAM (ver `PERFORMANCE.md`). |
 
 ### Variaveis de Ambiente
 
