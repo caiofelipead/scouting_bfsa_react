@@ -243,11 +243,11 @@ export default function PlayerCardPage() {
     <div className="space-y-5">
       {/* Page title */}
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <Target size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <Target size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Player Card
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="page-subtitle">
           Perfil completo com ranking percentil por categoria
         </p>
       </div>
@@ -263,7 +263,7 @@ export default function PlayerCardPage() {
       <div className="card-glass rounded-lg p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
               JOGADOR
             </label>
             <div className="relative">
@@ -299,7 +299,7 @@ export default function PlayerCardPage() {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
               POSIÇÃO
             </label>
             <select

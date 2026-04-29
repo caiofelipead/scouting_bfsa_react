@@ -44,14 +44,14 @@ export default function IndicesPage() {
   const values = indexEntries.map(([, v]) => v);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <BarChart3 size={18} style={{ color: 'var(--color-accent)' }} />
-          Indices Compostos
+        <h1 className="page-title flex items-center gap-2.5">
+          <BarChart3 size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
+          Índices Compostos
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-          Indices compostos por posicao com detalhamento de metricas
+        <p className="page-subtitle">
+          Indicadores compostos por posição, com detalhamento de métricas
         </p>
       </div>
 
@@ -65,7 +65,7 @@ export default function IndicesPage() {
       <div className="card-glass rounded-lg p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR (WYSCOUT)</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR (WYSCOUT)</label>
             <div className="relative">
               <input type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)} placeholder="Digite o nome..." className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
               {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
@@ -81,7 +81,7 @@ export default function IndicesPage() {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
             <select value={position} onChange={(e) => setPosition(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
               {(positions.length > 0 ? positions : ['Atacante','Extremo','Meia','Volante','Lateral direito','Lateral esquerdo','Zagueiro','Goleiro']).map(p => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -105,11 +105,11 @@ export default function IndicesPage() {
           {/* Radar + Bar chart grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="card-glass rounded-lg p-5">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>RADAR DE INDICES</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>RADAR DE INDICES</div>
               {labels.length > 0 && <RadarChart labels={labels} values={values} size={360} />}
             </div>
             <div className="card-glass rounded-lg p-5">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>RANKING PERCENTIL</div>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase mb-3" style={{ color: 'var(--color-text-muted)' }}>RANKING PERCENTIL</div>
               <div className="space-y-2.5">
                 {indexEntries.map(([name, value], i) => (
                   <motion.div key={name} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}>
@@ -128,7 +128,7 @@ export default function IndicesPage() {
 
           {/* Detailed breakdown per index */}
           <div className="space-y-2">
-            <div className="text-[10px] font-[var(--font-display)] tracking-[0.2em] uppercase" style={{ color: 'var(--color-text-muted)' }}>DETALHAMENTO POR INDICE</div>
+            <div className="text-[11px] font-[var(--font-display)] tracking-[0.16em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>DETALHAMENTO POR INDICE</div>
             {indicesData.breakdown && Object.entries(indicesData.breakdown).map(([idxName, metrics]) => (
               <div key={idxName} className="card-glass rounded-lg overflow-hidden">
                 <button onClick={() => setExpandedIndex(expandedIndex === idxName ? null : idxName)} className="w-full flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors" style={{ borderBottom: expandedIndex === idxName ? '1px solid var(--color-border-subtle)' : 'none' }}>

@@ -26,11 +26,11 @@ export default function ClustersPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <Dna size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <Dna size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Clusters Taticos
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="page-subtitle">
           K-Means + Gaussian Mixture + Random Forest para perfis taticos
         </p>
       </div>
@@ -44,13 +44,13 @@ export default function ClustersPage() {
       <div className="card-glass rounded-lg p-5">
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>POSICAO</label>
             <select value={position} onChange={(e) => setPosition(e.target.value)} className="px-3 py-2 rounded text-sm cursor-pointer outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>
               {(positions.length > 0 ? positions : ['Atacante','Extremo','Meia','Volante','Lateral direito','Lateral esquerdo','Zagueiro','Goleiro']).map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>MIN MINUTOS</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>MIN MINUTOS</label>
             <input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} className="w-24 px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }} />
           </div>
           <button
@@ -90,7 +90,7 @@ export default function ClustersPage() {
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-4 pb-4 space-y-4">
                     {/* Top players */}
                     <div>
-                      <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>TOP JOGADORES</div>
+                      <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>TOP JOGADORES</div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -120,7 +120,7 @@ export default function ClustersPage() {
                     {/* Cluster features (centroid z-scores) */}
                     {cluster.features.length > 0 && (
                       <div>
-                        <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>CARACTERISTICAS (Z-SCORE DO CENTROIDE)</div>
+                        <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>CARACTERISTICAS (Z-SCORE DO CENTROIDE)</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                           {cluster.features.map((f) => (
                             <div key={f.metric} className="p-2 rounded text-center" style={{ background: 'var(--color-surface-2)', borderLeft: `3px solid ${f.zscore > 0 ? '#22c55e' : '#ef4444'}` }}>

@@ -20,11 +20,11 @@ export default function OfferedPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <FileText size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <FileText size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Jogadores Oferecidos
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="page-subtitle">
           {players.length} jogadores na lista de oferecidos
         </p>
       </div>
@@ -46,7 +46,7 @@ export default function OfferedPage() {
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-surface-1)' }}>
                 {columns.map((col) => (
-                  <th key={col} className="px-3 py-3 text-left text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase whitespace-nowrap sticky top-0" style={{ color: 'var(--color-text-muted)', background: 'var(--color-surface-1)' }}>
+                  <th key={col} className="px-3 py-3 text-left text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase whitespace-nowrap sticky top-0" style={{ color: 'var(--color-text-muted)', background: 'var(--color-surface-1)' }}>
                     {col}
                   </th>
                 ))}

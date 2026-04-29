@@ -117,23 +117,24 @@ export default function DashboardPage() {
   const total = data?.total ?? 0;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="font-[var(--font-display)] text-xl font-bold tracking-tight">Jogadores</h1>
-        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-          {total} jogadores no banco de dados WyScout
+        <h1 className="page-title">Jogadores</h1>
+        <p className="page-subtitle">
+          <span className="stat-num font-semibold" style={{ color: 'var(--color-text-secondary)' }}>{total.toLocaleString('pt-BR')}</span>{' '}
+          jogadores no banco de dados WyScout
         </p>
       </div>
 
       {/* Filters — compact horizontal bar */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
             <Search
-              size={14}
-              strokeWidth={1.5}
-              className="absolute left-3 top-1/2 -translate-y-1/2"
+              size={15}
+              strokeWidth={1.75}
+              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
               style={{ color: 'var(--color-text-muted)' }}
             />
             <input
@@ -141,28 +142,18 @@ export default function DashboardPage() {
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Buscar jogador..."
-              className="w-full pl-9 pr-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
-              style={{
-                background: 'var(--color-surface-1)',
-                borderBottom: '1px solid var(--color-surface-3)',
-                color: 'var(--color-text-primary)',
-                fontFamily: 'var(--font-body)',
-              }}
+              className="w-full pl-10 pr-3 py-2.5 text-sm"
+              style={{ fontFamily: 'var(--font-body)' }}
             />
           </div>
 
           <select
             value={position}
             onChange={(e) => setPosition(e.target.value)}
-            className="px-3 py-2.5 rounded-lg text-sm cursor-pointer outline-none"
-            style={{
-              background: 'var(--color-surface-1)',
-              borderBottom: '1px solid var(--color-surface-3)',
-              color: 'var(--color-text-secondary)',
-              fontFamily: 'var(--font-body)',
-            }}
+            className="px-3 py-2.5 text-sm cursor-pointer"
+            style={{ fontFamily: 'var(--font-body)' }}
           >
-            <option value="">Todas posicoes</option>
+            <option value="">Todas posições</option>
             {positions.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
@@ -171,13 +162,8 @@ export default function DashboardPage() {
           <select
             value={league}
             onChange={(e) => setLeague(e.target.value)}
-            className="px-3 py-2.5 rounded-lg text-sm cursor-pointer outline-none"
-            style={{
-              background: 'var(--color-surface-1)',
-              borderBottom: '1px solid var(--color-surface-3)',
-              color: 'var(--color-text-secondary)',
-              fontFamily: 'var(--font-body)',
-            }}
+            className="px-3 py-2.5 text-sm cursor-pointer"
+            style={{ fontFamily: 'var(--font-body)' }}
           >
             <option value="">Todas ligas</option>
             {leagues.map((l) => (
@@ -187,15 +173,15 @@ export default function DashboardPage() {
 
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm transition-all cursor-pointer font-medium"
             style={{
               background: showAdvanced ? 'var(--color-accent-glow)' : 'var(--color-surface-1)',
-              borderBottom: `1px solid ${showAdvanced ? 'var(--color-accent)' : 'var(--color-surface-3)'}`,
+              border: `1px solid ${showAdvanced ? 'var(--color-accent-dim)' : 'var(--color-border-subtle)'}`,
               color: showAdvanced ? 'var(--color-accent)' : 'var(--color-text-secondary)',
               fontFamily: 'var(--font-body)',
             }}
           >
-            <SlidersHorizontal size={13} strokeWidth={1.5} />
+            <SlidersHorizontal size={14} strokeWidth={1.75} />
             Filtros
           </button>
 
@@ -222,29 +208,23 @@ export default function DashboardPage() {
               className="flex flex-wrap items-end gap-3 overflow-hidden"
             >
               <div>
-                <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                  IDADE MIN
-                </label>
+                <label className="block eyebrow mb-1.5">IDADE MIN</label>
                 <input
                   type="number"
                   value={minAge}
                   onChange={(e) => setMinAge(e.target.value)}
                   placeholder="16"
-                  className="w-20 px-3 py-2.5 rounded-lg text-sm outline-none"
-                  style={{ background: 'var(--color-surface-1)', borderBottom: '1px solid var(--color-surface-3)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}
+                  className="w-20 px-3 py-2.5 text-sm stat-num"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                  IDADE MAX
-                </label>
+                <label className="block eyebrow mb-1.5">IDADE MAX</label>
                 <input
                   type="number"
                   value={maxAge}
                   onChange={(e) => setMaxAge(e.target.value)}
                   placeholder="40"
-                  className="w-20 px-3 py-2.5 rounded-lg text-sm outline-none"
-                  style={{ background: 'var(--color-surface-1)', borderBottom: '1px solid var(--color-surface-3)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}
+                  className="w-20 px-3 py-2.5 text-sm stat-num"
                 />
               </div>
             </motion.div>
@@ -268,20 +248,17 @@ export default function DashboardPage() {
         <div className="card-glass overflow-hidden">
           <div
             className="px-5 py-3 flex items-center justify-between"
-            style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+            style={{ borderBottom: '1px solid var(--color-border-active)' }}
           >
-            <span
-              className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase font-semibold"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              RESULTADOS
+            <span className="eyebrow-strong">
+              Resultados
             </span>
             <div className="flex items-center gap-2">
               {isFetching && !isLoading && (
                 <div className="filter-loading-spinner" />
               )}
-              <span className="text-[10px] font-[var(--font-mono)]" style={{ color: 'var(--color-text-muted)' }}>
-                {total}
+              <span className="text-[11px] stat-num font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                {total.toLocaleString('pt-BR')}
               </span>
             </div>
           </div>
@@ -329,33 +306,32 @@ export default function DashboardPage() {
 
                     {/* Rank */}
                     <span
-                      className="text-[10px] font-[var(--font-mono)] w-5 text-right"
-                      style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+                      className="text-[11px] stat-num font-semibold w-6 text-right"
+                      style={{ color: i < 3 ? 'var(--color-accent)' : 'var(--color-text-faint)' }}
                     >
                       {i + 1}
                     </span>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[14px] font-semibold truncate tracking-tight" style={{ color: 'var(--color-text-primary)' }}>
                           {player.name}
                         </span>
                         {player.team && (
-                          <span className="text-[10px] shrink-0 flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="text-[11px] shrink-0 flex items-center gap-1 truncate" style={{ color: 'var(--color-text-muted)' }}>
                             <ClubLogo url={player.club_logo} alt="" className="w-3.5 h-3.5 object-contain inline-block" />
                             {player.team}
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-
+                      <div className="flex items-center gap-2 mt-1">
                         {player.position && (
                           <span
-                            className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold tracking-wide uppercase"
                             style={{
-                              background: 'var(--color-surface-1)',
-                              color: 'var(--color-text-muted)',
+                              background: 'var(--color-surface-2)',
+                              color: 'var(--color-text-secondary)',
                               border: '1px solid var(--color-border-subtle)',
                             }}
                           >
@@ -363,44 +339,43 @@ export default function DashboardPage() {
                           </span>
                         )}
                         {player.age && (
-                          <span className="text-[10px] font-[var(--font-mono)]" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="text-[11px] stat-num" style={{ color: 'var(--color-text-muted)' }}>
                             {player.age}a
+                          </span>
+                        )}
+                        {player.minutes_played != null && (
+                          <span className="text-[11px] stat-num" style={{ color: 'var(--color-text-faint)' }}>
+                            {formatNumber(player.minutes_played)}′
                           </span>
                         )}
                       </div>
                     </div>
 
                     {/* SSP badge + recommendation */}
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="flex flex-col items-end gap-1 shrink-0">
                       {player.score != null && (
                         <span
-                          className="text-[10px] font-[var(--font-mono)] font-bold px-2 py-0.5 rounded-full"
-                          style={{ color: getScoreColor(player.score), background: `${getScoreColor(player.score)}15` }}
+                          className="text-[12px] stat-num font-bold px-2 py-0.5 rounded"
+                          style={{
+                            color: getScoreColor(player.score),
+                            background: `${getScoreColor(player.score)}1F`,
+                            border: `1px solid ${getScoreColor(player.score)}33`,
+                          }}
                         >
                           {player.score.toFixed(1)}
                         </span>
                       )}
                       {badge && (
-                        <span className={cn('text-[8px] px-1.5 py-0.5 rounded-full font-[var(--font-display)] tracking-wider uppercase', badge.cls)}>
+                        <span className={cn('text-[9px] px-1.5 py-0.5 rounded-full font-[var(--font-display)] tracking-wider uppercase', badge.cls)}>
                           {badge.label}
                         </span>
                       )}
                     </div>
 
-                    {/* Minutes */}
-                    {player.minutes_played && (
-                      <span
-                        className="text-[10px] font-[var(--font-mono)]"
-                        style={{ color: 'var(--color-text-muted)' }}
-                      >
-                        {formatNumber(player.minutes_played)}'
-                      </span>
-                    )}
-
                     <ChevronRight
-                      size={12}
-                      strokeWidth={1.5}
-                      style={{ color: isSelected ? 'var(--color-accent)' : 'var(--color-text-muted)', opacity: 0.5 }}
+                      size={14}
+                      strokeWidth={1.75}
+                      style={{ color: isSelected ? 'var(--color-accent)' : 'var(--color-text-faint)', opacity: 0.7 }}
                     />
                   </motion.button>
                 );
@@ -421,9 +396,9 @@ export default function DashboardPage() {
               className="card-glass p-12 text-center"
               style={{ color: 'var(--color-text-muted)' }}
             >
-              <Filter size={32} className="mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Selecione um jogador para ver o perfil completo</p>
-              <p className="text-xs mt-1 opacity-60">Com radar de percentis, indices compostos e dados SkillCorner</p>
+              <Filter size={36} className="mx-auto mb-4 opacity-40" style={{ color: 'var(--color-text-faint)' }} />
+              <p className="text-[15px] font-medium" style={{ color: 'var(--color-text-secondary)' }}>Selecione um jogador para ver o perfil completo</p>
+              <p className="text-[12px] mt-1.5" style={{ color: 'var(--color-text-faint)' }}>Com radar de percentis, índices compostos e dados SkillCorner</p>
             </div>
           )}
         </div>

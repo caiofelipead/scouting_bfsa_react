@@ -142,11 +142,11 @@ export default function ContractImpactPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-          <UserPlus size={18} style={{ color: 'var(--color-accent)' }} />
+        <h1 className="page-title flex items-center gap-2.5">
+          <UserPlus size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
           Impacto de Contratação
         </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="page-subtitle">
           Análise de impacto no elenco — PlayeRank, Soccernomics, Age Curves 2.0
         </p>
       </div>
@@ -161,7 +161,7 @@ export default function ContractImpactPage() {
       <div className="card-glass rounded-lg p-5 space-y-4" style={{ overflow: 'visible', backdropFilter: 'none', WebkitBackdropFilter: 'none', position: 'relative', zIndex: 10, background: 'rgba(20, 20, 20, 0.85)' }}>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end" style={{ overflow: 'visible' }}>
           <div style={{ position: 'relative', zIndex: 20 }}>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR CANDIDATO</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>JOGADOR CANDIDATO</label>
             <div className="relative">
               <input type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)} placeholder="Digite o nome do jogador..." className="w-full px-3 py-2 rounded text-sm outline-none" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
               {debouncedSearch.length >= 2 && !selectedPlayer && players.length > 0 && (
@@ -177,7 +177,7 @@ export default function ContractImpactPage() {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>SALÁRIO R$ (opcional)</label>
+            <label className="block text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-1" style={{ color: 'var(--color-text-muted)' }}>SALÁRIO R$ (opcional)</label>
             <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="Ex: 80000" className="px-3 py-2 rounded text-sm outline-none w-40" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }} />
           </div>
           <button
@@ -206,7 +206,7 @@ export default function ContractImpactPage() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase" style={{ color: 'var(--color-text-muted)' }}>IMPACT SCORE</div>
+                <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>IMPACT SCORE</div>
                 <div className="text-3xl font-[var(--font-mono)] font-bold" style={{ color: getScoreColor(result.impact_score) }}>
                   {result.impact_score.toFixed(1)}
                 </div>
@@ -261,7 +261,7 @@ export default function ContractImpactPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Positional Need Detail */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="card-glass rounded-lg p-4">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
                 <Users size={14} /> CONTEXTO POSICIONAL
               </div>
               <div className="space-y-2 text-sm">
@@ -295,7 +295,7 @@ export default function ContractImpactPage() {
 
             {/* Quality Uplift Detail */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="card-glass rounded-lg p-4">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
                 <TrendingUp size={14} /> GANHO DE QUALIDADE
               </div>
               <div className="space-y-2 text-sm">
@@ -333,7 +333,7 @@ export default function ContractImpactPage() {
 
             {/* Tactical Complementarity */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }} className="card-glass rounded-lg p-4">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
                 <Crosshair size={14} /> COMPLEMENTARIDADE TÁTICA
               </div>
               <div className="space-y-2 text-sm">
@@ -365,7 +365,7 @@ export default function ContractImpactPage() {
 
             {/* Age Profile */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="card-glass rounded-lg p-4">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
                 <Clock size={14} /> PERFIL ETÁRIO DO ELENCO
               </div>
               <div className="space-y-2 text-sm">
@@ -406,7 +406,7 @@ export default function ContractImpactPage() {
 
             {/* Salary Efficiency */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }} className="card-glass rounded-lg p-4">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
                 <DollarSign size={14} /> EFICIÊNCIA SALARIAL
               </div>
               <div className="space-y-2 text-sm">
@@ -449,7 +449,7 @@ export default function ContractImpactPage() {
 
             {/* Risk Assessment */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.0 }} className="card-glass rounded-lg p-4">
-              <div className="text-[10px] font-[var(--font-display)] tracking-[0.1em] uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="text-[11px] font-[var(--font-display)] tracking-[0.12em] font-semibold uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
                 <Shield size={14} /> AVALIAÇÃO DE RISCO
               </div>
               <div className="space-y-2 text-sm">

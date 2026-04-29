@@ -57,7 +57,7 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
         <form onSubmit={handleSubmit} className="card-glass-accent rounded-lg p-6 space-y-4">
           <div>
             <label
-              className="block text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase mb-2"
+              className="block text-[11px] font-[var(--font-display)] tracking-[0.14em] font-semibold uppercase mb-2"
               style={{ color: 'var(--color-text-muted)' }}
             >
               USUÁRIO
@@ -90,7 +90,7 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
 
           <div>
             <label
-              className="block text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase mb-2"
+              className="block text-[11px] font-[var(--font-display)] tracking-[0.14em] font-semibold uppercase mb-2"
               style={{ color: 'var(--color-text-muted)' }}
             >
               SENHA

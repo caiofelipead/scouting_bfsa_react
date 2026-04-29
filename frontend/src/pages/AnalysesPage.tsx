@@ -472,7 +472,7 @@ function SkillCornerProfileSection({ displayName, scOverride, onOverrideChange }
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MapPin size={12} style={{ color: 'var(--color-accent)' }} />
-          <span className="text-[10px] font-[var(--font-display)] tracking-[0.15em] uppercase" style={{ color: 'var(--color-text-muted)' }}>
+          <span className="text-[11px] font-[var(--font-display)] tracking-[0.14em] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>
             RESOLUCAO DE IDENTIDADE
           </span>
         </div>
@@ -658,8 +658,8 @@ export default function AnalysesPage() {
       <div className="w-[380px] min-w-[320px] flex flex-col card-glass overflow-hidden">
         {/* Header */}
         <div className="p-4 pb-3" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-          <h1 className="font-[var(--font-display)] text-lg font-bold tracking-tight flex items-center gap-2">
-            <Eye size={18} style={{ color: 'var(--color-accent)' }} />
+          <h1 className="page-title flex items-center gap-2.5">
+            <Eye size={22} strokeWidth={2} style={{ color: 'var(--color-accent)' }} />
             Analises do Scout
           </h1>
           <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
