@@ -536,6 +536,10 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# NOTE: when overriding CORS_ORIGINS in Render, MUST include the Vercel
+# domain the frontend is served from (e.g. https://scouting-bfsa-react.vercel.app)
+# — analytics endpoints now hit Render directly from the browser, so the
+# preflight will fail without it.
 _allowed_origins = os.environ.get(
     "CORS_ORIGINS",
     "https://botafogo-sp.vercel.app,https://scouting-bfsa-react.vercel.app,https://scouting-bfsa-react.onrender.com,http://localhost:5173",
