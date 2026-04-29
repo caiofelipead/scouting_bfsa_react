@@ -135,10 +135,13 @@ def resolve_actual_league(team_name: str, fallback_liga_tier: str = None) -> str
 # ── Simple TTL cache for heavy endpoint results ──────────────────────
 
 class _TTLCache:
-    """Minimal in-memory cache with time-based expiry (no dependencies)."""
+    """Minimal in-memory cache with time-based expiry and a hard size cap
+    so heavy endpoint payloads can't grow the process without bound.
+    """
 
-    def __init__(self, ttl_seconds: int = 300):
+    def __init__(self, ttl_seconds: int = 300, maxsize: int = 128):
         self.ttl = ttl_seconds
+        self.maxsize = max(1, int(maxsize))
         self._store: Dict[str, tuple] = {}  # key -> (timestamp, value)
 
     def get(self, key: str):
@@ -152,6 +155,11 @@ class _TTLCache:
         return val
 
     def set(self, key: str, value):
+        # Drop the oldest entry when the cache is full (FIFO is good enough
+        # for our cold/hot endpoint mix and keeps the ceiling predictable).
+        if key not in self._store and len(self._store) >= self.maxsize:
+            oldest_key = next(iter(self._store))
+            del self._store[oldest_key]
         self._store[key] = (time.time(), value)
 
     def make_key(self, *args) -> str:
@@ -162,7 +170,7 @@ class _TTLCache:
         self._store.clear()
 
 
-_endpoint_cache = _TTLCache(ttl_seconds=300)  # 5 min cache
+_endpoint_cache = _TTLCache(ttl_seconds=300, maxsize=128)  # 5 min, capped at 128 entries
 
 
 # ── In-memory data store (loaded on startup) ─────────────────────────
@@ -186,7 +194,11 @@ def _safe_float(val) -> Optional[float]:
 
 
 def _coerce_numeric_columns(df: pd.DataFrame, exclude_cols: set) -> pd.DataFrame:
-    """Convert string columns to numeric where possible."""
+    """Convert string columns to numeric where possible, then downcast to
+    float32/int32 to roughly halve in-memory footprint of large frames.
+    """
+    from services.data_loader import downcast_numeric
+
     for col in df.columns:
         if col in exclude_cols:
             continue
@@ -203,7 +215,7 @@ def _coerce_numeric_columns(df: pd.DataFrame, exclude_cols: set) -> pd.DataFrame
                 df[col] = numeric
         except Exception:
             pass
-    return df
+    return downcast_numeric(df)
 
 
 def _prepare_wyscout(df: pd.DataFrame) -> pd.DataFrame:

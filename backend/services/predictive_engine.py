@@ -34,17 +34,12 @@ try:
 except ImportError:
     HAS_SKLEARN = False
 
-try:
-    import xgboost as xgb
-    HAS_XGB = True
-except ImportError:
-    HAS_XGB = False
-
-try:
-    import statsmodels.api as sm
-    HAS_STATSMODELS = True
-except ImportError:
-    HAS_STATSMODELS = False
+# XGBoost availability is detected without importing the module so the
+# ~80 MB native library only loads when a model that actually needs it
+# is fit/used. Same idea for statsmodels.
+import importlib.util as _importlib_util
+HAS_XGB = _importlib_util.find_spec("xgboost") is not None
+HAS_STATSMODELS = _importlib_util.find_spec("statsmodels") is not None
 
 
 # ================================================================
@@ -431,6 +426,7 @@ class WinProbabilityModel:
         self._feature_names = feature_names
 
         if HAS_STATSMODELS:
+            import statsmodels.api as sm  # lazy: heavy compile on first import
             X_const = sm.add_constant(X)
             try:
                 logit_model = sm.Logit(y, X_const).fit(disp=0, maxiter=200, method='bfgs')

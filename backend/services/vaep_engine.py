@@ -33,31 +33,17 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Conditional imports — graceful fallback
-try:
-    import socceraction.spadl as spadl
-    import socceraction.vaep.features as features_module
-    import socceraction.vaep.labels as labels_module
-    import socceraction.vaep.formula as vaep_formula
-    HAS_SOCCERACTION = True
-except ImportError:
-    HAS_SOCCERACTION = False
+# Detect optional ML deps without importing them. socceraction pulls
+# in pandas/numpy/networkx and xgboost loads ~80MB of native code; both
+# are imported lazily inside the methods that need them.
+import importlib.util as _importlib_util
+HAS_SOCCERACTION = _importlib_util.find_spec("socceraction") is not None
+HAS_XGBOOST = _importlib_util.find_spec("xgboost") is not None
+HAS_SKLEARN = _importlib_util.find_spec("sklearn") is not None
+if not HAS_SOCCERACTION:
     logger.warning("socceraction not installed — VAEP engine will use heuristic fallback")
-
-try:
-    from xgboost import XGBClassifier
-    HAS_XGBOOST = True
-except ImportError:
-    HAS_XGBOOST = False
+if not HAS_XGBOOST:
     logger.warning("xgboost not installed — falling back to sklearn GradientBoosting")
-
-try:
-    from sklearn.ensemble import GradientBoostingClassifier
-    from sklearn.model_selection import train_test_split
-    from sklearn.metrics import brier_score_loss, log_loss
-    HAS_SKLEARN = True
-except ImportError:
-    HAS_SKLEARN = False
 
 # ── Constants ─────────────────────────────────────────────────────────
 
@@ -145,6 +131,11 @@ class VAEPEngine:
                            competition_id: int = None) -> Dict[str, Any]:
         """Full VAEP pipeline using socceraction library."""
         logger.info("Running full VAEP pipeline for season %s", season)
+
+        # Lazy import — socceraction pulls in heavy deps (pandas/numpy/networkx)
+        # and is only needed when an event-level dataset is provided.
+        import socceraction.vaep.features as features_module
+        import socceraction.vaep.labels as labels_module
 
         # Step 1: Convert to SPADL
         spadl_actions = self._convert_to_spadl(df_events)
@@ -237,6 +228,9 @@ class VAEPEngine:
         if spadl_required.issubset(set(df_events.columns)):
             return df_events
 
+        # Lazy import — only needed for the manual Wyscout→SPADL fallback path.
+        import socceraction.spadl as spadl
+
         # Manual conversion from Wyscout-like format
         actions = []
         for _, row in df_events.iterrows():
@@ -276,6 +270,7 @@ class VAEPEngine:
         X_clean = X.fillna(0)
 
         if HAS_XGBOOST:
+            from xgboost import XGBClassifier  # lazy: ~80MB native lib
             self.scoring_model = XGBClassifier(
                 n_estimators=100,
                 max_depth=3,
@@ -295,6 +290,7 @@ class VAEPEngine:
                 n_jobs=-1,
             )
         elif HAS_SKLEARN:
+            from sklearn.ensemble import GradientBoostingClassifier  # lazy
             self.scoring_model = GradientBoostingClassifier(
                 n_estimators=100, max_depth=3, learning_rate=0.1, random_state=42
             )
