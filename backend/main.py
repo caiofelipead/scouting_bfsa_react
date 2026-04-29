@@ -3046,10 +3046,14 @@ async def analyze_contract_impact(
         liga_tier = str(row_data.get("liga_tier", "")) if pd.notna(row_data.get("liga_tier")) else None
         league = resolve_actual_league(row_data.get("Equipa"), fallback_liga_tier=liga_tier)
 
+    # Filter percentile base to Serie B Brasil so quality uplift reflects the
+    # squad's competitive context, not the full multi-league dataset
+    df_league = df[df["liga_tier"] == "Serie B Brasil"] if "liga_tier" in df.columns else df
+
     engine = _get_scouting_engine()
     impact = engine.analyze_impact(
         candidate_row=row_data,
-        df_all=df,
+        df_all=df_league,
         position=pos,
         league=league,
         salary=req.salary,
