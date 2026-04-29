@@ -27,8 +27,20 @@
   ],
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://scouting-bfsa-react.onrender.com/api/:path*"
+      "source": "/api/team-logo/:path*",
+      "destination": "https://scouting-bfsa-react.onrender.com/api/team-logo/:path*"
+    },
+    {
+      "source": "/api/image-proxy/:path*",
+      "destination": "https://scouting-bfsa-react.onrender.com/api/image-proxy/:path*"
+    },
+    {
+      "source": "/api/player-face/:path*",
+      "destination": "https://scouting-bfsa-react.onrender.com/api/player-face/:path*"
+    },
+    {
+      "source": "/api/config/:path*",
+      "destination": "https://scouting-bfsa-react.onrender.com/api/config/:path*"
     }
   ]
 }
