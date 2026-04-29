@@ -6,10 +6,12 @@ Uses the same DATABASE_URL as auth.py (Neon PostgreSQL).
 
 import os
 import logging
+from contextlib import contextmanager
 from typing import Dict, Optional
 
 import pandas as pd
 import psycopg2
+from psycopg2 import InterfaceError, OperationalError
 from psycopg2.extras import execute_values
 from psycopg2 import pool as pg_pool
 
@@ -41,24 +43,117 @@ def _get_pool() -> pg_pool.SimpleConnectionPool:
     return _pool
 
 
+def _is_dead(conn) -> bool:
+    """Check whether a pooled connection is dead (server timed out, etc.).
+
+    psycopg2's `conn.closed` flag flips only when WE explicitly close the
+    connection — not when the server drops it. We probe with `SELECT 1` to
+    detect the silent-death case which is what causes "connection already
+    closed" errors after long idle periods on Neon/Render.
+    """
+    if conn is None:
+        return True
+    if getattr(conn, "closed", 0):
+        return True
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            cur.fetchone()
+        return False
+    except (OperationalError, InterfaceError, psycopg2.Error):
+        return True
+
+
 def get_connection():
-    """Return a psycopg2 connection from the pool."""
-    conn = _get_pool().getconn()
-    conn.autocommit = False
-    return conn
+    """Return a healthy psycopg2 connection from the pool.
+
+    Validates each checkout with a lightweight SELECT 1 and discards dead
+    connections (server-side timeout, broken socket, etc.) before returning.
+    Retries up to 3 times to ride out transient pool churn.
+    """
+    pool_obj = _get_pool()
+    last_err: Optional[Exception] = None
+    for _ in range(3):
+        try:
+            conn = pool_obj.getconn()
+        except Exception as e:
+            last_err = e
+            continue
+        if _is_dead(conn):
+            try:
+                pool_obj.putconn(conn, close=True)
+            except Exception:
+                pass
+            continue
+        try:
+            conn.autocommit = False
+        except Exception:
+            pass
+        return conn
+    if last_err is not None:
+        raise last_err
+    raise OperationalError("Could not obtain a live PostgreSQL connection from the pool")
 
 
 def release_connection(conn):
-    """Return a connection to the pool."""
+    """Return a connection to the pool, dropping it if it's dead."""
+    if conn is None:
+        return
     try:
-        if _pool and not _pool.closed:
-            _pool.putconn(conn)
+        if not _pool or _pool.closed:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            return
+        # Drop the conn instead of recycling if it's broken — otherwise the
+        # next caller pulls a corpse and crashes with "connection already
+        # closed".
+        if getattr(conn, "closed", 0):
+            _pool.putconn(conn, close=True)
+            return
+        _pool.putconn(conn)
     except Exception:
-        # If putconn fails, close the connection to avoid leaks
         try:
             conn.close()
         except Exception:
             pass
+
+
+@contextmanager
+def get_conn():
+    """Context manager: leases a healthy connection and always returns it.
+
+    On OperationalError/InterfaceError the connection is forcibly closed
+    (rather than recycled) so the next caller doesn't pull a stale socket.
+    """
+    conn = get_connection()
+    try:
+        yield conn
+    except (OperationalError, InterfaceError) as e:
+        logger.error("Postgres connection error: %s", e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        try:
+            if _pool and not _pool.closed:
+                _pool.putconn(conn, close=True)
+            else:
+                conn.close()
+        except Exception:
+            pass
+        conn = None  # signal finally to skip release
+        raise
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        if conn is not None:
+            release_connection(conn)
 
 
 # ── Schema ────────────────────────────────────────────────────────────
