@@ -234,14 +234,19 @@ def _get_percentile_matrix(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _fast_percentile(player_idx, col: str, perc_matrix: pd.DataFrame) -> float:
-    """O(1) percentile lookup from pre-computed matrix."""
+    """O(1) percentile lookup from pre-computed matrix.
+
+    Returns NaN if the player isn't in the percentile base (e.g. a non-Serie B
+    player ranked against a Serie B-only matrix). Callers must fall back to the
+    value-based slow path so the player is still ranked relative to that base.
+    """
     try:
         val = perc_matrix.at[player_idx, col]
         if pd.isna(val):
-            return 50.0
+            return float('nan')
         return float(val)
     except (KeyError, ValueError):
-        return 50.0
+        return float('nan')
 
 
 def invalidate_percentile_cache():
@@ -305,9 +310,10 @@ def calculate_weighted_index(player_row, metrics, df_all, position=None, _perc_m
         if val is None:
             continue
 
+        perc = float('nan')
         if use_cache and resolved in _perc_matrix.columns:
             perc = _fast_percentile(player_idx, resolved, _perc_matrix)
-        else:
+        if np.isnan(perc):  # player not in percentile base — rank by value instead
             perc = _percentile_rank(val, df_all[resolved])
 
         if _is_inverted(metric):
@@ -365,9 +371,10 @@ def calculate_overall_score(player_row, position, df_all, _perc_matrix=None):
         if val is None:
             continue
 
+        perc = float('nan')
         if use_cache and resolved in _perc_matrix.columns:
             perc = _fast_percentile(player_idx, resolved, _perc_matrix)
-        else:
+        if np.isnan(perc):  # player not in percentile base — rank by value instead
             perc = _percentile_rank(val, df_all[resolved])
 
         if metric in INVERTED_METRICS:
@@ -449,9 +456,10 @@ def calculate_metric_percentiles(player_row, position, df_all, top_n=12):
         val = _safe_float(player_row[resolved])
         if val is None:
             continue
+        perc = float('nan')
         if use_cache and resolved in perc_matrix.columns:
             perc = _fast_percentile(player_idx, resolved, perc_matrix)
-        else:
+        if np.isnan(perc):  # player not in percentile base — rank by value instead
             perc = _percentile_rank(val, df_all[resolved])
         if metric in INVERTED_METRICS:
             perc = 100.0 - perc

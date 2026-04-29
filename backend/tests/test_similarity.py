@@ -100,6 +100,41 @@ class TestSimilarityService:
             assert isinstance(score, (int, float))
             assert 0 <= score <= 100
 
+    def test_metric_percentiles_rank_non_league_player_by_value(self):
+        """Players outside the percentile base (e.g. Serie A vs Serie B base)
+        must still be ranked by value, not silently default to 50%."""
+        from services.similarity import (
+            calculate_metric_percentiles, invalidate_percentile_cache,
+            POSITION_WEIGHTS, INVERTED_METRICS,
+        )
+        positions = list(POSITION_WEIGHTS.keys())
+        if not positions:
+            pytest.skip("No position weights configured")
+        pos = positions[0]
+        metric = next(
+            (m for m in POSITION_WEIGHTS[pos] if m not in INVERTED_METRICS),
+            None,
+        )
+        if metric is None:
+            pytest.skip("No non-inverted metric for this position")
+
+        invalidate_percentile_cache()
+        df = pd.DataFrame({
+            metric: [0.1, 0.2, 0.3, 0.4, 0.9],
+            "liga_tier": [
+                "Serie B Brasil", "Serie B Brasil", "Serie B Brasil",
+                "Serie B Brasil", "Top League",
+            ],
+        })
+        df_league = df[df["liga_tier"] == "Serie B Brasil"]
+
+        # Player from outside Serie B (idx 4, value 0.9 above all Serie B values)
+        outsider = df.loc[4]
+        result = calculate_metric_percentiles(outsider, pos, df_league, top_n=1)
+        assert result, "Expected at least one percentile"
+        pct = next(iter(result.values()))
+        assert pct == 100.0, f"Outsider should rank 100% vs Serie B, got {pct}"
+
 
 @pytest.mark.asyncio
 async def test_rankings_requires_auth(client):
